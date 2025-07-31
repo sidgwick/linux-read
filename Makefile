@@ -104,10 +104,15 @@ mbr:
 
 	$(CPP) -traditional boot/bootsect0.S -o boot/bootsect0.s
 	$(AS86) -o boot/bootsect0.o boot/bootsect0.s
-	$(LD86) -s -o boot/bootsect0.bin boot/bootsect0.o
+	$(LD86) -s -d -o boot/bootsect0.bin boot/bootsect0.o
 
 	objdump -D -b binary -mi386 -Maddr16,data16 boot/bootsect1.bin > BOOTSET11
 	objdump -D -b binary -mi386 -Maddr16,data16 boot/bootsect0.bin > BOOTSET01
+
+	cat BOOTSET01  | sed 's/^[^:]*://g' > BOOTSET0
+	cat BOOTSET11  | sed 's/^[^:]*://g' > BOOTSET1
+	
+	diff -u BOOTSET0 BOOTSET1 > x.patch
 
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \

@@ -54,31 +54,31 @@ SWAP_DEV = 0
 
 .globl start
 start:
-        movw $BOOTSEG, %ax
-        movw %ax, %ds
-        movw $INITSEG, %ax
-        movw %ax, %es
-        movw $256, %cx
-        subw %si, %si
-        subw %di, %di
+        mov $BOOTSEG, %ax
+        mov %ax, %ds
+        mov $INITSEG, %ax
+        mov %ax, %es
+        mov $256, %cx
+        sub %si, %si
+        sub %di, %di
         rep movsw
         ljmp $INITSEG, $go
 
 go:
-        movw %cs, %ax
-        movw $0xfef4, %dx  # arbitrary value >>512 - disk parm size
+        mov %cs, %ax
+        mov $0xfef4, %dx  # arbitrary value >>512 - disk parm size
 
         # 目前设置 DX 为 0xfef4, 此值通过计算得出:
         #   INITSEG 段末尾(0x9ffff) 减去 12 字节(用于保存寄存器状态), 即 0x9ff00 - 12 = 0x9fef4
         #   由于段基址 CS=0x9000, 偏移量 0xfef4 对应物理地址 (0x9000<<4 + 0xfef4) = 0x9fef4, 接近 0x9ffff
         # TODO: 为什么要设置这个值呢?
 
-        movw %ax, %ds
-        movw %ax, %es
-        pushw %ax
+        mov %ax, %ds
+        mov %ax, %es
+        push %ax
 
-        movw %ax, %ss # put stack at 0x9ff00 - 12.
-        movw %dx, %sp
+        mov %ax, %ss # put stack at 0x9ff00 - 12.
+        mov %dx, %sp
 
 /*
  *	Many BIOS's default disk parameter tables will not
@@ -105,8 +105,8 @@ go:
  */
 
         ### -------- 拷贝磁盘参数表
-        pushw $0
-        popw %fs
+        push $0
+        pop %fs
         mov $0x78, %bx # fs:bx is parameter table address
         # seg 并非独立指令, 而是​​段超越前缀​​(Segment Override Prefix), 它强制指定下一条指令使用的段寄存器, 覆盖默认的段寄存器设置
         # lgs 用于​​加载远指针(48 位地址)到 GS 段寄存器和指定的通用寄存器
@@ -114,22 +114,22 @@ go:
         # // lgs	si,(bx)			! gs:si is source
         lgs %fs:(%bx), %si # 从内存(0:0x78位置)加载 段和偏移量, 执行完成后 GS:SI 指向的就是这个参数表指向的位置
 
-        movw %dx, %di # DX 之前被设置到内存位置稍高的区域了(0xfef4)
+        mov %dx, %di # DX 之前被设置到内存位置稍高的区域了(0xfef4)
         mov $6, %cx # 拷贝 6*2 = 12 字节
         cld
         rep movsw %gs:(%si), %es:(%di)
 
-        movw %dx, %di
+        mov %dx, %di
         movb $18, 4(%di) # patch sector count --> 把磁盘参数表里面的最大扇区, 调整成 18
 
         # BX=0x78 --- 让中断向量 0x1E, 0x20 的值指向新表
         # TODO: 好像没啥作用?
-        movw %di, %fs:(%bx)
-        movw %es, %fs:2(%bx)
+        mov %di, %fs:(%bx)
+        mov %es, %fs:2(%bx)
 
         ### -------- 拷贝磁盘参数表(结束)
 
-        popw %ax
+        pop %ax
         mov %ax, %fs
         mov %ax, %gs
 
@@ -164,7 +164,7 @@ go:
         jnc ok_load_setup # ok - continue, TODO: 编译出来是 jne 指令?
 
         # 读取出错的情况
-        pushw %ax   # dump error code
+        push %ax   # dump error code
         call print_nl
         mov %sp, %bp
         call print_hex
@@ -202,9 +202,9 @@ go:
         # 下句保存每磁道扇区数, 对于软盘来说(dl=0), 其最大磁道号不会超过 256
         # ch 已经足够表示它, 因此 cl 的位 6-7 肯定为 0. 只需要设置ch=0, 此时 cx 中就是每磁道扇区数
         xor %ch, %ch
-        movw %cx, %cs:sectors
-        movw $INITSEG, %ax
-        movw %ax, %es
+        mov %cx, %cs:sectors
+        mov $INITSEG, %ax
+        mov %ax, %es
 
         # Print some inane message
         # BIOS 0x10
@@ -233,8 +233,8 @@ go:
         #   DH = Row
         #   DL = Column
         #   ES:BP = Offset of string
-        movw $9, %cx
-        movw $0x0007, %bx # page 0, attribute 7 (normal)
+        mov $9, %cx
+        mov $0x0007, %bx # page 0, attribute 7 (normal)
         mov $msg1, %bp
         mov $0x1301, %ax # write string, move cursor
         int $0x10
@@ -431,7 +431,7 @@ print_all:
 #   BH=Page Number
 #   BL=Color (only in graphic mode)
 print_nl:
-        movw $0xe0d, %ax # CR
+        mov $0xe0d, %ax # CR
         int $0x10
         movb $0xa, %al # LF
         int $0x10
@@ -442,8 +442,8 @@ print_nl:
  * pointed to by ss:bp in hexadecmial.
  */
 print_hex:
-        movw $4, %cx # 4 hex digits
-        movw (%bp), %dx # load word into dx, `bp` 默认就是配合 SS 使用
+        mov $4, %cx # 4 hex digits
+        mov (%bp), %dx # load word into dx, `bp` 默认就是配合 SS 使用
     print_digit:
         rolw $4, %dx # rotate so that lowest 4 bits are used
         movb $0x0e, %ah
