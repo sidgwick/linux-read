@@ -92,6 +92,7 @@ boot/setup.s:	boot/setup.S include/linux/config.h
 
 boot/bootsect.s:	boot/bootsect.S include/linux/config.h
 	$(CPP) -traditional boot/bootsect.S -o boot/bootsect.s
+	$(CPP) -traditional boot/bootsect1.S -o boot/bootsect1.s
 
 boot/bootsect:	boot/bootsect.s
 	$(AS86) -o boot/bootsect.o boot/bootsect.s
