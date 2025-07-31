@@ -92,11 +92,19 @@ boot/setup.s:	boot/setup.S include/linux/config.h
 
 boot/bootsect.s:	boot/bootsect.S include/linux/config.h
 	$(CPP) -traditional boot/bootsect.S -o boot/bootsect.s
-	$(CPP) -traditional boot/bootsect1.S -o boot/bootsect1.s
 
 boot/bootsect:	boot/bootsect.s
 	$(AS86) -o boot/bootsect.o boot/bootsect.s
 	$(LD86) -s -o boot/bootsect boot/bootsect.o
+
+mbr:
+	cpp -nostdinc -Iinclude -traditional boot/bootsect1.S -o boot/bootsect1.s
+	as -o boot/bootsect1.o boot/bootsect1.s
+	ld -e start -z noexecstack --oformat=binary -o boot/bootsect1.bin boot/bootsect1.o --Ttext=0
+
+	$(CPP) -traditional boot/bootsect0.S -o boot/bootsect0.s
+	$(AS86) -o boot/bootsect0.o boot/bootsect0.s
+	$(LD86) -s -o boot/bootsect0.bin boot/bootsect0.o
 
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
