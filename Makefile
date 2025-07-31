@@ -98,21 +98,21 @@ boot/bootsect:	boot/bootsect.s
 	$(LD86) -s -o boot/bootsect boot/bootsect.o
 
 mbr:
-	cpp -nostdinc -Iinclude -traditional boot/bootsect1.S -o boot/bootsect1.s
-	as -o boot/bootsect1.o boot/bootsect1.s
-	ld -e start -z noexecstack --oformat=binary -o boot/bootsect1.bin boot/bootsect1.o --Ttext=0
+	cpp -nostdinc -Iinclude -traditional boot/setup1.S -o boot/setup1.s
+	as -o boot/setup1.o boot/setup1.s
+	ld -e start -z noexecstack --oformat=binary -o boot/setup1.bin boot/setup1.o --Ttext=0
 
-	$(CPP) -traditional boot/bootsect0.S -o boot/bootsect0.s
-	$(AS86) -o boot/bootsect0.o boot/bootsect0.s
-	$(LD86) -s -d -o boot/bootsect0.bin boot/bootsect0.o
+	$(CPP) -traditional boot/setup0.S -o boot/setup0.s
+	$(AS86) -o boot/setup0.o boot/setup0.s
+	$(LD86) -s -d -o boot/setup0.bin boot/setup0.o
 
-	objdump -D -b binary -mi386 -Maddr16,data16 boot/bootsect1.bin > BOOTSET11
-	objdump -D -b binary -mi386 -Maddr16,data16 boot/bootsect0.bin > BOOTSET01
+	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup1.bin > SETUP11
+	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup0.bin > SETUP01
 
-	cat BOOTSET01  | sed 's/^[^:]*://g' > BOOTSET0
-	cat BOOTSET11  | sed 's/^[^:]*://g' > BOOTSET1
+	cat SETUP01  | sed 's/^[^:]*://g' > SETUP0
+	cat SETUP11  | sed 's/^[^:]*://g' > SETUP1
 	
-	diff -u BOOTSET0 BOOTSET1 > x.patch
+	diff -u SETUP0 SETUP1 > x.patch
 
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
