@@ -1,72 +1,109 @@
-# !
-# ! setup.s  (C) 1991 Linus Torvalds
-# !
-# ! setup.s is responsible for getting the system data from the BIOS,
-# ! and putting them into the appropriate places in system memory.
-# ! both setup.s and system has been loaded by the bootblock.
-# !
-# ! This code asks the bios for memory/disk/other parameters, and
-# ! puts them in a "safe" place: 0x90000-0x901FF, ie where the
-# ! boot-block used to be. It is then up to the protected mode
-# ! system to read them from there before the area is overwritten
-# ! for buffer-blocks.
-# !
 #
-# ! NOTE! These had better be the same as in bootsect.s!
-# #include <linux/config.h>
+# setup.s  (C) 1991 Linus Torvalds
 #
-# INITSEG  = DEF_INITSEG ! we move boot here - out of the way
-# SYSSEG   = DEF_SYSSEG ! system loaded at 0x10000 (65536).
-# SETUPSEG = DEF_SETUPSEG ! this is the current segment
+# setup.s is responsible for getting the system data from the BIOS,
+# and putting them into the appropriate places in system memory.
+# both setup.s and system has been loaded by the bootblock.
 #
-# .globl begtext, begdata, begbss, endtext, enddata, endbss
-# .text
-# begtext:
-# .data
-# begdata:
-# .bss
-# begbss:
-# .text
+# This code asks the bios for memory/disk/other parameters, and
+# puts them in a "safe" place: 0x90000-0x901FF, ie where the
+# boot-block used to be. It is then up to the protected mode
+# system to read them from there before the area is overwritten
+# for buffer-blocks.
 #
-# entry start
-# start:
 #
-# ! ok, the read went well so we get current cursor position and save it for
-# ! posterity.
-#
-#  mov ax,#INITSEG ! this is done in bootsect already, but...
-#  mov ds,ax
-#
-# ! Get memory size (extended mem, kB)
-#
-#  mov ah,#0x88
-#  int 0x15
-#  mov [2],ax
-#
-# ! check for EGA/VGA and some config parameters
-#
-#  mov ah,#0x12
-#  mov bl,#0x10
-#  int 0x10
-#  mov [8],ax
-#  mov [10],bx
-#  mov [12],cx
-#  mov ax,#0x5019
-#  cmp bl,#0x10
-#  je novga
-#  call chsvga
-# novga: mov [14],ax
-#  mov ah,#0x03 ! read cursor pos
-#  xor bh,bh
-#  int 0x10  ! save it in known place, con_init fetches
-#  mov [0],dx  ! it from 0x90000.
-#
-# ! Get video-card data:
-#
-#  mov ah,#0x0f
-#  int 0x10
-#  mov [4],bx  ! bh = display page
-#  mov [6],ax  ! al = video mode, ah = window width
+# NOTE! These had better be the same as in bootsect.s!
+
+#include <linux/config.h>
+
+INITSEG  = DEF_INITSEG # we move boot here - out of the way
+SYSSEG   = DEF_SYSSEG # system loaded at 0x10000 (65536).
+SETUPSEG = DEF_SETUPSEG # this is the current segment
+
+.code16
+
+.globl start, begtext, begdata, begbss, endtext, enddata, endbss
+
+.text
+begtext:
+
+.data
+begdata:
+
+.bss
+begbss:
+
+.text
+
+start:
+        # ok, the read went well so we get current cursor position and save it for
+        # posterity.
+
+        mov $INITSEG, %ax
+        mov %ax, %ds
+
+        # BIOS INT 15h AH=88h: Get Extended Memory Size
+        # 返回值: AX = number of contiguous KB above 1M - 注意是超过 1M 的扩展内存大小
+        #        若出错则 CF 置位, ax=错误码
+
+        # Get memory size (extended mem, kB)
+        mov $0x88, %ah
+        int $0x15
+        mov %ax, 0x2 # 保存到 INITSEG:0x02 位置
+
+        # BIOS INT 10h AH=12h: detect EGA/VGA
+        # 检查显示方式(EGA/VGA)并取参数。
+        # 
+        # 返回:
+        #    bh=显示状态: 0x00-彩色模式,I/0端口=0x3dX:0x01-单色模式,I/0端口=0x3bX
+        #    bl=安装的显示内存: 0x00-64k;0x01-128k;0x02 - 192k; 0x03 = 256k。
+        #    CX=显示卡特性参数
+
+        # check for EGA/VGA and some config parameters
+        mov $0x12, %ah
+        mov $0x10, %bl
+        int $0x10
+
+        mov %ax, 8
+        mov %bx, 10
+        mov %cx, 12
+
+        mov $0x5019, %ax
+        cmp $0x10, %bl
+        je novga
+        call chsvga
+    novga:
+        mov %ax, 14
+        mov $0x03, %ah # read cursor pos
+        xor %bh, %bh
+        int $0x10 # save it in known place, con_init fetches it from 0x90000
+        mov %dx, 0
+
+        # BIOS INT 0x10, AH = 0xF -- get video page and mode
+        #
+        # 下面这段用于取显示卡当前显示模式
+        # 返回:
+        #    ah=字符列数
+        #    al=显示模式
+        #    bh=当前显示页
+        #    
+        #    0x90004(1字)存放当前页
+        #    0x90006存放显示模式
+        #    0x90007存放字符列数
+
+        # Get video-card data:
+        mov $0x0f, %ah
+        int $0x10
+        mov %bx, 4 # bh = display page
+        mov %ax, 6 # al = video mode, ah = window width
+
+
+/*
+
+*/
+
+
+
 #
 # ! Get hd0 data
 #
@@ -207,12 +244,12 @@
 #  test al,#2  ! is input buffer full?
 #  jnz empty_8042 ! yes - loop
 #  ret
-#
-# ! Routine trying to recognize type of SVGA-board present (if any)
-# ! and if it recognize one gives the choices of resolution it offers.
-# ! If one is found the resolution chosen is given by al,ah (rows,cols).
-#
-# chsvga: cld
+
+# Routine trying to recognize type of SVGA-board present (if any)
+# and if it recognize one gives the choices of resolution it offers.
+# If one is found the resolution chosen is given by al,ah (rows,cols).
+chsvga:
+    cld
 #  push ds
 #  push cs
 #  pop ds
