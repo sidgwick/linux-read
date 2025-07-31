@@ -94,13 +94,13 @@ boot/bootsect.s:	boot/bootsect.S include/linux/config.h
 	$(CPP) -traditional boot/bootsect.S -o boot/bootsect.s
 
 boot/bootsect:	boot/bootsect.s
-	$(AS86) -o boot/bootsect.o boot/bootsect.s
-	$(LD86) -s -o boot/bootsect boot/bootsect.o
+	as -o boot/bootsect.o boot/bootsect.s
+	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/bootsect boot/bootsect.o
 
 mbr:
 	cpp -nostdinc -Iinclude -traditional boot/setup1.S -o boot/setup1.s
 	as -o boot/setup1.o boot/setup1.s
-	ld -e start -z noexecstack --oformat=binary -o boot/setup1.bin boot/setup1.o --Ttext=0
+	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/setup1.bin boot/setup1.o --Ttext=0
 
 	$(CPP) -traditional boot/setup0.S -o boot/setup0.s
 	$(AS86) -o boot/setup0.o boot/setup0.s
