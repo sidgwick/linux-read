@@ -41,12 +41,12 @@ begbss:
 
 .text
 
-SETUPLEN = 4				# nr of setup-sectors
-BOOTSEG  = 0x07c0			# original address of boot-sector
-INITSEG  = DEF_INITSEG			# we move boot here - out of the way
-SETUPSEG = DEF_SETUPSEG			# setup starts here
-SYSSEG   = DEF_SYSSEG			# system loaded at 0x10000 (65536).
-ENDSEG   = SYSSEG + SYSSIZE		# where to stop loading
+SETUPLEN = 4    # nr of setup-sectors
+BOOTSEG  = 0x07c0   # original address of boot-sector
+INITSEG  = DEF_INITSEG   # we move boot here - out of the way
+SETUPSEG = DEF_SETUPSEG   # setup starts here
+SYSSEG   = DEF_SYSSEG   # system loaded at 0x10000 (65536).
+ENDSEG   = SYSSEG + SYSSIZE  # where to stop loading
 
 # ROOT_DEV & SWAP_DEV are now written by "build".
 ROOT_DEV = 0
@@ -156,19 +156,19 @@ go:
     #       AH  Return Code
     #       AL  Actual Sectors Read Count
     load_setup:
-        xor	%dx, %dx # drive 0, head 0
-        mov	$0x0002, %cx # sector 2, track 0
-        mov	$0x0200, %bx # address = 512, in INITSEG
-        mov	$(0x0200+SETUPLEN), %ax	# service 2, nr of sectors
-        int	$0x13 # read it
-        jnc	ok_load_setup # ok - continue, TODO: 编译出来是 jne 指令?
+        xor %dx, %dx # drive 0, head 0
+        mov $0x0002, %cx # sector 2, track 0
+        mov $0x0200, %bx # address = 512, in INITSEG
+        mov $(0x0200+SETUPLEN), %ax # service 2, nr of sectors
+        int $0x13 # read it
+        jnc ok_load_setup # ok - continue, TODO: 编译出来是 jne 指令?
 
         # 读取出错的情况
-        pushw %ax			# dump error code
+        pushw %ax   # dump error code
         call print_nl
-        mov	%sp, %bp
+        mov %sp, %bp
         call print_hex
-        pop	%ax
+        pop %ax
 
         # 重新读
         xor %ah, %ah # reset FDC
@@ -267,7 +267,7 @@ go:
     undef_root:
         jmp undef_root
     root_defined:
-        mov	%ax, %cs:root_dev
+        mov %ax, %cs:root_dev
 
         # after that (everyting loaded), we jump to
         # the setup-routine loaded directly after
@@ -419,7 +419,7 @@ print_all:
         int $0x10
 
     no_reg:
-        add	$2, %bp # next register
+        add $2, %bp # next register
         call print_hex # print it
         pop %cx
         loop print_loop
@@ -485,7 +485,7 @@ kill_motor:
         pop %dx
         ret
 
-sread: .word 1+SETUPLEN	# sectors read of current track - 当前已经读取的扇区数量
+sread: .word 1+SETUPLEN # sectors read of current track - 当前已经读取的扇区数量
 head: .word 0 # current head - 当前磁头号
 track: .word 0 # current track - 当前磁道号
 sectors: .word 0 # 磁盘一个磁道有多少扇区
@@ -507,7 +507,9 @@ boot_flag:
 
 .text
 endtext:
+
 .data
 enddata:
+
 .bss
 endbss:
