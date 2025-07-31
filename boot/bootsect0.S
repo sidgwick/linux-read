@@ -377,6 +377,9 @@ kill_motor:
 	pop dx
 	ret
 
+sread:	.word 1+SETUPLEN	! sectors read of current track
+head:	.word 0			! current head
+track:	.word 0			! current track
 sectors:
 	.word 0
 
@@ -391,10 +394,6 @@ root_dev:
 	.word ROOT_DEV
 boot_flag:
 	.word 0xAA55
-
-sread:	.word 1+SETUPLEN	! sectors read of current track
-head:	.word 0			! current head
-track:	.word 0			! current track
 
 .text
 endtext:

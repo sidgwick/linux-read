@@ -236,7 +236,7 @@ go:
         movw $9, %cx
         movw $0x0007, %bx # page 0, attribute 7 (normal)
         mov $msg1, %bp
-        mov 0x1301, %ax # write string, move cursor
+        mov $0x1301, %ax # write string, move cursor
         int $0x10
 
         # ok, we've written the message, now
@@ -282,7 +282,7 @@ go:
     # in:	es - starting address segment (normally 0x1000)
 read_it:
         mov %es, %ax
-        test %ax, 0x0FFF
+        test $0xfff, %ax
     die:
         jne die # es must be at 64kB boundary
 
@@ -295,7 +295,7 @@ read_it:
 
     ok1_read:
         mov %cs:sectors, %ax # 每个磁道扇区数, 上面费劲算好的
-        sub $sread, %ax # sread 是当前磁道已经读取的数量
+        sub sread, %ax # sread 是当前磁道已经读取的数量
         mov %ax, %cx # cx = 当前未读扇区数量
         shl $9, %cx # 乘上 512, 这是未读取的字节数量
         add %bx, %cx # bx 保存的是本次读取完成之后, 段内共计字节数量
@@ -318,11 +318,11 @@ read_it:
     ok2_read:
         call read_track # 读取一个磁道
         mov %ax, %cx # AX 是读取的扇区数量
-        add $sread, %ax
+        add sread, %ax
         cmp %cs:sectors, %ax
         jne ok3_read
         mov $1, %ax
-        sub $head, %ax
+        sub head, %ax
         jne ok4_read
         incw track
     ok4_read:
@@ -351,11 +351,12 @@ read_track:
 
         popa
 
-        mov $track, %dx # 当前磁道号, 磁道号不会超过 255
-        mov $sread, %cx # 当前已经读取的扇区数量
+
+        mov track, %dx # 当前磁道号, 磁道号不会超过 255
+        mov sread, %cx # 当前已经读取的扇区数量
         inc %cx
         mov %dl, %ch # CX, DX 都不会超过 255
-        mov $head, %dx # 当前磁头号
+        mov head, %dx # 当前磁头号
         mov %dl, %dh
         and $0x0100, %dx # 磁头号不会大于 1, 因此只留第 4bit, DL 是驱动器号
         mov $2, %ah # 0x13 中断的 2 号功能, 搜索 `Read Sectors From Drive` 看注解
@@ -479,7 +480,7 @@ print_hex:
 kill_motor:
         push %dx
         mov $0x3f2, %dx # 软驱控制卡的数字输出寄存器(DOR)端口, 只写
-        movb $0b00000000, %al # A驱动器, 关闭FDC, 禁止DMA和中断请求, 关闭马达
+        xor %al, %al # A驱动器, 关闭FDC, 禁止DMA和中断请求, 关闭马达
         outb %al, (%dx)
         pop %dx
         ret
