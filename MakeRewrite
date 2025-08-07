@@ -1,12 +1,12 @@
-aa = boot/setup0.S
-ab = boot/setup0.s
-ac = boot/setup0.o
-ad = boot/setup0.bin
+.PHONY: rewrite
 
-ba = boot/setup1.S
-bb = boot/setup1.s
-bc = boot/setup1.o
-bd = boot/setup1.bin
+ab = boot/head0.s
+ac = boot/head0.o
+ad = boot/head0.bin
+
+bb = boot/head1.s
+bc = boot/head1.o
+bd = boot/head1.bin
 
 AS86 = as86 -0 -a
 LD86 = ld86 -0
@@ -19,11 +19,9 @@ CFLAGS = -Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs -mstring
 CPP	= cpp -nostdinc -Iinclude
 
 rewrite:
-	$(CPP) -traditional -o $(ab) $(aa)
-	$(AS86) -o $(ac) $(ab)
-	$(LD86) -s -d -o $(ad) $(ac)
+	as -o $(ac) $(ab)
+	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o $(ad) $(ac)
 
-	$(CPP) -traditional -o $(bb) $(ba)
 	as -o $(bc) $(bb)
 	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o $(bd) $(bc)
 

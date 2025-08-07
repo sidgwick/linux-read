@@ -15,8 +15,4 @@ explain.txt
 
 a
 b
-boot/setup0.bin
-boot/setup0.s
-boot/setup1.bin
-boot/setup1.s
-
+boot/*.bin
