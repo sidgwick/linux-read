@@ -2,6 +2,9 @@
 # if you want the ram-disk device, define this to be the
 # size in blocks.
 #
+
+.PHONY: clean rewrite
+
 RAMDISK = #-DRAMDISK=512
 
 AS86	=as86 -0 -a
@@ -97,22 +100,22 @@ boot/bootsect:	boot/bootsect.s
 	as -o boot/bootsect.o boot/bootsect.s
 	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/bootsect boot/bootsect.o
 
-mbr:
-	cpp -nostdinc -Iinclude -traditional boot/setup1.S -o boot/setup1.s
-	as -o boot/setup1.o boot/setup1.s
-	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/setup1.bin boot/setup1.o --Ttext=0
-
-	$(CPP) -traditional boot/setup0.S -o boot/setup0.s
+rewrite:
+	$(CPP) -traditional -o boot/setup0.s boot/setup0.S
 	$(AS86) -o boot/setup0.o boot/setup0.s
 	$(LD86) -s -d -o boot/setup0.bin boot/setup0.o
 
-	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup1.bin > SETUP11
-	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup0.bin > SETUP01
+	$(CPP) -traditional -o boot/setup1.s boot/setup1.S
+	as -o boot/setup1.o boot/setup1.s
+	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/setup1.bin boot/setup1.o
 
-	cat SETUP01  | sed 's/^[^:]*://g' > SETUP0
-	cat SETUP11  | sed 's/^[^:]*://g' > SETUP1
-	
-	diff -u SETUP0 SETUP1 > x.patch
+	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup0.bin | \
+		sed 's/^[^:]*://g' > a
+
+	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup1.bin | \
+		sed 's/^[^:]*://g' > b
+
+	diff --color -u a b
 
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
