@@ -25,15 +25,6 @@ SETUPSEG = DEF_SETUPSEG # this is the current segment
 .globl start, begtext, begdata, begbss, endtext, enddata, endbss
 
 .text
-begtext:
-
-.data
-begdata:
-
-.bss
-begbss:
-
-.text
 
 start:
         # ok, the read went well so we get current cursor position and save it for
@@ -49,35 +40,38 @@ start:
         # Get memory size (extended mem, kB)
         mov $0x88, %ah
         int $0x15
-        mov %ax, 0x2 # 保存到 INITSEG:0x02 位置
+        mov %ax, 0x02 # 保存到 INITSEG:0x02 位置
 
         # BIOS INT 10h AH=12h: detect EGA/VGA
         # 检查显示方式(EGA/VGA)并取参数。
         # 
         # 返回:
-        #    bh=显示状态: 0x00-彩色模式,I/0端口=0x3dX:0x01-单色模式,I/0端口=0x3bX
-        #    bl=安装的显示内存: 0x00-64k;0x01-128k;0x02 - 192k; 0x03 = 256k。
-        #    CX=显示卡特性参数
+        #    AH = ​​开关设置状态​​(如视频模式, 显示组合码)
+        #    AL = ​​视频模式状态​​(如当前模式是否有效)
+        #    BH = 显示状态: 0x00-彩色模式,I/0端口=0x3dX:0x01-单色模式,I/0端口=0x3bX
+        #    BL = 安装的显示内存: 0x00-64k;0x01-128k;0x02 - 192k; 0x03 = 256k。
+        #    CX = 显示卡特性参数
 
         # check for EGA/VGA and some config parameters
         mov $0x12, %ah
         mov $0x10, %bl
         int $0x10
 
-        mov %ax, 8
-        mov %bx, 10
-        mov %cx, 12
+        mov %ax, 0x08
+        mov %bx, 0x0a
+        mov %cx, 0x0c
 
-        mov $0x5019, %ax
-        cmp $0x10, %bl
+        mov $0x5019, %ax # 默认是 0x50=80 列, 0x19=25 行
+        cmp $0x10, %bl # ​​基础 EGA 适配器​​(无 VGA 扩展功能)
         je novga
         call chsvga
     novga:
-        mov %ax, 14
+        mov %ax, 0x0e
         mov $0x03, %ah # read cursor pos
         xor %bh, %bh
-        int $0x10 # save it in known place, con_init fetches it from 0x90000
-        mov %dx, 0
+        int $0x10
+        # save it in known place, con_init fetches it from 0x90000
+        mov %dx, 0 # 光标位置
 
         # BIOS INT 0x10, AH = 0xF -- get video page and mode
         #
@@ -98,7 +92,22 @@ start:
         mov %ax, 6 # al = video mode, ah = window width
 
 
+
 /*
+
+struct info {
+    uint16_t cursor;         // 0x00, 光标位置
+    uint16_t extended_mem;   // 0x02, 扩展内存大小
+    uint16_t display_page;   // 0x04, display page
+    uint8_t display_mode;    // 0x06, video mode
+    uint8_t display_columns; // 0x07, window width
+    uint16_t display_???;    // 0x08, 显示配置信息
+    uint8_t display_memory;  // 0x0a, 显示内存, 0x00-64k, 0x01-128k, 0x02-192k, 0x03-256k
+    uint8_t display_status;  // 0x0b, 显示状态, 0x00-彩色模式(I/0端口=0x3dX), 0x01-单色模式(I/0端口=0x3bX)
+    uint16_t display_card;   // 0x0c, 显示卡特性参数
+    uint8_t ;                // 0x0e, 屏幕行行数
+    uint8_t ;                // 0x0f, 屏幕行列数
+}
 
 */
 
