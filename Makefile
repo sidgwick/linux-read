@@ -3,8 +3,6 @@
 # size in blocks.
 #
 
-.PHONY: clean rewrite
-
 RAMDISK = #-DRAMDISK=512
 
 AS86	=as86 -0 -a
@@ -99,23 +97,6 @@ boot/bootsect.s:	boot/bootsect.S include/linux/config.h
 boot/bootsect:	boot/bootsect.s
 	as -o boot/bootsect.o boot/bootsect.s
 	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/bootsect boot/bootsect.o
-
-rewrite:
-	$(CPP) -traditional -o boot/setup0.s boot/setup0.S
-	$(AS86) -o boot/setup0.o boot/setup0.s
-	$(LD86) -s -d -o boot/setup0.bin boot/setup0.o
-
-	$(CPP) -traditional -o boot/setup1.s boot/setup1.S
-	as -o boot/setup1.o boot/setup1.s
-	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/setup1.bin boot/setup1.o
-
-	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup0.bin | \
-		sed 's/^[^:]*://g' > a
-
-	objdump -D -b binary -mi386 -Maddr16,data16 boot/setup1.bin | \
-		sed 's/^[^:]*://g' > b
-
-	diff --color -u a b
 
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
