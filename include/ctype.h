@@ -13,6 +13,7 @@
 extern unsigned char _ctype[];
 extern char _ctmp;
 
+// 字符特性判断宏
 #define isalnum(c) ((_ctype+1)[c]&(_U|_L|_D))
 #define isalpha(c) ((_ctype+1)[c]&(_U|_L))
 #define iscntrl(c) ((_ctype+1)[c]&(_C))
@@ -25,10 +26,16 @@ extern char _ctmp;
 #define isupper(c) ((_ctype+1)[c]&(_U))
 #define isxdigit(c) ((_ctype+1)[c]&(_D|_X))
 
+// 判断字符是否是 ascii 字符
 #define isascii(c) (((unsigned) c)<=0x7f)
+
+// 转 ascii
 #define toascii(c) (((unsigned) c)&0x7f)
 
+// 大写字母转小写
 #define tolower(c) (_ctmp=c,isupper(_ctmp)?_ctmp-('A'-'a'):_ctmp)
+
+// 小写字母转大写
 #define toupper(c) (_ctmp=c,islower(_ctmp)?_ctmp-('a'-'A'):_ctmp)
 
 #endif
