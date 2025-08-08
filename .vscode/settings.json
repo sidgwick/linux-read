@@ -1,0 +1,8 @@
+{
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+  "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+  "C_Cpp.default.compilerArgs": [
+    "-nostdinc",
+    "-Iinclude"
+  ]
+}
