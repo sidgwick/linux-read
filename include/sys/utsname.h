@@ -1,6 +1,10 @@
 #ifndef _SYS_UTSNAME_H
 #define _SYS_UTSNAME_H
 
+/**
+ * 系统名称结构头文件
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 

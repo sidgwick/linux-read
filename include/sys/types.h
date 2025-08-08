@@ -58,11 +58,11 @@ typedef unsigned short ushort;
 
 // 下面这三个定义, 都和 termios 有关
 
-// TODO: 好像是控制字, 具体干啥的要再看
+// POSIX 的 termios 结构中控制字符数组
 typedef unsigned char cc_t;
-// TODO: ???
+// 终端的接受或者发送波特率
 typedef unsigned int speed_t;
-// TODO: ???
+// POSIX 的 termios 结构中控制模式标志
 typedef unsigned long tcflag_t;
 
 // 文件描述符集, 每比特代表 1 个描述符

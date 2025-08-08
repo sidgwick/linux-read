@@ -2,6 +2,10 @@
 #define _SYS_TIME_H
 
 /**
+ * 时间功能头文件
+ */
+
+/**
  * 一些关于 gettimeofday 的资料:
  *
  * The gettimeofday function in C retrieves the current time, with precision up to microseconds.

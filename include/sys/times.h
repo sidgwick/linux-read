@@ -1,6 +1,10 @@
 #ifndef _TIMES_H
 #define _TIMES_H
 
+/**
+ * 进程中时间头文件
+ */
+
 #include <sys/types.h>
 
 struct tms {
