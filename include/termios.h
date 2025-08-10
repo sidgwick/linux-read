@@ -1,6 +1,9 @@
 #ifndef _TERMIOS_H
 #define _TERMIOS_H
 
+/**
+ * 终端输入输出函数头文件。主要定义控制异步通信口的终端接口 */
+
 #include <sys/types.h>
 
 #define TTY_BUF_SIZE 1024 // tty 中的缓冲区长度

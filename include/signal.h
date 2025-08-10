@@ -1,6 +1,10 @@
 #ifndef _SIGNAL_H
 #define _SIGNAL_H
 
+/**
+ * 信号头文件
+ * 定义信号符号常量, 信号结构以及信号操作函数原型 */
+
 #include <sys/types.h>
 
 typedef int sig_atomic_t; // 定义信号原子操作类型
