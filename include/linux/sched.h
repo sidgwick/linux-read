@@ -8,9 +8,9 @@
 // 定义系统时钟滴答频率(1百赫兹，每个滴答10ms)
 #define HZ 100
 
-#define NR_TASKS	64 // 系统中同时最多任务（进程）数
-#define TASK_SIZE	0x04000000 // 每个任务的长度（64MB）
-#define LIBRARY_SIZE	0x00400000 // 动态加载库长度（4MB）
+#define NR_TASKS	64 // 系统中同时最多任务(进程)数
+#define TASK_SIZE	0x04000000 // 每个任务的长度(64MB)
+#define LIBRARY_SIZE	0x00400000 // 动态加载库长度(4MB)
 
 // 任务长度必须是4MB的倍数
 #if (TASK_SIZE & 0x3fffff)
@@ -140,10 +140,12 @@ struct task_struct {
 	long blocked;	/* bitmap of masked signals, 进程信号屏蔽码(对应信号位图) */
 /* various fields */
 	int exit_code; // 任务执行停止的退出码，其父进程会取
-	unsigned long start_code; // 代码段地址
-	unsigned long end_code; // 代码长度（字节数）
-	unsigned long end_data; // 代码长度 + 数据长度（字节数）
+	
+    unsigned long start_code; // 代码段开始地址(绝对地址)
+	unsigned long end_code; // 代码长度(字节数)
+	unsigned long end_data; // 代码长度 + 数据长度(字节数)
 	unsigned long brk; // 总长度（字节数）
+
 	unsigned long start_stack; // 堆栈段地址
 	long pid; // 进程标识号(进程号)
 	long pgrp; // 进程组号
@@ -178,10 +180,10 @@ struct task_struct {
 /* file system info */
 	int tty;		/* -1 if no tty, so it must be signed */ // 进程使用tty终端的子设备号。-1表示没有使用
 	unsigned short umask; // 文件创建属性屏蔽位
-	struct m_inode * pwd; // 当前工作目录i节点结构指针
-	struct m_inode * root; // 根目录i节点结构指针
-	struct m_inode * executable; // 执行文件i节点结构指针
-	struct m_inode * library; // 被加载库文件i节点结构指针
+	struct m_inode * pwd; // 当前工作目录 i 节点结构指针
+	struct m_inode * root; // 根目录 i 节点结构指针
+	struct m_inode * executable; // 执行文件 i 节点结构指针
+	struct m_inode * library; // 被加载库文件 i 节点结构指针
 	unsigned long close_on_exec; // 执行时关闭文件句柄位图标志。（参见include/fcntl.h)
 	struct file * filp[NR_OPEN]; // 文件结构指针表，最多32项。表项号即是文件描述符的值
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */

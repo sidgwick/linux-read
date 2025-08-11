@@ -47,7 +47,7 @@ typedef unsigned short mode_t;
 typedef unsigned short umode_t;
 // 用于链接计数 - 软硬链接?
 typedef unsigned char nlink_t;
-// TODO: ???
+// TODO: ??? 是不是磁盘地址的意思 disk address?
 typedef int daddr_t;
 // 用于文件长度(大小)
 typedef long off_t;

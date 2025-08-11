@@ -40,6 +40,7 @@ extern inline volatile void oom(void)
 // 为了提高地址转换的效率, CPU将最近使用的页表数据存放在芯片中高速缓冲中
 // 在修改过页表信息之后, 就需要刷新该缓冲区
 // 这里使用重新加载页目录基址寄存器 cr3 的方法来进行刷新, 下面 eax = 0, 是页目录的基址
+// 还有个更精细的 invlpg 指令, 可以失效特定的 TLB 记录, Linux 没有使用
 #define invalidate() \
 __asm__("movl %%eax,%%cr3"::"a" (0))
 
@@ -48,9 +49,9 @@ __asm__("movl %%eax,%%cr3"::"a" (0))
  * Linux 0.12 内核默认支持的最大内存容量是 16MB, 可以修改这些定义以适合更多的内存 */
 #define LOW_MEM 0x100000    // 机器物理内存低端(1MB)
 extern unsigned long HIGH_MEMORY;   // 存放实际物理内存最高端地址
-#define PAGING_MEMORY (15*1024*1024)    // 分页内存15MB。主内存区最多15M
+#define PAGING_MEMORY (15*1024*1024)    // 分页内存 15MB, 主内存区最多 15M
 #define PAGING_PAGES (PAGING_MEMORY>>12)    // 分页后的物理内存页面数(3840)
-#define MAP_NR(addr) (((addr)-LOW_MEM)>>12) // 指定内存地址映射为页面号
+#define MAP_NR(addr) (((addr)-LOW_MEM)>>12) // 给定 addr, 计算 addr 所属的页面编号
 #define USED 100    // 页面被占用标志，参见449行
 
 // 内存映射字节图(1 字节代表 1 页内存), 每个页面对应的字节用于标志页面当前被引用(占用)次数

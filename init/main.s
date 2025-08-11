@@ -1,3 +1,5 @@
+
+
 	.file	"init/main.c"
 gcc_compiled.:
 .text
