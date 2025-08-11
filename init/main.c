@@ -72,8 +72,29 @@ static int sprintf(char * str, const char *fmt, ...)
 #define CON_ROWS ((*(unsigned short *)0x9000e) & 0xff)
 #define CON_COLS (((*(unsigned short *)0x9000e) & 0xff00) >> 8)
 #define DRIVE_INFO (*(struct drive_info *)0x90080)
-#define ORIG_ROOT_DEV (*(unsigned short *)0x901FC)
-#define ORIG_SWAP_DEV (*(unsigned short *)0x901FA)
+#define ORIG_ROOT_DEV (*(unsigned short *)0x901FC) // 根文件系统所在设备号
+#define ORIG_SWAP_DEV (*(unsigned short *)0x901FA) // 交换分区所在设备号
+
+/*
+
+struct info {
+    uint16_t cursor;         // 0x00, 光标位置
+    uint16_t extended_mem;   // 0x02, 扩展内存大小
+    uint16_t display_page;   // 0x04, display page
+    uint8_t display_mode;    // 0x06, video mode
+    uint8_t display_columns; // 0x07, window width
+    uint16_t display_???;    // 0x08, 显示配置信息
+    uint8_t display_memory;  // 0x0a, 显示内存, 0x00-64k, 0x01-128k, 0x02-192k, 0x03-256k
+    uint8_t display_status;  // 0x0b, 显示状态, 0x00-彩色模式(I/0端口=0x3dX), 0x01-单色模式(I/0端口=0x3bX)
+    uint16_t display_card;   // 0x0c, 显示卡特性参数
+    uint8_t ;                // 0x0e, 屏幕行行数
+    uint8_t ;                // 0x0f, 屏幕行列数
+    ....
+    16bytes ;                // 0x80, HD0 参数 - 16 字节
+    16bytes ;                // 0x90, HD1 参数 - 16 字节
+}
+
+*/
 
 /*
  * Yeah, yeah, it's ugly, but I cannot find how to do this correctly
@@ -133,14 +154,14 @@ void main(void)		/* This really IS void, no error here. */
  	ROOT_DEV = ORIG_ROOT_DEV;
  	SWAP_DEV = ORIG_SWAP_DEV;
 	sprintf(term, "TERM=con%dx%d", CON_COLS, CON_ROWS);
-	envp[1] = term;	
+	envp[1] = term;
 	envp_rc[1] = term;
  	drive_info = DRIVE_INFO;
 	memory_end = (1<<20) + (EXT_MEM_K<<10);
 	memory_end &= 0xfffff000;
 	if (memory_end > 16*1024*1024)
 		memory_end = 16*1024*1024;
-	if (memory_end > 12*1024*1024) 
+	if (memory_end > 12*1024*1024)
 		buffer_memory_end = 4*1024*1024;
 	else if (memory_end > 6*1024*1024)
 		buffer_memory_end = 2*1024*1024;

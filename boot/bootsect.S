@@ -614,9 +614,9 @@ msg1:
 .org 506
 
 swap_dev:
-    .word SWAP_DEV
+    .word SWAP_DEV // 0x1FA
 root_dev:
-    .word ROOT_DEV
+    .word ROOT_DEV // 0x1FC
 boot_flag:
     .word 0xAA55
 
