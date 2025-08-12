@@ -166,14 +166,14 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	unsigned long new_page;
 	unsigned long nr;
 
-    /* 指定的线性地址都应该是 4M 对齐的 */
+    /* 指定的线性地址都应该是 4MB 对齐的 */
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
 
     /* 找到 from, to 所属的 PDE */
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
-    size = ((unsigned) (size+0x3fffff)) >> 22; /* size 有几个 PDE */
+    size = ((unsigned) (size+0x3fffff)) >> 22; /* size 跨度有几个 PDE */
 	for( ; size-->0 ; from_dir++,to_dir++) {
         /* 如果目标页面已经存在, 就报错退出 */
 		if (1 & *to_dir)
@@ -205,7 +205,7 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 					return -1;
 				read_swap_page(this_page>>1, (char *) new_page);
 				*to_page_table = this_page;
-				*from_page_table = new_page | (PAGE_DIRTY | 7); /* TODO: 这里设置 DIRTY 的含义??? */
+				*from_page_table = new_page | (PAGE_DIRTY | 7); /* TODO: 这里设置 DIRTY 的含义, 可能是 '标记为 dirty 之后无法共享这个页' ??? */
 				continue;
 			}
 
@@ -688,7 +688,9 @@ void mem_init(long start_mem, long end_mem)
 	end_mem -= start_mem;
 	end_mem >>= 12;
 
-    /* 再把主内存区域所属的页面置为空闲 */
+    /* 再把主内存区域所属的页面置为空闲
+     * 请注意这里的处理主内存区域不是从 1M 开始的
+     * Linux 主内存区域只是 **最多** 能管理 15MB 主内存区域 */
 	while (end_mem-->0)
 		mem_map[i++]=0;
 }

@@ -56,11 +56,11 @@
 
 // 这里定义了进程运行时可能处的状态
 
-#define TASK_RUNNING		0   // 进程正在运行或已准备就绪
-#define TASK_INTERRUPTIBLE	1   // 进程处于可中断等待状态
-#define TASK_UNINTERRUPTIBLE	2   // 进程处于不可中断等待状态，主要用于I/O操作等待
-#define TASK_ZOMBIE		3   // 进程处于僵死状态，已经停止运行，但父进程还没发信号
-#define TASK_STOPPED		4   // 进程已停止
+#define TASK_RUNNING 0          // 进程正在运行或已准备就绪
+#define TASK_INTERRUPTIBLE 1    // 进程处于可中断等待状态
+#define TASK_UNINTERRUPTIBLE 2  // 进程处于不可中断等待状态，主要用于I/O操作等待
+#define TASK_ZOMBIE 3           // 进程处于僵死状态，已经停止运行，但父进程还没发信号
+#define TASK_STOPPED 4          // 进程已停止
 
 #ifndef NULL
 #define NULL ((void *) 0)
@@ -141,7 +141,7 @@ struct task_struct {
 /* various fields */
 	int exit_code; // 任务执行停止的退出码，其父进程会取
 	
-    unsigned long start_code; // 代码段开始地址(绝对地址)
+    unsigned long start_code; // 代码段开始地址(任务在 4GB 线性空间的线性地址, 在 64M 边界上)
 	unsigned long end_code; // 代码长度(字节数)
 	unsigned long end_data; // 代码长度 + 数据长度(字节数)
 	unsigned long brk; // 总长度（字节数）
@@ -152,16 +152,18 @@ struct task_struct {
 	long session; // 会话号
 	long leader; // 会话首领
 	int	groups[NGROUPS]; // 进程所属组号。一个进程可属于多个组
-	/*
+
+    /*
 	 * pointers to parent process, youngest child, younger sibling,
 	 * older sibling, respectively.  (p->father can be replaced with
 	 * p->p_pptr->pid)
 	 */
-	struct task_struct	*p_pptr; // 指向父进程的指针
-	struct task_struct	*p_cptr; // 指向最新子进程的指针
-	struct task_struct	*p_ysptr; // 指向比自己后创建的相邻进程的指针
-	struct task_struct	*p_osptr; // 指向比自己早创建的相邻进程的指针
-	unsigned short uid; // 用户标识号（用户id）
+	struct task_struct	*p_pptr; // Parent, 指向父进程的指针
+	struct task_struct	*p_cptr; // Child, 指向最新子进程的指针
+	struct task_struct	*p_ysptr; // Younger Sibling, 指向比自己后创建的相邻进程的指针
+	struct task_struct	*p_osptr; // Older Sibling, 指向比自己早创建的相邻进程的指针
+
+    unsigned short uid; // 用户标识号(用户id)
 	unsigned short euid; // 有效用户id
 	unsigned short suid; // 保存的用户id
 	unsigned short gid; // 组标识号（组id）
@@ -185,7 +187,7 @@ struct task_struct {
 	struct m_inode * executable; // 执行文件 i 节点结构指针
 	struct m_inode * library; // 被加载库文件 i 节点结构指针
 	unsigned long close_on_exec; // 执行时关闭文件句柄位图标志。（参见include/fcntl.h)
-	struct file * filp[NR_OPEN]; // 文件结构指针表，最多32项。表项号即是文件描述符的值
+	struct file * filp[NR_OPEN]; // 文件结构指针表, 最多 32 项, 表项号即是文件描述符的值
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
 	struct desc_struct ldt[3]; // 局部描述符表。0-空，1-代码段cs，2-数据和堆栈段ds&ss
 /* tss for this task */
@@ -298,10 +300,15 @@ extern int in_group_p(gid_t grp);
  *  - 7# 是第 2 个任务的 LDT
  *  - ....
  */
-#define FIRST_TSS_ENTRY 4 // 全局表中第1个任务状态段(TSS)描述符的选择符索引号
-#define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1) // 全局表中第1个局部描述符表(LDT)描述符的选择符索引号
-#define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3)) // 计算在全局表中第n个任务的TSS段描述符的偏移量
-#define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3)) // 计算在全局表中第n个任务的LDT段描述符的偏移量
+#define FIRST_TSS_ENTRY 4 // GDT 中第 1 个 TSS 的索引号
+#define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1) // GDT 中第 1 个 LDT 的索引号
+
+/*   (n<<4)+(FIRST_TSS_ENTRY<<3)
+ * = ((n<<1)+(FIRST_TSS_ENTRY)) << 3
+ * = (TSS_n 的索引编号) << 3
+ * = TSS_n 的描述符选择子, RPL=0, TI=0 */
+#define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3)) // 第 n 个任务的 TSS 选择子
+#define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3)) // 第 n 个任务的 LDT 选择子
 #define ltr(n) __asm__("ltr %%ax"::"a" (_TSS(n))) // 装载第 N 个任务的 TSS. TaskRegister 里面装载的是 Task State Segement
 #define lldt(n) __asm__("lldt %%ax"::"a" (_LDT(n))) // 装载第 N 个任务的 LDT
 

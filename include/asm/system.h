@@ -82,7 +82,7 @@ Intel 把中断描述符分三类：任务门、中断门、陷阱门，而Linux
 // TSS 描述符或者 LDT 描述符, 他们的组成如下:
 // BBRL-RRBB
 // BBBB-LLLL
-// DONE - TODO: D/B 字段为啥没有置 1 呢?
+// TODO-DONE: D/B 字段为啥没有置 1 呢?
 ///     可能是这里只考虑设置 TSS 或者 LDT 描述符, D/B 字段和这两个都没啥关系, D/B 字段控制的是
 //          1. 代码段: 操作数位数和有效地址长度
 //          1. 数据段: 栈操作的长度和栈的边界
@@ -105,8 +105,8 @@ __asm__ ("movw $104,%1\n\t" /* TSS, LDT 的 limit 都被设置为 104 字节 */ 
      "m" (*(n+7)) \
 	)
 
-// 在 GDT 里面设置任务 TSS
+// 在 GDT 里面设置任务 N 的 TSS
 #define set_tss_desc(n,addr) _set_tssldt_desc(((char *) (n)),addr,"0x89")
 
-// 在 GDT 里面设置任务 LDT
+// 在 GDT 里面设置任务 N 的 LDT
 #define set_ldt_desc(n,addr) _set_tssldt_desc(((char *) (n)),addr,"0x82")

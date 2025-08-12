@@ -20,6 +20,9 @@
  * won't be any messing with the stack from main(), but we define
  * some others too.
  */
+
+ /* fork 函数复制了一份当前运行任务的副本
+  * 然后更新属于新进程栈等等参数, 追加到任务队列里面, 等待调度 */
 static inline _syscall0(int,fork)
 static inline _syscall0(int,pause)
 static inline _syscall1(int,setup,void *,BIOS)
@@ -177,20 +180,23 @@ void main(void)		/* This really IS void, no error here. */
 
     // 以下是内核进行所有方面的初始化工作
 
-    // 初始化内存
-    mem_init(main_memory_start,memory_end);
-
-    trap_init();
-	blk_dev_init();
-	chr_dev_init();
+    mem_init(main_memory_start,memory_end); /* 初始化主内存区域 */
+    trap_init(); /* 设置中断处理程序 */
+	blk_dev_init(); /* 初始化块设备请求数组 */
+	chr_dev_init(); /* 空 */
 	tty_init();
-	time_init();
+	time_init(); /* 初始化开机时间 */
 	sched_init();
 	buffer_init(buffer_memory_end);
 	hd_init();
 	floppy_init();
-	sti();
+	sti(); /* 开启中断 */
 	move_to_user_mode();
+
+    /* 上面必须打开中断, fork 依赖 `int 0x80` 没法运行
+     *
+     * fork 出一个任务, 然后在那个任务里面执行 init
+     * kernel 自身跳到下面的 pause 执行 */
 	if (!fork()) {		/* we count on this going ok */
 		init();
 	}

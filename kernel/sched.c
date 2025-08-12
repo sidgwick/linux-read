@@ -66,7 +66,7 @@ union task_union {
 
 static union task_union init_task = {INIT_TASK,};
 
-unsigned long volatile jiffies=0;
+unsigned long volatile jiffies=0; /* TODO: 滴答计数? */
 unsigned long startup_time=0;
 int jiffies_offset = 0;		/* # clock ticks to add to get "true
 				   time".  Should always be less than
@@ -414,6 +414,8 @@ int sys_nice(long increment)
 	return 0;
 }
 
+/**
+ * 调度程序的初始化函数 */
 void sched_init(void)
 {
 	int i;
@@ -421,9 +423,13 @@ void sched_init(void)
 
 	if (sizeof(struct sigaction) != 16)
 		panic("Struct sigaction MUST be 16 bytes");
+
+    /* 在 GDT 里面设置第 0 个任务的 TSS 和 LDT 描述符 */
 	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
 	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
-	p = gdt+2+FIRST_TSS_ENTRY;
+	
+    /* 把 Task 1 到 NR_TASKS 的 TSS/LDT 描述符清空 */
+    p = gdt+2+FIRST_TSS_ENTRY;
 	for(i=1;i<NR_TASKS;i++) {
 		task[i] = NULL;
 		p->a=p->b=0;
@@ -431,14 +437,27 @@ void sched_init(void)
 		p->a=p->b=0;
 		p++;
 	}
-/* Clear NT, so that we won't have troubles with that later on */
+
+    /* Clear NT, so that we won't have troubles with that later on
+     * 清理 NT 位 */
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
-	ltr(0);
-	lldt(0);
-	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
+	
+    ltr(0); /* 装载第 0 个任务的 TSS */
+	lldt(0); /* 装载第 0 个任务的 LDT */
+
+    /* 下面代码用于初始化 8253 定时器. 通道 0, 选择工作方式 3, 二进制计数方式
+     * 通道 0 的输出引脚接在中断控制主芯片的 IRQ0 上, 它每 10 毫秒发出一个 IRQ0 请求
+     * LATCH 是初始定时计数值 */
+    outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-	set_intr_gate(0x20,&timer_interrupt);
+
+    /* 设置时钟中断处理程序句柄(设置时钟中断门)
+     * IRQ0 ~ 0x20 号中断 */
+    set_intr_gate(0x20,&timer_interrupt);
+    /* 修改 8259A 主片中断控制器屏蔽码, 允许时钟中断 */
 	outb(inb_p(0x21)&~0x01,0x21);
-	set_system_gate(0x80,&system_call);
+
+    /* 安装系统调用中断门 */
+    set_system_gate(0x80,&system_call);
 }
