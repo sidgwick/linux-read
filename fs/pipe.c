@@ -42,7 +42,7 @@ int read_pipe(struct m_inode * inode, char * buf, int count)
 	wake_up(& PIPE_WRITE_WAIT(*inode));
 	return read;
 }
-	
+
 int write_pipe(struct m_inode * inode, char * buf, int count)
 {
 	int chars, size, written = 0;

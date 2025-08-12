@@ -4,7 +4,7 @@
  * NOTE! Don't touch this without checking that nothing in rs_io.s or
  * con_io.s breaks. Some constants are hardwired into the system (mainly
  * offsets into 'tty_queue'
- * 
+ *
  * 在修改这里的定义时, 一定要检查 rs_io.s 或 con_io.s 程序中不会出现问题
  * 在系统中有些常量是直接写在程序中的(主要是一些tty_queue中的偏移值)
  */
@@ -61,7 +61,7 @@ struct tty_queue {
 
     这个数学原理有点不太好解释, 大概想一下:
 
-    如此, 求队列空闲字符数, 就是 R = SIZE - (head - tail) = (SIZE - 1) + (tail - head + 1) 
+    如此, 求队列空闲字符数, 就是 R = SIZE - (head - tail) = (SIZE - 1) + (tail - head + 1)
     因为 SIZE 设定值符合 2 的幂, 因此 R 可取的最大值就是 SIZE-1, 这么考虑使用 `&(SIZE-1)` 的问题:
 
     (SIZE - 1) + X = (SIZE - 1) + (X/SIZE) + (X%SIZE)
@@ -74,7 +74,7 @@ struct tty_queue {
     R = (tail + SIZE) - head - 1
       = SIZE + (tail - head - 1)
       = (tail - head - 1) % SIZE
- 
+
 3. 如果队列因为读写操作, 变成了下面这样
     0-1-2-3-4-5-6-7
     E-F     A-B-C-D
@@ -144,10 +144,10 @@ extern int fg_console; // 前台控制台号
  * 第73行后半部分用于根据子设备号 dev 在 tty_table[] 表中选择对应的 tty 结构. 如果 dev = 0,
  * 表示正在使用前台终端, 因此直接使用终端号 fg_console 作为 tty_table[] 项索引取 tty 结构.
  * 如果 dev 大于 0, 那么就要分两种情况考虑:
- * 
+ *
  *  1. dev 是虚拟终端号
  *  2. dev 是串行终端号或者伪终端号
- * 
+ *
  * 对于虚拟终端其 tty 结构在 tty_table[] 中索引项是 dev-1(0 -- 63), 对于其它类型终端,
  * 它们的 tty 结构索引项就是 dev. 例如, 如果 dev = 64, 表示是一个串行终端 1, 则其 tty
  * 结构就是 tty_table[dev]. 如果 dev = 1, 则对应终端的 tty 结构是 tty_table[0].
@@ -158,7 +158,7 @@ extern int fg_console; // 前台控制台号
 /**
  * 这里给出了终端 termios 结构中可更改的特殊字符数组 c_cc[] 的初始值
  * 该 termios 结构定义在 include/termios.h 中
- * 
+ *
  * POSIX.1 定义了 11 个特殊字符, 但是 Linux 系统还另外定义了 SVR4 使用的 6 个特殊字符
  * 如果定义了 `_POSIX_VDISABLE(\0), 那么当某一项值等于 _POSIX_VDISABLE 的值时, 表示
  * 禁止使用相应的特殊字符

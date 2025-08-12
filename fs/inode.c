@@ -149,7 +149,7 @@ int create_block(struct m_inode * inode, int block)
 {
 	return _bmap(inode,block,1);
 }
-		
+
 void iput(struct m_inode * inode)
 {
 	if (!inode)

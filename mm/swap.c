@@ -44,7 +44,7 @@ int SWAP_DEV = 0;
 /*
  * We never page the pages in task[0] - kernel memory.
  * We page all other pages.
- * 
+ *
  * task-0 的页面不做交换, 因为它在内核内存范围
  */
 #define FIRST_VM_PAGE (TASK_SIZE>>12) /* 所有任务的 第一个虚拟页面号 */
@@ -96,20 +96,20 @@ void swap_in(unsigned long *table_ptr)
 		printk("trying to swap in present page\n\r");
 		return;
 	}
-	
+
     swap_nr = *table_ptr >> 1;
 	if (!swap_nr) {
 		printk("No swap page in swap_in\n\r");
 		return;
 	}
-	
+
     if (!(page = get_free_page()))
 		oom();
-	
+
     read_swap_page(swap_nr, (char *) page);
 	if (setbit(swap_bitmap,swap_nr))
 		printk("swapping in multiply from same page\n\r");
-	
+
     /* TODO: 这里为啥要把页面置为脏页? */
     *table_ptr = page | (PAGE_DIRTY | 7);
 }
@@ -170,7 +170,7 @@ int try_to_swap_out(unsigned long * table_ptr)
  * Ok, this has a rather intricate logic - the idea is to make good
  * and fast machine code. If we didn't worry about that, things would
  * be easier.
- * 
+ *
  * 把某个页, 交换到 SWAP 设备
  * TODO: 重新看, 没看懂
  */
@@ -208,7 +208,7 @@ int swap_out(void)
 		page_entry++;
 		if (page_entry >= 1024) {
 			page_entry = 0;
-		
+
 repeat:
 			dir_entry++;
 			if (dir_entry >= 1024)

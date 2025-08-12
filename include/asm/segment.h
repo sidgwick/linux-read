@@ -51,7 +51,7 @@ __asm__ ("movl %0,%%fs:%1"::"r" (val),"m" (*addr));
  */
 
 // 获取 %fs 的值
-extern inline unsigned long get_fs() 
+extern inline unsigned long get_fs()
 {
 	unsigned short _v;
 	__asm__("mov %%fs,%%ax":"=a" (_v):);
@@ -59,7 +59,7 @@ extern inline unsigned long get_fs()
 }
 
 // 获取 %ds 的值
-extern inline unsigned long get_ds() 
+extern inline unsigned long get_ds()
 {
 	unsigned short _v;
 	__asm__("mov %%ds,%%ax":"=a" (_v):);

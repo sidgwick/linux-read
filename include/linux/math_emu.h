@@ -12,7 +12,7 @@
 struct info {
 	long ___math_ret;   // math_emulate 调用者（int7）返回地址
 	long ___orig_eip;   // 临时保存原 EIP 的地方
-	
+
     // 异常中断 int7 处理过程入栈的寄存器
     long ___edi;
 	long ___esi;
@@ -55,12 +55,12 @@ struct info {
  * 终止数学协处理器仿真操作. 在 math_emulation.c 程序中实现(L488行)
  * 下面 `math_abort` 宏定义的实际作用是把 __math_abort
  * 重新定义为一个不会返回的函数(即在前面加上了volatile)
- * 
+ *
  * 该宏的前部分: `(volatile void (*)(struct info *,unsigned int))`
  * 是函数类型定义，用于重新指明 __math_abort 函数的定义, 后面是其相应的参数
- * 关键词 volatile 放在函数名前来修饰函数, 是用来通知gcc 编译器该函数不会返回, 
+ * 关键词 volatile 放在函数名前来修饰函数, 是用来通知gcc 编译器该函数不会返回,
  * 以让 gcc 产生更好一些的代码. 详细说明请参见第3章 $3.3.2节内容。
- * 因此下面的宏定义, 其主要目的就是利用 __math_abort, 让它即可用作普通有返回函数, 
+ * 因此下面的宏定义, 其主要目的就是利用 __math_abort, 让它即可用作普通有返回函数,
  * 又可以在使用宏定义 math_abort 时用作不返回的函数 */
 void __math_abort(struct info *, unsigned int);
 
@@ -72,7 +72,7 @@ void __math_abort(struct info *, unsigned int);
  * for the temporary real 64-bit mantissa, but then gcc aligns out the
  * structure to 12 bytes which breaks things in math_emulate.c. Shit. I
  * want some kind of "no-alignt" pragma or something.
- * 
+ *
  * Gcc 会强迫这种愚蠢的对齐问题: 我只想使用两个 long 类型数据来表示 64 比特的
  * 临时实数尾数, 但是 gcc 却会将该结构以 12 字节来对齐, 这将导致 math_emulate.c
  * 中程序出问题. 唉, 我真需要某种非对齐 "no-align" 编译指令

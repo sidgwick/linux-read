@@ -42,7 +42,7 @@ typedef unsigned int sigset_t;		/* 32 bits, 定义信号集类型 */
 /* Ok, I haven't implemented sigactions, but trying to keep headers POSIX
  * 上面原注释已经过时, 因为在 0.12 内核中已经实现了 sigaction
  * 下面是 sigaction 结构 sa_flags 标志字段可取的符号常数值*/
-#define SA_NOCLDSTOP	1 // 当子进程处于停止状态, 就不对 SIGCHLD 处理
+#define SA_NOCLDSTOP	1 // 当子进程处于停止状态, 不对 SIGCHLD 处理
 #define SA_INTERRUPT	0x20000000 // 系统调用被信号中断后不重新启动系统调用
 #define SA_NOMASK	0x40000000 // 不阻止在指定的信号处理程序中再收到该信号
 #define SA_ONESHOT	0x80000000 // 信号句柄一旦被调用过就恢复到默认处理句柄

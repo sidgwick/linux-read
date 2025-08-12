@@ -4,6 +4,9 @@
  * (C) 1991 Linus Torvalds
  */
 
+/**
+ * 块设备 Low Level 读写接口 */
+
 /*
  * This handles all read/write requests to block devices
  */
@@ -193,7 +196,7 @@ repeat:
 	current->state = TASK_UNINTERRUPTIBLE;
 	add_request(major+blk_dev,req);
 	schedule();
-}	
+}
 
 void ll_rw_block(int rw, struct buffer_head * bh)
 {
@@ -207,6 +210,7 @@ void ll_rw_block(int rw, struct buffer_head * bh)
 	make_request(major,rw,bh);
 }
 
+/* 初始化请求数组, 将所有请求项置为空闲项(dev = -1) */
 void blk_dev_init(void)
 {
 	int i;

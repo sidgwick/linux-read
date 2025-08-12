@@ -231,10 +231,10 @@ void copy_to_cooked(struct tty_struct * tty)
 /*
  * Called when we need to send a SIGTTIN or SIGTTOU to our process
  * group
- * 
- * We only request that a system call be restarted if there was if the 
+ *
+ * We only request that a system call be restarted if there was if the
  * default signal handler is being used.  The reason for this is that if
- * a job is catching SIGTTIN or SIGTTOU, the signal handler may not want 
+ * a job is catching SIGTTIN or SIGTTOU, the signal handler may not want
  * the system call to be restarted blindly.  If there is no way to reset the
  * terminal pgrp back to the current pgrp (perhaps because the controlling
  * tty has been released on logout), we don't want to be in an infinite loop
@@ -249,7 +249,7 @@ int tty_signal(int sig, struct tty_struct *tty)
 		return -EIO;		/* don't stop an orphaned pgrp */
 	(void) kill_pg(current->pgrp,sig,1);
 	if ((current->blocked & (1<<(sig-1))) ||
-	    ((int) current->sigaction[sig-1].sa_handler == 1)) 
+	    ((int) current->sigaction[sig-1].sa_handler == 1))
 		return -EIO;		/* Our signal will be ignored */
 	else if (current->sigaction[sig-1].sa_handler)
 		return -EINTR;		/* We _will_ be interrupted :-) */
@@ -270,7 +270,7 @@ int tty_read(unsigned channel, char * buf, int nr)
 	tty = TTY_TABLE(channel);
 	if (!(tty->write_q || tty->read_q || tty->secondary))
 		return -EIO;
-	if ((current->tty == channel) && (tty->pgrp != current->pgrp)) 
+	if ((current->tty == channel) && (tty->pgrp != current->pgrp))
 		return(tty_signal(SIGTTIN, tty));
 	if (channel & 0x80)
 		other_tty = tty_table + (channel ^ 0x40);
@@ -347,8 +347,8 @@ int tty_write(unsigned channel, char * buf, int nr)
 	tty = TTY_TABLE(channel);
 	if (!(tty->write_q || tty->read_q || tty->secondary))
 		return -EIO;
-	if (L_TOSTOP(tty) && 
-	    (current->tty == channel) && (tty->pgrp != current->pgrp)) 
+	if (L_TOSTOP(tty) &&
+	    (current->tty == channel) && (tty->pgrp != current->pgrp))
 		return(tty_signal(SIGTTOU, tty));
 	while (nr>0) {
 		sleep_if_full(tty->write_q);
@@ -399,6 +399,8 @@ void do_tty_interrupt(int tty)
 	copy_to_cooked(TTY_TABLE(tty));
 }
 
+/* 字符设备初始化函数
+ * 当前为空, 为以后扩展做准备 */
 void chr_dev_init(void)
 {
 }

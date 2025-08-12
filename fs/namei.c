@@ -468,7 +468,7 @@ int sys_mknod(const char * filename, int mode, int dev)
 	struct m_inode * dir, * inode;
 	struct buffer_head * bh;
 	struct dir_entry * de;
-	
+
 	if (!suser())
 		return -EPERM;
 	if (!(dir = dir_namei(filename,&namelen,&basename, NULL)))
@@ -602,7 +602,7 @@ static int empty_dir(struct m_inode * inode)
 		return 0;
 	}
 	de = (struct dir_entry *) bh->b_data;
-	if (de[0].inode != inode->i_num || !de[1].inode || 
+	if (de[0].inode != inode->i_num || !de[1].inode ||
 	    strcmp(".",de[0].name) || strcmp("..",de[1].name)) {
 	    	printk("warning - bad directory on dev %04x\n",inode->i_dev);
 		return 0;

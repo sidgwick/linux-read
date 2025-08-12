@@ -140,12 +140,12 @@ int main(int argc, char ** argv)
 	buf[506] = (char) minor_swap;
 	buf[507] = (char) major_swap;
 	buf[508] = (char) minor_root;
-	buf[509] = (char) major_root;	
+	buf[509] = (char) major_root;
 	i=write(1,buf,512);
 	if (i!=512)
 		die("Write call failed");
 	close (id);
-	
+
 	if ((id=open(argv[2],O_RDONLY,0))<0)
 		die("Unable to open 'setup'");
 	if (read(id,buf,MINIX_HEADER) != MINIX_HEADER)
@@ -180,7 +180,7 @@ int main(int argc, char ** argv)
 			die("Write call failed");
 		i += c;
 	}
-	
+
 	if ((id=open(argv[3],O_RDONLY,0))<0)
 		die("Unable to open 'system'");
 	if (read(id,buf,GCC_HEADER) != GCC_HEADER)

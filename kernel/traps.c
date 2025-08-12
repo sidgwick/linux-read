@@ -64,6 +64,7 @@ static void die(char * str,long esp_ptr,long nr)
 	long * esp = (long *) esp_ptr;
 	int i;
 
+    /* esp_ptr 对应的栈内容为: EIP, CS, EFLAGS, ESP, SS .... */
 	printk("%s: %04x\n\r",str,nr&0xffff);
 	printk("EIP:\t%04x:%p\nEFLAGS:\t%p\nESP:\t%04x:%p\n",
 		esp[1],esp[0],esp[2],esp[4],esp[3]);
@@ -75,8 +76,9 @@ static void die(char * str,long esp_ptr,long nr)
 			printk("%p ",get_seg_long(0x17,i+(long *)esp[3]));
 		printk("\n");
 	}
-	str(i);
+	str(i); /* Save TaskRegister */
 	printk("Pid: %d, process nr: %d\n\r",current->pid,0xffff & i);
+    /* 打印代码段接下来的 10 个字节 */
 	for(i=0;i<10;i++)
 		printk("%02x ",0xff & get_seg_byte(esp[1],(i+(char *)esp[0])));
 	printk("\n\r");
@@ -110,6 +112,7 @@ void do_int3(long * esp, long error_code,
 {
 	int tr;
 
+    /* 打印调试信息 */
 	__asm__("str %%ax":"=a" (tr):"0" (0));
 	printk("eax\t\tebx\t\tecx\t\tedx\n\r%8x\t%8x\t%8x\t%8x\n\r",
 		eax,ebx,ecx,edx);
@@ -170,6 +173,7 @@ void do_stack_segment(long esp,long error_code)
 	die("stack segment",esp,error_code);
 }
 
+/* 数学协处理器, 不能在两个任务之间混用 ??? */
 void do_coprocessor_error(long esp, long error_code)
 {
 	if (last_task_used_math != current)
@@ -182,32 +186,43 @@ void do_reserved(long esp, long error_code)
 	die("reserved (15,17-47) error",esp,error_code);
 }
 
+/* 设置中断描述符表
+ * set_trap_gate 与 set_system_gate 都使用了中断描述符表 IDT 中的陷阱门(Trap Gate),
+ * 它们之间的主要区别在于前者设置的特权级为 0, 后者是 3
+ * 因此断点陷阱中断int3, 溢出中断 overflow 和边界出错中断 bounds 可以由任何程序调用 */
 void trap_init(void)
 {
 	int i;
 
-	set_trap_gate(0,&divide_error);
-	set_trap_gate(1,&debug);
-	set_trap_gate(2,&nmi);
-	set_system_gate(3,&int3);	/* int3-5 can be called from all */
-	set_system_gate(4,&overflow);
-	set_system_gate(5,&bounds);
-	set_trap_gate(6,&invalid_op);
-	set_trap_gate(7,&device_not_available);
-	set_trap_gate(8,&double_fault);
-	set_trap_gate(9,&coprocessor_segment_overrun);
-	set_trap_gate(10,&invalid_TSS);
-	set_trap_gate(11,&segment_not_present);
-	set_trap_gate(12,&stack_segment);
-	set_trap_gate(13,&general_protection);
-	set_trap_gate(14,&page_fault);
-	set_trap_gate(15,&reserved);
-	set_trap_gate(16,&coprocessor_error);
-	set_trap_gate(17,&alignment_check);
-	for (i=18;i<48;i++)
+	set_trap_gate(0,&divide_error); /* 除 0 中断 */
+	set_trap_gate(1,&debug); /* 调试 */
+	set_trap_gate(2,&nmi); /* 不可屏蔽中断 */
+	set_system_gate(3,&int3);	/* 调试, int3-5 可以被所有程序执行 */
+	set_system_gate(4,&overflow); /* into 溢出 */
+	set_system_gate(5,&bounds); /* bound 检查错误 */
+	set_trap_gate(6,&invalid_op); /* 无效指令 */
+	set_trap_gate(7,&device_not_available); /* 找不到设备 */
+	set_trap_gate(8,&double_fault); /* 双重错误 */
+	set_trap_gate(9,&coprocessor_segment_overrun); /* 协处理器段超出错误 */
+	set_trap_gate(10,&invalid_TSS); /* 非法 TSS */
+	set_trap_gate(11,&segment_not_present); /* 段不存在 */
+	set_trap_gate(12,&stack_segment); /* 堆栈段错误 */
+	set_trap_gate(13,&general_protection); /* 通用保护 */
+	set_trap_gate(14,&page_fault); /* 页面异常 */
+	set_trap_gate(15,&reserved); /* 保留 */
+	set_trap_gate(16,&coprocessor_error); /* 协处理器错误 */
+	set_trap_gate(17,&alignment_check); /* 对齐错误 */
+
+    /* int17 ~ int47 的陷阱门先均设置为 reserved
+     * 以后各硬件初始化时会重新设置自己的陷阱门 */
+    for (i=18;i<48;i++)
 		set_trap_gate(i,&reserved);
+
+    /* 设置协处理器中断 0x2d(即45)陷阱门描述符, 并允许其产生中断请求, 设置并行口中断描述符 */
 	set_trap_gate(45,&irq13);
-	outb_p(inb_p(0x21)&0xfb,0x21);
-	outb(inb_p(0xA1)&0xdf,0xA1);
-	set_trap_gate(39,&parallel_interrupt);
+
+	outb_p(inb_p(0x21)&0xfb,0x21); /* 允许 8259A 主芯片的 IRQ2 中断请求 */
+	outb(inb_p(0xA1)&0xdf,0xA1);  /* 允许 8259A 从芯片的 IRQ13 中断请求 */
+
+	set_trap_gate(39,&parallel_interrupt); /* 设置并行口 1 的中断 0x27 陷阱门描述符 */
 }

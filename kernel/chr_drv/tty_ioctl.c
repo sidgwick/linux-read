@@ -216,7 +216,7 @@ int tty_ioctl(int dev, int cmd, int arg)
 				return -EINVAL;
 			if (session_of_pgrp(pgrp) != current->session)
 				return -EPERM;
-			tty->pgrp = pgrp;			
+			tty->pgrp = pgrp;
 			return 0;
 		case TIOCOUTQ:
 			verify_area((void *) arg,4);

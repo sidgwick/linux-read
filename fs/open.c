@@ -65,7 +65,7 @@ int sys_access(const char * filename,int mode)
 	 * XXX we are doing this test last because we really should be
 	 * swapping the effective with the real user id (temporarily),
 	 * and then calling suser() routine.  If we do call the
-	 * suser() routine, it needs to be called last. 
+	 * suser() routine, it needs to be called last.
 	 */
 	if ((!current->uid) &&
 	    (!(mode & 1) || (i_mode & 0111)))
@@ -217,7 +217,7 @@ int sys_creat(const char * pathname, int mode)
 }
 
 int sys_close(unsigned int fd)
-{	
+{
 	struct file * filp;
 
 	if (fd >= NR_OPEN)

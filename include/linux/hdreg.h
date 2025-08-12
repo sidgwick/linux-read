@@ -2,7 +2,7 @@
  * This file contains some defines for the AT-hd-controller.
  * Various sources. Check out some definitions (see comments with
  * a ques).
- * 
+ *
  * 本文件含有一些AT硬盘控制器的定义。来自各种资料。请查证某些定义（带有问号的注释）。
  */
 #ifndef _HDREG_H
@@ -53,9 +53,9 @@
  * --------------------------------------------------
  * 0x01      无错误               数据标志丢失
  * 0x02      控制器出错           磁道0错
- * 0x03      扇区缓冲区错        
+ * 0x03      扇区缓冲区错
  * 0x04      ECC部件错            命令放弃
- * 0x05      控制处理器错         
+ * 0x05      控制处理器错
  * 0x10                            ID未找到
  * 0x40                            ECC错误
  * 0x80                            坏扇区

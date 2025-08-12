@@ -45,7 +45,7 @@ int sys_dup(unsigned int fildes)
 }
 
 int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
-{	
+{
 	struct file * filp;
 
 	if (fd >= NR_OPEN || !(filp = current->filp[fd]))

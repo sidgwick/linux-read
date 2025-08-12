@@ -13,7 +13,7 @@
  * Hopefully this will be a rather complete VT102 implementation.
  *
  * Beeping thanks to John T Kohl.
- * 
+ *
  * Virtual Consoles, Screen Blanking, Screen Dumping, Color, Graphics
  *   Chars, and VT100 enhancements by Peter MacDonald.
  */
@@ -90,7 +90,7 @@ static unsigned short	video_port_val;		/* Video register value port	*/
 static int can_do_colour = 0;
 
 static struct {
-	unsigned short	vc_video_erase_char;	
+	unsigned short	vc_video_erase_char;
 	unsigned char	vc_attr;
 	unsigned char	vc_def_attr;
 	int		vc_bold_attr;
@@ -132,11 +132,11 @@ static struct {
 #define video_mem_start	(vc_cons[currcons].vc_video_mem_start)
 #define video_mem_end	(vc_cons[currcons].vc_video_mem_end)
 #define def_attr	(vc_cons[currcons].vc_def_attr)
-#define video_erase_char  (vc_cons[currcons].vc_video_erase_char)	
+#define video_erase_char  (vc_cons[currcons].vc_video_erase_char)
 #define iscolor		(vc_cons[currcons].vc_iscolor)
 
-int blankinterval = 0;
-int blankcount = 0;
+int blankinterval = 0;  // 设定的屏幕黑屏间隔时间
+int blankcount = 0;     // 黑屏时间计数
 
 static void sysbeep(void);
 
@@ -390,7 +390,7 @@ void csi_m(int currcons )
 			case 0: attr=def_attr;break;  /* default */
 			case 1: attr=(iscolor?attr|0x08:attr|0x0f);break;  /* bold */
 			/*case 4: attr=attr|0x01;break;*/  /* underline */
-			case 4: /* bold */ 
+			case 4: /* bold */
 			  if (!iscolor)
 			    attr |= 0x01;
 			  else
@@ -399,15 +399,15 @@ void csi_m(int currcons )
 			      attr = (vc_cons[currcons].vc_bold_attr&0x0f)|(0xf0&(attr));
 			    else
 			    { short newattr = (attr&0xf0)|(0xf&(~attr));
-			      attr = ((newattr&0xf)==((attr>>4)&0xf)? 
+			      attr = ((newattr&0xf)==((attr>>4)&0xf)?
 			        (attr&0xf0)|(((attr&0xf)+1)%0xf):
 			        newattr);
-			    }    
+			    }
 			  }
 			  break;
 			case 5: attr=attr|0x80;break;  /* blinking */
 			case 7: attr=(attr<<4)|(attr>>4);break;  /* negative */
-			case 22: attr=attr&0xf7;break; /* not bold */ 
+			case 22: attr=attr&0xf7;break; /* not bold */
 			case 24: attr=attr&0xfe;break;  /* not underline */
 			case 25: attr=attr&0x7f;break;  /* not blinking */
 			case 27: attr=def_attr;break; /* positive image */
@@ -568,7 +568,7 @@ static void restore_cur(int currcons)
 }
 
 
-enum { ESnormal, ESesc, ESsquare, ESgetpars, ESgotpars, ESfunckey, 
+enum { ESnormal, ESesc, ESsquare, ESgetpars, ESgotpars, ESfunckey,
 	ESsetterm, ESsetgraph };
 
 void con_write(struct tty_struct * tty)
@@ -576,11 +576,11 @@ void con_write(struct tty_struct * tty)
 	int nr;
 	char c;
 	int currcons;
-     
+
 	currcons = tty - tty_table;
 	if ((currcons>=MAX_CONSOLES) || (currcons<0))
 		panic("con_write: illegal tty");
- 	   
+
 	nr = CHARS(tty->write_q);
 	while (nr--) {
 		if (tty->stopped)
@@ -660,14 +660,14 @@ void con_write(struct tty_struct * tty)
 					restore_cur(currcons);
 					break;
 				  case '(':  case ')':
-				    	state = ESsetgraph;		
+				    	state = ESsetgraph;
 					break;
 				  case 'P':
-				    	state = ESsetterm;  
+				    	state = ESsetterm;
 				    	break;
 				  case '#':
 				  	state = -1;
-				  	break;  	
+				  	break;
 				  case 'c':
 					tty->termios = DEF_TERMIOS;
 				  	state = restate = ESnormal;
@@ -677,7 +677,7 @@ void con_write(struct tty_struct * tty)
 					break;
 				 /* case '>':   Numeric keypad */
 				 /* case '=':   Appl. keypad */
-				}	
+				}
 				break;
 			case ESsquare:
 				for(npar=0;npar<NPAR;npar++)
@@ -687,7 +687,7 @@ void con_write(struct tty_struct * tty)
 				if (c =='[')  /* Function key */
 				{ state=ESfunckey;
 				  break;
-				}  
+				}
 				if (ques=(c=='?'))
 					break;
 			case ESgetpars:
@@ -703,7 +703,7 @@ void con_write(struct tty_struct * tty)
 				if (ques)
 				{ ques =0;
 				  break;
-				}  
+				}
 				switch(c) {
 					case 'G': case '`':
 						if (par[0]) par[0]--;
@@ -781,11 +781,11 @@ void con_write(struct tty_struct * tty)
 					case 'l': /* blank interval */
 					case 'b': /* bold attribute */
 						  if (!((npar >= 2) &&
-						  ((par[1]-13) == par[0]) && 
-						  ((par[2]-17) == par[0]))) 
+						  ((par[1]-13) == par[0]) &&
+						  ((par[2]-17) == par[0])))
 						    break;
 						if ((c=='l')&&(par[0]>=0)&&(par[0]<=60))
-						{  
+						{
 						  blankinterval = HZ*60*par[0];
 						  blankcount = blankinterval;
 						}
@@ -846,7 +846,7 @@ void con_init(void)
 	video_page = ORIG_VIDEO_PAGE;
 	video_erase_char = 0x0720;
 	blankcount = blankinterval;
-	
+
 	if (ORIG_VIDEO_MODE == 7)	/* Is this a monochrome display? */
 	{
 		video_mem_base = 0xb0000;
@@ -893,16 +893,16 @@ void con_init(void)
 	video_memory /= NR_CONSOLES;
 
 	/* Let the user known what kind of display driver we are using */
-	
+
 	display_ptr = ((char *)video_mem_base) + video_size_row - 8;
 	while (*display_desc)
 	{
 		*display_ptr++ = *display_desc++;
 		display_ptr++;
 	}
-	
+
 	/* Initialize the variables used for scrolling (mostly EGA/VGA)	*/
-	
+
 	base = origin = video_mem_start = video_mem_base;
 	term = video_mem_end = base + video_memory;
 	scr_end	= video_mem_start + video_num_lines * video_size_row;
@@ -959,7 +959,7 @@ static void sysbeep(void)
 	outb_p(0x37, 0x42);
 	outb(0x06, 0x42);
 	/* 1/8 second */
-	beepcount = HZ/8;	
+	beepcount = HZ/8;
 }
 
 int do_screendump(int arg)
@@ -974,7 +974,7 @@ int do_screendump(int arg)
 	currcons--;
 	sptr = (char *) origin;
 	for (l=video_num_lines*video_num_columns; l>0 ; l--)
-		put_fs_byte(*sptr++,buf++);	
+		put_fs_byte(*sptr++,buf++);
 	return(0);
 }
 

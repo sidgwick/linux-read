@@ -216,7 +216,7 @@ static void do_emu(struct info * info)
 		case 0x9b:
 			fcom(PST(code & 7),PST(0));
 			fpop();
-			return;			
+			return;
 		case 0x9c:
 			ST(code & 7).exponent ^= 0x8000;
 			fadd(PST(0),PST(code & 7),&tmp);
