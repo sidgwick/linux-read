@@ -8,10 +8,11 @@
  * 这个宏和 string.h 里面的 memcpy 完全一样
  * 都是利用 movsb 指令 copy N 字节数据(不考虑数据覆盖)
  */
-#define memcpy(dest,src,n) ({ \
-void * _res = dest; \
-__asm__ ("cld;rep;movsb" \
-	::"D" ((long)(_res)),"S" ((long)(src)),"c" ((long) (n)) \
-	:"di","si","cx"); \
-_res; \
-})
+#define memcpy(dest, src, n)                                                   \
+    ({                                                                         \
+        void *_res = dest;                                                     \
+        __asm__("cld;rep;movsb" ::"D"((long)(_res)), "S"((long)(src)),         \
+                "c"((long)(n))                                                 \
+                : "di", "si", "cx");                                           \
+        _res;                                                                  \
+    })

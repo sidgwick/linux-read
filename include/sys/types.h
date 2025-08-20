@@ -18,8 +18,9 @@ typedef long time_t;
 #ifndef _PTRDIFF_T
 #define _PTRDIFF_T
 /**
- * ptrdiff_t is the signed integer type of the result of subtracting two pointers
- * 比如整数的 size 是 4, 字符的 size 是 1, 对整形/字符型数组里面的第四个元素(a[3])指针减去第一个(a[0]) 有:
+ * ptrdiff_t is the signed integer type of the result of subtracting two
+ * pointers 比如整数的 size 是 4, 字符的 size 是 1,
+ * 对整形/字符型数组里面的第四个元素(a[3])指针减去第一个(a[0]) 有:
  *  - 整数型: 虽然内存位置相差了 12, 但是指针相减的结果是 3
  *  - 整数型: 内存位置相差了 3, 指针相减的结果是 3
  */
@@ -28,7 +29,7 @@ typedef long ptrdiff_t;
 
 #ifndef NULL
 // 空指针
-#define NULL ((void *) 0)
+#define NULL ((void *)0)
 #endif
 
 // 用于进程号和进程组号
@@ -68,22 +69,26 @@ typedef unsigned long tcflag_t;
 // 文件描述符集, 每比特代表 1 个描述符
 typedef unsigned long fd_set;
 
- // 用于 DIV 操作(TODO: 软件模式除法吗???)
-typedef struct { int quot,rem; } div_t;
+// 用于 DIV 操作(TODO: 软件模式除法吗???)
+typedef struct {
+    int quot, rem;
+} div_t;
 // 用于长 DIV 操作
-typedef struct { long quot,rem; } ldiv_t;
+typedef struct {
+    long quot, rem;
+} ldiv_t;
 
 // 文件系统参数结构, 用于 ustat() 函数
 // 最后两个字段未使用, 总是返回 NULL 指针
 struct ustat {
     // 系统总空闲块数
-	daddr_t f_tfree;
+    daddr_t f_tfree;
     // 总空闲 i 节点数
-	ino_t f_tinode;
+    ino_t f_tinode;
     // 文件系统名称
-	char f_fname[6];
+    char f_fname[6];
     // 文件系统压缩名称
-	char f_fpack[6];
+    char f_fpack[6];
 };
 
 #endif

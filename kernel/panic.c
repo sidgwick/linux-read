@@ -11,16 +11,17 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
-void sys_sync(void);	/* it's really int */
+void sys_sync(void); /* it's really int */
 
-volatile void panic(const char * s)
+volatile void panic(const char *s)
 {
-	printk("Kernel panic: %s\n\r",s);
-	if (current == task[0])
-		printk("In swapper task - not syncing\n\r");
-	else
-		sys_sync();
+    printk("Kernel panic: %s\n\r", s);
+    if (current == task[0])
+        printk("In swapper task - not syncing\n\r");
+    else
+        sys_sync();
 
     /* 死循环 */
-    for(;;);
+    for (;;)
+        ;
 }

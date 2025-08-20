@@ -23,5 +23,5 @@ typedef unsigned long size_t;
  * 这里是一个技巧用法, ((TYPE *)0) 是将一个整数 0 类型投射(type cast)成数
  * 据对象指针类型, 然后在该结果上进行运算
  */
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#define offsetof(TYPE, MEMBER) ((size_t) & ((TYPE *)0)->MEMBER)
 #endif

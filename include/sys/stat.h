@@ -9,17 +9,17 @@
 
 // 这个结构包含了文件信息
 struct stat {
-    dev_t	st_dev; // 含有文件的设备号
-    ino_t	st_ino; // 文件 i 节点号
-    umode_t	st_mode; // 文件类型和属性(见下面)
-    nlink_t	st_nlink; // 指定文件的连接数
-    uid_t	st_uid; // 文件的用户(标识)号
-    gid_t	st_gid; // 文件的组号
-    dev_t	st_rdev; // 设备号(如果文件是特殊的字符文件或块文件)
-    off_t	st_size; // 文件大小(字节数)(如果文件是常规文件)
-    time_t	st_atime; // 上次(最后)访问时间
-    time_t	st_mtime; // 最后修改时间
-    time_t	st_ctime; // 最后节点修改时间
+    dev_t st_dev;     // 含有文件的设备号
+    ino_t st_ino;     // 文件 i 节点号
+    umode_t st_mode;  // 文件类型和属性(见下面)
+    nlink_t st_nlink; // 指定文件的连接数
+    uid_t st_uid;     // 文件的用户(标识)号
+    gid_t st_gid;     // 文件的组号
+    dev_t st_rdev; // 设备号(如果文件是特殊的字符文件或块文件)
+    off_t st_size;   // 文件大小(字节数)(如果文件是常规文件)
+    time_t st_atime; // 上次(最后)访问时间
+    time_t st_mtime; // 最后修改时间
+    time_t st_ctime; // 最后节点修改时间
 };
 
 // 下面是为 st_mode 字段所用的值定义的符号名称, 这些值均用八进制表示
@@ -31,7 +31,8 @@ struct stat {
 // 其它名称可以此类推
 
 /**
- * 总结一下, st_mode 字段使用一个 16 bits 整形来表示含义, 16 bits 记作 FEDC_BA9_876_543_210, 作用如下:
+ * 总结一下, st_mode 字段使用一个 16 bits 整形来表示含义, 16 bits 记作
+ * FEDC_BA9_876_543_210, 作用如下:
  *
  * FEDCB 用来记录文件的类型:
  *     0001 ~ 1=FIFO
@@ -52,27 +53,27 @@ struct stat {
  *     100 ~ 4=读权限
  */
 
-#define S_IFMT  00170000 // 文件类型比特位屏蔽码(8进制表示)
-#define S_IFLNK	 0120000 // 符号链接
-#define S_IFREG  0100000 // 常规文件
-#define S_IFBLK  0060000 // 块特殊(设备)文件, 如磁盘 /dev/fd0
-#define S_IFDIR  0040000 // 目录
-#define S_IFCHR  0020000 // 字符设备文件
-#define S_IFIFO  0010000 // FIFO特殊文件
+#define S_IFMT 00170000 // 文件类型比特位屏蔽码(8进制表示)
+#define S_IFLNK 0120000 // 符号链接
+#define S_IFREG 0100000 // 常规文件
+#define S_IFBLK 0060000 // 块特殊(设备)文件, 如磁盘 /dev/fd0
+#define S_IFDIR 0040000 // 目录
+#define S_IFCHR 0020000 // 字符设备文件
+#define S_IFIFO 0010000 // FIFO特殊文件
 
 // S_ISUID 用于测试文件的 set-user-ID 标志是否置位.
-// 若该标志置位, 则当执行该文件时, 进程的有效用户 ID 将被设置为该文件宿主的用户 ID
-// S_ISGID 则是针对组 ID 进行相同处理
-#define S_ISUID  0004000 // 执行时设置用户 ID(set-user-ID)
-#define S_ISGID  0002000 // 执行时设置组 ID(set-group-ID)
-#define S_ISVTX  0001000 // 对于目录, 受限删除标志
+// 若该标志置位, 则当执行该文件时, 进程的有效用户 ID 将被设置为该文件宿主的用户
+// ID S_ISGID 则是针对组 ID 进行相同处理
+#define S_ISUID 0004000 // 执行时设置用户 ID(set-user-ID)
+#define S_ISGID 0002000 // 执行时设置组 ID(set-group-ID)
+#define S_ISVTX 0001000 // 对于目录, 受限删除标志
 
-#define S_ISLNK(m)	(((m) & S_IFMT) == S_IFLNK) // 测试是否符号链接文件
-#define S_ISREG(m)	(((m) & S_IFMT) == S_IFREG) // 测试是否常规文件
-#define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR) // 是否目录文件
-#define S_ISCHR(m)	(((m) & S_IFMT) == S_IFCHR) // 是否字符设备文件
-#define S_ISBLK(m)	(((m) & S_IFMT) == S_IFBLK) // 是否块设备文件
-#define S_ISFIFO(m)	(((m) & S_IFMT) == S_IFIFO) // 是否FIFO特殊文件
+#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK) // 测试是否符号链接文件
+#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG) // 测试是否常规文件
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR) // 是否目录文件
+#define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR) // 是否字符设备文件
+#define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK) // 是否块设备文件
+#define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO) // 是否FIFO特殊文件
 
 #define S_IRWXU 00700 // 宿主可以读/写/执行/搜索(名称最后字母代表User)
 #define S_IRUSR 00400 // 宿主读许可

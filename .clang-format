@@ -1,3 +1,5 @@
+# find . -name '*.cpp' -o -name '*.h' | xargs clang-format -i
+
 BraceWrapping:
   AfterClass: false
   AfterControlStatement: false
