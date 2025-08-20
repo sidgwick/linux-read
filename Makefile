@@ -2,13 +2,17 @@
 # if you want the ram-disk device, define this to be the
 # size in blocks.
 #
+
 RAMDISK = #-DRAMDISK=512
 
 AS86	=as86 -0 -a
 LD86	=ld86 -0
 
-AS	=gas
-LD	=gld
+# AS = as --32
+# LD = ld -m elf_i386
+
+AS	= as
+LD	= ld
 LDFLAGS	=-s -x -M
 CC	=gcc $(RAMDISK)
 CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer \
@@ -54,13 +58,13 @@ tools/build: tools/build.c
 boot/head.o: boot/head.s
 
 tools/system:	boot/head.o init/main.o \
-		$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
+				$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
 	$(LD) $(LDFLAGS) boot/head.o init/main.o \
-	$(ARCHIVES) \
-	$(DRIVERS) \
-	$(MATH) \
-	$(LIBS) \
-	-o tools/system > System.map
+		$(ARCHIVES) \
+		$(DRIVERS) \
+		$(MATH) \
+		$(LIBS) \
+		-o tools/system > System.map
 
 kernel/math/math.a:
 	(cd kernel/math; make)
@@ -83,9 +87,10 @@ fs/fs.o:
 lib/lib.a:
 	(cd lib; make)
 
+# --------- OK ---------
 boot/setup: boot/setup.s
-	$(AS86) -o boot/setup.o boot/setup.s
-	$(LD86) -s -o boot/setup boot/setup.o
+	$(AS) -o boot/setup.o boot/setup.s
+	$(LD) -e start --oformat=binary --Ttext=0 -s -o boot/setup boot/setup.o
 
 boot/setup.s:	boot/setup.S include/linux/config.h
 	$(CPP) -traditional boot/setup.S -o boot/setup.s
@@ -94,13 +99,13 @@ boot/bootsect.s:	boot/bootsect.S include/linux/config.h
 	$(CPP) -traditional boot/bootsect.S -o boot/bootsect.s
 
 boot/bootsect:	boot/bootsect.s
-	$(AS86) -o boot/bootsect.o boot/bootsect.s
-	$(LD86) -s -o boot/bootsect boot/bootsect.o
+	$(AS) -o boot/bootsect.o boot/bootsect.s
+	$(LD) -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/bootsect boot/bootsect.o
 
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
-		boot/bootsect.s boot/setup.s
-	rm -f init/*.o tools/system tools/build boot/*.o
+		boot/bootsect.s boot/setup.s boot/bootsect0.s boot/bootsect1.s
+	rm -f init/*.o tools/system tools/build boot/*.o boot/*.bin
 	(cd mm;make clean)
 	(cd fs;make clean)
 	(cd kernel;make clean)

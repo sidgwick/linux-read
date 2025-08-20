@@ -1,0 +1,34 @@
+.PHONY: rewrite
+
+ab = boot/head0.s
+ac = boot/head0.o
+ad = boot/head0.bin
+
+bb = boot/head1.s
+bc = boot/head1.o
+bd = boot/head1.bin
+
+AS86 = as86 -0 -a
+LD86 = ld86 -0
+
+AS = gas
+LD = gld
+LDFLAGS	= -s -x -M
+CC = gcc $(RAMDISK)
+CFLAGS = -Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs -mstring-insns
+CPP	= cpp -nostdinc -Iinclude
+
+rewrite:
+	as -o $(ac) $(ab)
+	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o $(ad) $(ac)
+
+	as -o $(bc) $(bb)
+	ld -e start -z noexecstack --oformat=binary --Ttext=0 -o $(bd) $(bc)
+
+	objdump -D -b binary -mi386 -Maddr16,data16 $(ad) | \
+		sed 's/^[^:]*://g' > a
+
+	objdump -D -b binary -mi386 -Maddr16,data16 $(bd) | \
+		sed 's/^[^:]*://g' > b
+
+	diff --color -u a b

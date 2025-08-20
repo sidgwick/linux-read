@@ -1,0 +1,17 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/include/**", // 项目路径（强制首位）
+      ],
+      "browse": {
+        "path": [], // 禁用自动扫描，避免干扰
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "compilerPath": "/usr/bin/gcc", // 指定编译器路径
+      "intelliSenseMode": "linux-gcc-x86"
+    }
+  ],
+  "version": 4
+}
