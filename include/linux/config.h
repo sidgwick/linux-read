@@ -1,6 +1,10 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
+/**
+ * 这个头文件定义了系统的名字, 还有系统在内存里面的参数相关的信息
+ */
+
 /*
  * Defines for what uname() should return
  */
