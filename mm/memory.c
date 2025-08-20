@@ -214,8 +214,8 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
                 read_swap_page(this_page >> 1, (char *)new_page);
                 *to_page_table = this_page;
                 *from_page_table =
-                    new_page | (PAGE_DIRTY |
-                                7); /* TODO: 这里设置 DIRTY 的含义, 可能是
+                    new_page |
+                    (PAGE_DIRTY | 7); /* TODO: 这里设置 DIRTY 的含义, 可能是
                                        '标记为 dirty 之后无法共享这个页' ??? */
                 continue;
             }

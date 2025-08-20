@@ -131,8 +131,8 @@ static struct {
 #define video_erase_char (vc_cons[currcons].vc_video_erase_char)
 #define iscolor (vc_cons[currcons].vc_iscolor)
 
-int blankinterval = 0;
-int blankcount = 0;
+int blankinterval = 0; // 设定的屏幕黑屏间隔时间
+int blankcount = 0;    // 黑屏时间计数
 
 static void sysbeep(void);
 

@@ -226,7 +226,8 @@ void fdiv(const temp_real *, const temp_real *, temp_real *);
 
 /* compare.c */
 // 比较函数
-void fcom(const temp_real *, const temp_real *); // 仿真浮点指令FCOM，比较两个数
+void fcom(const temp_real *,
+          const temp_real *); // 仿真浮点指令FCOM，比较两个数
 void fucom(const temp_real *,
            const temp_real *); // 仿真浮点指令FUCOM，无次序比较
 void ftst(const temp_real *); // 仿真浮点指令FTST，栈顶累加器与0比较

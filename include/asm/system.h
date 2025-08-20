@@ -27,17 +27,17 @@
 // SSSS-OOOO
 // i 是 `立即数` 约束
 // o 是 `内存地址偏移` 约束
-#define _set_gate(gate_addr, type, dpl, addr)                                        \
-    __asm__(                                                                         \
+#define _set_gate(gate_addr, type, dpl, addr)                                          \
+    __asm__(                                                                           \
         "movw %%dx,%%ax\n\t" /* EAX = 0x0008_OOOO, SSSS=0x0008 = 1# 描述符,       \
-                                GDT, dpl=0 */                                        \
-        "movw %0,%%dx\n\t"   /* EDX = OOOO_ABCD */                                   \
-        "movl %%eax,%1\n\t"  /* 装到 gate_addr */                                  \
-        "movl %%edx,%2"      /* 装到 gate_addr */                                  \
-        :                                                                            \
-        : "i"((short)(0x8000 + (dpl << 13) + (type << 8))), /* 构造属性部分 */ \
-          "o"(*((char *)(gate_addr))), /* 门描述符的低 4 字节地址 */       \
-          "o"(*(4 + (char *)(gate_addr))), /* 门描述符的高 4 字节地址 */   \
+                                GDT, dpl=0 */ \
+        "movw %0,%%dx\n\t"  /* EDX = OOOO_ABCD */                                      \
+        "movl %%eax,%1\n\t" /* 装到 gate_addr */                                     \
+        "movl %%edx,%2"     /* 装到 gate_addr */                                     \
+        :                                                                              \
+        : "i"((short)(0x8000 + (dpl << 13) + (type << 8))), /* 构造属性部分 */   \
+          "o"(*((char *)(gate_addr))), /* 门描述符的低 4 字节地址 */         \
+          "o"(*(4 + (char *)(gate_addr))), /* 门描述符的高 4 字节地址 */     \
           "d"((char *)(addr)), "a"(0x00080000))
 
 /*
@@ -83,19 +83,20 @@ Intel 把中断描述符分三类：任务门、中断门、陷阱门，而Linux
 ///     D/B 字段控制的是
 //          1. 代码段: 操作数位数和有效地址长度
 //          1. 数据段: 栈操作的长度和栈的边界
-#define _set_tssldt_desc(n, addr, type)                                                     \
-    __asm__("movw $104,%1\n\t" /* TSS, LDT 的 limit 都被设置为 104 字节 */          \
-            "movw %%ax,%2\n\t"   /* base 的低16位 */                                     \
-            "rorl $16,%%eax\n\t" /* AX = base 高 16 位 */                                 \
-            "movb %%al,%3\n\t"   /* base 的第三字节 */                                 \
-            "movb $" type ",%4\n\t" /* type 指定描述符 p_dpl_s_type 这几位 */       \
-            "movb $0x00,%5\n\t" /* g_db_l_avl = 0000, L=0000 主要是考虑 limit          \
+#define _set_tssldt_desc(n, addr, type)                                                   \
+    __asm__(                                                                              \
+        "movw $104,%1\n\t" /* TSS, LDT 的 limit 都被设置为 104 字节 */            \
+        "movw %%ax,%2\n\t" /* base 的低16位 */                                         \
+        "rorl $16,%%eax\n\t"    /* AX = base 高 16 位 */                                \
+        "movb %%al,%3\n\t"      /* base 的第三字节 */                                \
+        "movb $" type ",%4\n\t" /* type 指定描述符 p_dpl_s_type 这几位 */         \
+        "movb $0x00,%5\n\t" /* g_db_l_avl = 0000, L=0000 主要是考虑 limit          \
                                    用低 16 位足够存储, 因此这一位 L 就是 0 */ \
-            "movb %%ah,%6\n\t" /* base 的最高 1 字节 */                                \
-            "rorl $16,%%eax"   /* 恢复 EAX */                                             \
-            :                                                                               \
-            : "a"(addr), "m"(*(n)), "m"(*(n + 2)), "m"(*(n + 4)),                           \
-              "m"(*(n + 5)), "m"(*(n + 6)), "m"(*(n + 7)))
+        "movb %%ah,%6\n\t" /* base 的最高 1 字节 */                                  \
+        "rorl $16,%%eax"   /* 恢复 EAX */                                               \
+        :                                                                                 \
+        : "a"(addr), "m"(*(n)), "m"(*(n + 2)), "m"(*(n + 4)), "m"(*(n + 5)),              \
+          "m"(*(n + 6)), "m"(*(n + 7)))
 
 // 在 GDT 里面设置任务 N 的 TSS
 #define set_tss_desc(n, addr) _set_tssldt_desc(((char *)(n)), addr, "0x89")

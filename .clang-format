@@ -19,3 +19,9 @@ BraceWrapping:
 BreakBeforeBinaryOperators: None
 BreakBeforeBraces: Custom
 IndentWidth: 4
+ColumnLimit: 80
+ReflowComments: false
+# CommentPragmas: "^ +-"
+SpacesInLineCommentPrefix:
+  Minimum: 1 # 注释符后至少保留1个空格
+  Maximum: 1 # 注释符后最多保留1个空格

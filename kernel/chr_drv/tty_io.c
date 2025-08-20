@@ -388,6 +388,8 @@ int tty_write(unsigned channel, char *buf, int nr)
  */
 void do_tty_interrupt(int tty) { copy_to_cooked(TTY_TABLE(tty)); }
 
+/* 字符设备初始化函数
+ * 当前为空, 为以后扩展做准备 */
 void chr_dev_init(void) {}
 
 void tty_init(void)

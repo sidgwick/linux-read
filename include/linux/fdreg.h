@@ -37,16 +37,16 @@ extern void floppy_deselect(unsigned int nr);
 #define STATUS_READY 0x80 /* Data reg ready, 数据寄存器就绪位 */
 
 /* Bits of FD_ST0, 状态字节0（ST0）各比特位的含义 */
-#define ST0_DS                                                                     \
+#define ST0_DS                                                                 \
     0x03 /* drive select mask, 驱动器选择号（发生中断时驱动器号） \
           */
 #define ST0_HA 0x04 /* Head (Address), 磁头号 */
 #define ST0_NR 0x08 /* Not Ready, 磁盘驱动器未准备好 */
-#define ST0_ECE                                                                  \
+#define ST0_ECE                                                                \
     0x10 /* Equipment chech error, 设备检测出错（零磁道校准出错） \
           */
 #define ST0_SE 0x20 /* Seek end, 寻道或重新校正操作执行结束 */
-#define ST0_INTR                                                                                 \
+#define ST0_INTR                                                               \
     0xC0 /* Interrupt code mask, 中断代码位（中断原因），00 - 命令正常结束, 01 \
             - 命令异常结束；10 - 命令无效；11 - FDD就绪状态改变 */
 

@@ -152,11 +152,13 @@ extern inline void end_request(int uptodate)
         CLEAR_DEVICE_TIMEOUT                                                   \
         return;                                                                \
     }                                                                          \
-    if (MAJOR(CURRENT->dev) != MAJOR_NR)                                       \
+    if (MAJOR(CURRENT->dev) != MAJOR_NR) {                                     \
         panic(DEVICE_NAME ": request list destroyed");                         \
+    }                                                                          \
     if (CURRENT->bh) {                                                         \
-        if (!CURRENT->bh->b_lock)                                              \
+        if (!CURRENT->bh->b_lock) {                                            \
             panic(DEVICE_NAME ": block not locked");                           \
+        }                                                                      \
     }
 
 #endif

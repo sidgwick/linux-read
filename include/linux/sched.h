@@ -36,8 +36,8 @@
 #define LIBRARY_OFFSET (TASK_SIZE - LIBRARY_SIZE)
 
 #define CT_TO_SECS(x) ((x) / HZ) /* 滴答数转秒数 */
-#define CT_TO_USECS(x)                                                                                    \
-    (((x) % HZ) * 1000000 /                                                                               \
+#define CT_TO_USECS(x)                                                         \
+    (((x) % HZ) * 1000000 /                                                    \
      HZ) /* 滴答数对应的不足 1s 的毫秒数. 取余是求出不足 1s 的滴答数, 把它乘以 \
             1_000_000 / HZ 得到对应的毫秒数  */
 
@@ -150,7 +150,10 @@ struct task_struct {
     long blocked; /* bitmap of masked signals, 进程信号屏蔽码(对应信号位图) */
 
     /* various fields */
-    int exit_code; // 任务执行停止的退出码, 其父进程会取
+
+    /* 任务执行停止的退出码, 其父进程会取
+     * 值等于 0 表示进程的停止状态并非由信号触发​​, 或者​​停止状态已被处理并重置 */
+    int exit_code;
 
     unsigned long start_code; // 代码段开始地址(任务在 4GB 线性空间的线性地址,
                               // 在 64M 边界上)
@@ -173,10 +176,10 @@ struct task_struct {
      */
     struct task_struct *p_pptr; // Parent, 指向父进程的指针
     struct task_struct *p_cptr; // Child, 指向最新子进程的指针
-    struct task_struct
-        *p_ysptr; // Younger Sibling, 指向比自己后创建的相邻进程的指针
-    struct task_struct
-        *p_osptr; // Older Sibling, 指向比自己早创建的相邻进程的指针
+    /* Younger Sibling 指向比自己后创建的相邻进程的指针 */
+    struct task_struct *p_ysptr;
+    /* Older Sibling 指向比自己早创建的相邻进程的指针 */
+    struct task_struct *p_osptr;
 
     // TODO: 这些 UID/GID 的区别是什么?
     unsigned short uid;  // 用户标识号(用户id)
@@ -200,13 +203,13 @@ struct task_struct {
 
     unsigned int flags;
     /* per process flags, defined below */ // 各进程的标志,
-                                           // 在下面第149行开始定义(还未使用)
+    // 在下面第149行开始定义(还未使用)
     unsigned short used_math; // 标志：是否使用了协处理器
                               /* file system info */
     int tty;
-        /* -1 if no tty, so it must be signed */ // 进程使用tty终端的子设备号.
-                                                 // -1表示没有使用
-    unsigned short umask;       // 文件创建属性屏蔽位
+    /* -1 if no tty, so it must be signed */ // 进程使用tty终端的子设备号.
+                                             // -1表示没有使用
+    unsigned short umask;                    // 文件创建属性屏蔽位
     struct m_inode *pwd;        // 当前工作目录 i 节点结构指针
     struct m_inode *root;       // 根目录 i 节点结构指针
     struct m_inode *executable; // 执行文件 i 节点结构指针
@@ -395,22 +398,24 @@ extern int in_group_p(gid_t grp);
     ((((unsigned long)n) << 4) +                                               \
      (FIRST_LDT_ENTRY << 3)) // 第 n 个任务的 LDT 选择子
 #define ltr(n)                                                                 \
-    __asm__("ltr %%ax" ::"a"(_TSS(n))) // 装载第 N 个任务的 TSS. TaskRegister
+    __asm__(                                                                   \
+        "ltr %%ax" ::"a"(_TSS(n))) // 装载第 N 个任务的 TSS. TaskRegister \
                                        // 里面装载的是 Task State Segement
 #define lldt(n) __asm__("lldt %%ax" ::"a"(_LDT(n))) // 装载第 N 个任务的 LDT
 
 // 取当前运行任务的任务号(是任务数组中的索引值, 与进程号pid不同)
 // 返回：n - 当前任务号. 用于( kernel/traps.c )
-#define str(n)                                                                         \
-    __asm__("str %%ax\n\t" /* 将任务寄存器中TSS段的选择符复制到ax中 */ \
-            "subl %2,%%eax\n\t" /* 当前任务的 TSS 指针减去                    \
+#define str(n)                                                                       \
+    __asm__(                                                                         \
+        "str %%ax\n\t" /* 将任务寄存器中TSS段的选择符复制到ax中 */   \
+        "subl %2,%%eax\n\t" /* 当前任务的 TSS 指针减去                    \
                                    (FIRST_TSS_ENTRY<<3), 这实际上是 TSS(Task0)    \
-                                   到 TSS(current) 的偏移量 */                    \
-            "shrl $4,%%eax" /* 因为每个任务的 TSS + LDT 一共占据 16 字节, \
+                                   到 TSS(current) 的偏移量 */ \
+        "shrl $4,%%eax" /* 因为每个任务的 TSS + LDT 一共占据 16 字节, \
                                因此上面计算好的偏移量除以 16              \
-                               就是当前任务的任务号 */                       \
-            : "=a"(n)                                                                  \
-            : "a"(0), "i"(FIRST_TSS_ENTRY << 3))
+                               就是当前任务的任务号 */ \
+        : "=a"(n)                                                                    \
+        : "a"(0), "i"(FIRST_TSS_ENTRY << 3))
 
 /* switch_to(n) should switch tasks to task nr n, first
  * checking that n isn't the current task, in which case it does nothing.
@@ -437,27 +442,27 @@ extern int in_group_p(gid_t grp);
  * switch_to(n)将切换当前任务到任务nr, 即n. 首先检测任务n不是当前任务,
  * 如果是则什么也不做退出. 如果我们切换到的任务最近(上次运行)使用过数学
  * 协处理器的话, 则还需复位控制寄存器 cr0 中的 TS 标志 */
-#define switch_to(n)                                                                          \
-    {                                                                                         \
-        struct {                                                                              \
-            long a, b;                                                                        \
-        } __tmp;                                                                              \
-        __asm__(                                                                              \
+#define switch_to(n)                                                                            \
+    {                                                                                           \
+        struct {                                                                                \
+            long a, b;                                                                          \
+        } __tmp;                                                                                \
+        __asm__(                                                                                \
             "cmpl %%ecx,current\n\t" /* 检查任务 n 是不是当前任务, 是直接退出 \
-                                      */                                                      \
-            "je 1f\n\t"                                                                       \
-            "movw %%dx,%1\n\t" /* 将任务的 TSS 描述符指针, 移动到 __tmp.b */      \
+                                      */ \
+            "je 1f\n\t"                                                                         \
+            "movw %%dx,%1\n\t" /* 将任务的 TSS 描述符指针, 移动到 __tmp.b */        \
             "xchgl %%ecx,current\n\t" /* 交换 %ecx 和 current, 这样 current              \
-                                         里面就是任务 n 的 task 结构指针了 */     \
+                                         里面就是任务 n 的 task 结构指针了 */ \
             "ljmp %0\n\t" /* 跳转到新任务执行, 这里主要用 TSS 描述符,         \
-                             因此上面只填充了 b 字段 */                             \
+                             因此上面只填充了 b 字段 */ \
             "cmpl %%ecx,last_task_used_math\n\t" /* 任取切换回来之后,                 \
                                                     从这里继续,                          \
-                                                    检查数学协处理器的情况 */      \
-            "jne 1f\n\t"                                                                      \
-            "clts\n" /* 如果本任务之前用到了协处理器, 需要清空 TS 标记 */ \
-            "1:" ::"m"(*&__tmp.a),                                                            \
-            "m"(*&__tmp.b), "d"(_TSS(n)), "c"((long)task[n]));                                \
+                                                    检查数学协处理器的情况 */ \
+            "jne 1f\n\t"                                                                        \
+            "clts\n" /* 如果本任务之前用到了协处理器, 需要清空 TS 标记 */   \
+            "1:" ::"m"(*&__tmp.a),                                                              \
+            "m"(*&__tmp.b), "d"(_TSS(n)), "c"((long)task[n]));                                  \
     }
 
 // 4Kb 对齐
@@ -465,15 +470,15 @@ extern int in_group_p(gid_t grp);
 
 // 更新位于地址 addr 处描述符中的基地址字段(基地址是base)
 // 假如 base = %edx = HGEF_CDAB
-#define _set_base(addr, base)                                                            \
+#define _set_base(addr, base)                                                              \
     __asm__("movw %%dx,%0\n\t" /* base 一开始被加载到 %edx, 因此这里就是把 \
-                                *(addr+2) = DCBA */                                      \
-            "rorl $16,%%edx\n\t" /* ror $16, %ebx --> CDAB_HGEF */                       \
-            "movb %%dl,%1\n\t"   /* *(addr+4) = dl = EF */                               \
-            "movb %%dh,%2"       /* *(addr+7) = dh = GH */                               \
-            :                                                                            \
-            : "m"(*((addr) + 2)), "m"(*((addr) + 4)), "m"(*((addr) + 7)),                \
-              "d"(base)                                                                  \
+                                *(addr+2) = DCBA */ \
+            "rorl $16,%%edx\n\t" /* ror $16, %ebx --> CDAB_HGEF */                         \
+            "movb %%dl,%1\n\t"   /* *(addr+4) = dl = EF */                                 \
+            "movb %%dh,%2"       /* *(addr+7) = dh = GH */                                 \
+            :                                                                              \
+            : "m"(*((addr) + 2)), "m"(*((addr) + 4)), "m"(*((addr) + 7)),                  \
+              "d"(base)                                                                    \
             : "dx")
 
 // 更新位于地址 addr 处描述符的 limit 字段, 注意 limit 在高位字节部分是

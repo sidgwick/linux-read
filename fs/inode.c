@@ -151,6 +151,7 @@ int create_block(struct m_inode *inode, int block)
     return _bmap(inode, block, 1);
 }
 
+/* TODO: exit 的时候用到了, 回过头来看看 */
 void iput(struct m_inode *inode)
 {
     if (!inode)

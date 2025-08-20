@@ -7,7 +7,7 @@
 #define _HIGH(v) (((v) >> 8) & 0377) // 取高字节
 
 // 以下常数符号是函数 waitpid 入参中 options 使用的选项
-#define WNOHANG 1   // 如果没有状态也不要挂起, 并立刻返回
+#define WNOHANG 1 // 如果子进程没有处于退出或终止态也立刻返回
 #define WUNTRACED 2 // 报告停止执行的子进程状态
 
 // 以下宏定义用于判断 waitpid 函数返回的状态字(stat_loc)的含义

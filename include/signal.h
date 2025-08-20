@@ -58,8 +58,9 @@ typedef unsigned int sigset_t; /* 32 bits, 定义信号集类型 */
  * 这两个指针值是逻辑上讲实际上不可能出现的函数地址值, 可作为下面 signal
  * 函数的第二个参数 用于告知内核, 让内核处理信号或忽略对信号的处理 使用方法参见
  * kernel/signal.c 程序 */
-#define SIG_DFL                                                                           \
-    ((void (*)(int))0) /* default signal handling, 默认信号处理程序(信号句柄) \
+#define SIG_DFL                                                                \
+    ((void (*)(                                                                \
+        int))0) /* default signal handling, 默认信号处理程序(信号句柄) \
                         */
 #define SIG_IGN ((void (*)(int))1) /* ignore signal, 忽略信号的处理程序 */
 #define SIG_ERR                                                                \

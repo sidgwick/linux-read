@@ -178,9 +178,8 @@ void main(void) /* This really IS void, no error here. */
         buffer_memory_end = 2 * 1024 * 1024;
     else // 如果内存容量小于等于 6M, 给 buffer_memory_end 分配 1M
         buffer_memory_end = 1 * 1024 * 1024;
-    main_memory_start =
-        buffer_memory_end; // 内存布局上 0 ->
-                           // buffer_memory_end(main_memory_start) -> end
+    main_memory_start = buffer_memory_end; // 内存布局上 0 ->
+        // buffer_memory_end(main_memory_start) -> end
 
 #ifdef RAMDISK
     // 如果使用 RAMDISK, 在 buffer_memory_end 和 main_memory_start 之间,
