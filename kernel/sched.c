@@ -20,9 +20,11 @@
 
 #include <signal.h>
 
-#define _S(nr) (1 << ((nr) - 1)) /* 信号在信号位图中的索引 */
-#define _BLOCKABLE                                                             \
-    (~(_S(SIGKILL) | _S(SIGSTOP))) /* SIGKILL 和 SIGSTOP 不可被 block */
+/* 信号在信号位图中的索引 */
+#define _S(nr) (1 << ((nr) - 1))
+
+/* SIGKILL 和 SIGSTOP 不可被 block */
+#define _BLOCKABLE (~(_S(SIGKILL) | _S(SIGSTOP)))
 
 void show_task(int nr, struct task_struct *p)
 {
@@ -33,20 +35,22 @@ void show_task(int nr, struct task_struct *p)
 
     /* 检测指定任务数据结构以后等于 0 的字节数 */
     i = 0;
-    while (i < j && !((char *)(p + 1))[i])
+    while (i < j && !((char *)(p + 1))[i]) {
         i++;
+    }
 
     printk("%d/%d chars free in kstack\n\r", i, j);
     // TODO: 1019 是 tss.eip 的偏移量???
     //       看着似乎不是, tss.eip 偏移量是 0x3d0, 1019x4 算下来是 0xfec,
     //       差的还挺多的
     printk("   PC=%08X.", *(1019 + (unsigned long *)p));
-    if (p->p_ysptr || p->p_osptr)
+    if (p->p_ysptr || p->p_osptr) {
         printk("   Younger sib=%d, older sib=%d\n\r",
                p->p_ysptr ? p->p_ysptr->pid : -1,
                p->p_osptr ? p->p_osptr->pid : -1);
-    else
+    } else {
         printk("\n\r");
+    }
 }
 
 // 显示所有任务的任务号、进程号、进程状态和内核堆栈空闲字节数(大约)
@@ -56,9 +60,11 @@ void show_state(void)
     int i;
 
     printk("\rTask-info:\n\r");
-    for (i = 0; i < NR_TASKS; i++)
-        if (task[i])
+    for (i = 0; i < NR_TASKS; i++) {
+        if (task[i]) {
             show_task(i, task[i]);
+        }
+    }
 }
 
 // PC 机 8253 定时芯片的输入时钟频率约为 1.193180MHz, Linux
@@ -129,8 +135,9 @@ struct {
 void math_state_restore()
 {
     /* 如果上一个任务就是当前任务 */
-    if (last_task_used_math == current)
+    if (last_task_used_math == current) {
         return;
+    }
 
     /* 在发送协处理器命令之前要先发 WAIT 指令
      * 如果上个任务使用了协处理器, 则保存其状态 */
@@ -144,7 +151,7 @@ void math_state_restore()
      * 于是就向协处理器发初始化命令, 并设置使用了协处理器标志 */
     last_task_used_math = current;
     if (current->used_math) {
-        __asm__("frstor %0" ::"m"(current->tss.i387));
+        __asm__("frstor %0" : : "m"(current->tss.i387));
     } else {
         __asm__("fninit" ::);
         current->used_math = 1;
@@ -175,8 +182,9 @@ void schedule(void)
              */
             if ((*p)->timeout && (*p)->timeout < jiffies) {
                 (*p)->timeout = 0;
-                if ((*p)->state == TASK_INTERRUPTIBLE)
+                if ((*p)->state == TASK_INTERRUPTIBLE) {
                     (*p)->state = TASK_RUNNING;
+                }
             }
 
             /* 闹钟到时间, 发送闹钟信号
@@ -194,8 +202,9 @@ void schedule(void)
              * (*p)->blocked)` 用于忽略被阻塞的信号, 但 SIGKILL 和 SIGSTOP
              * 不能被阻塞 */
             if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
-                (*p)->state == TASK_INTERRUPTIBLE)
+                (*p)->state == TASK_INTERRUPTIBLE) {
                 (*p)->state = TASK_RUNNING;
+            }
         }
 
     /* this is the scheduler proper:
@@ -211,8 +220,9 @@ void schedule(void)
          * 比较每个就绪状态任务的运行时间的递减滴答计数(counter)值, 哪一个值大,
          * 说明这个任务运行时间还不长, next 就指向哪个的任务号 */
         while (--i) {
-            if (!*--p)
+            if (!*--p) {
                 continue;
+            }
 
             if ((*p)->state == TASK_RUNNING && (*p)->counter > c) {
                 c = (*p)->counter, next = i;
@@ -227,8 +237,10 @@ void schedule(void)
          * `counter = counter/2 + priority`
          *
          * 注意, 这里计算过程不考虑进程的状态 */
-        if (c)
+        if (c) {
             break;
+        }
+
         for (p = &LAST_TASK; p > &FIRST_TASK; --p) {
             if (*p) {
                 (*p)->counter = ((*p)->counter >> 1) + (*p)->priority;
@@ -271,12 +283,14 @@ static inline void __sleep_on(struct task_struct **p, int state)
 {
     struct task_struct *tmp;
 
-    if (!p)
+    if (!p) {
         return;
+    }
 
     /* task-0 不允许进入睡眠 */
-    if (current == &(init_task.task))
+    if (current == &(init_task.task)) {
         panic("task[0] trying to sleep");
+    }
 
     /* 让 tmp 指向已经在等待队列上的任务(如果有的话), 例如 inode->i_wait.
      * 并且将睡眠队列头的等待指针指向当前任务, 这样就把当前任务插入到了 *p
@@ -309,11 +323,13 @@ repeat:
     // 的任务（*p = tmp）。
     // 若确实存在这样一个任务，即队列中还有任务（tmp不为空），就
     // 唤醒之。最先进入队列的任务在唤醒后运行时最终会把等待队列头指针置成NULL。
-    if (!*p)
+    if (!*p) {
         printk("Warning: *P = NULL\n\r");
+    }
 
-    if (*p = tmp)
+    if (*p = tmp) {
         tmp->state = 0;
+    }
 }
 
 /* 将当前任务置为可中断的等待状态(TASK_INTERRUPTIBLE)
@@ -326,18 +342,26 @@ void interruptible_sleep_on(struct task_struct **p)
 /* 把当前任务置为不可中断的等待状态(TASK_UNINTERRUPTIBLE)
  * 并让睡眠队列头指针指向当前任务. 只有明确地唤醒时才会返回, 该函数提供了进程
  * 与中断处理程序之间的同步机制 */
-void sleep_on(struct task_struct **p) { __sleep_on(p, TASK_UNINTERRUPTIBLE); }
+void sleep_on(struct task_struct **p)
+{
+    __sleep_on(p, TASK_UNINTERRUPTIBLE);
+}
 
 /* 唤醒 *p 指向的任务
  * TODO: 看这意思是僵尸进程和已经停止的进程, 还能被重新唤醒??? */
 void wake_up(struct task_struct **p)
 {
     if (p && *p) {
-        if ((**p).state == TASK_STOPPED) /* 处于停止状态 */
+        if ((**p).state == TASK_STOPPED) { /* 处于停止状态 */
             printk("wake_up: TASK_STOPPED");
-        if ((**p).state == TASK_ZOMBIE) /* 处于僵死状态 */
+        }
+
+        if ((**p).state == TASK_ZOMBIE) { /* 处于僵死状态 */
             printk("wake_up: TASK_ZOMBIE");
-        (**p).state = 0; /* 置为就绪状态 0, 也即 TASK_RUNNING */
+        }
+
+        /* 置为就绪状态 0, 也即 TASK_RUNNING */
+        (**p).state = TASK_RUNNING;
     }
 }
 
@@ -379,8 +403,9 @@ int ticks_to_floppy_on(unsigned int nr)
     unsigned char mask = 0x10 << nr;
 
     // 系统最多有4个软驱
-    if (nr > 3)
+    if (nr > 3) {
         panic("floppy_on: nr>3");
+    }
 
     // 首先预先设置好指定软驱nr停转之前需要经过的时间(100秒)
     // 然后取当前DOR寄存器值到临时变量mask中, 并把指定软驱的马达启动标志置位
@@ -398,6 +423,7 @@ int ticks_to_floppy_on(unsigned int nr)
         /* 如果数字输出寄存器的当前值与要求的值不同, 则向 FDC 的 DOR
          * 输出新值(mask) */
         outb(mask, FD_DOR);
+
         /* 异或操作 `^` 结果是相同位置 0, 不同置 1
          * 下面这个条件就是在看 mask 和 current_DOR 高 4 位有没有不同值
          * 上面的逻辑给 mask 的高 4 bits 可能有赋 1 操作(表示启用对应的软驱),
@@ -405,10 +431,12 @@ int ticks_to_floppy_on(unsigned int nr)
          * 这时候就给 mon_timer 数组对应的定时器设置 0.5 秒延时 否则说明 nr
          * 对应的那个软驱已经是启动状态, 简单的设置为 2 个滴答, 以满足
          * do_floppy_timer 中先递 减后判断的要求 */
-        if ((mask ^ current_DOR) & 0xf0)
+        if ((mask ^ current_DOR) & 0xf0) {
             mon_timer[nr] = HZ / 2;
-        else if (mon_timer[nr] < 2)
+        } else if (mon_timer[nr] < 2) {
             mon_timer[nr] = 2;
+        }
+
         current_DOR = mask;
     }
 
@@ -431,15 +459,19 @@ void floppy_on(unsigned int nr)
      * 下面 sleep_on 切换任务之后, 不影响其他任务继续使用中断 */
     cli();
 
-    while (ticks_to_floppy_on(nr))
+    while (ticks_to_floppy_on(nr)) {
         sleep_on(nr + wait_motor);
+    }
 
     sti();
 }
 
 /* 置关闭相应软驱马达停转定时器(3秒)
  * 若不使用该函数明确关闭指定的软驱马达, 则在马达开启 100 秒之后也会被关闭 */
-void floppy_off(unsigned int nr) { moff_timer[nr] = 3 * HZ; }
+void floppy_off(unsigned int nr)
+{
+    moff_timer[nr] = 3 * HZ;
+}
 
 /* 软盘定时器程序, 用于更新马达启动定时值和马达关闭停转计时值
  * 该子程序会在时钟定时中断过程中被调用, 因此系统每经过一个滴答(10ms)
@@ -452,18 +484,24 @@ void do_floppy_timer(void)
     unsigned char mask = 0x10;
 
     for (i = 0; i < 4; i++, mask <<= 1) {
-        if (!(mask & current_DOR)) /* 如果不是 DOR 指定的马达则跳过*/
+        if (!(mask & current_DOR)) {
+            /* 如果不是 DOR 指定的马达则跳过 */
             continue;
+        }
 
-        if (mon_timer[i]) { /* 如果设置了马达启动定时尝试到时间唤醒进程 */
-            if (!--mon_timer[i])
+        if (mon_timer[i]) {
+            /* 如果设置了马达启动定时尝试到时间唤醒进程 */
+            if (!--mon_timer[i]) {
                 wake_up(i + wait_motor);
-        } else if (!moff_timer[i]) { /* 如果设置了马达停转定时,
-                                        则尝试到时间关闭软驱马达 */
+            }
+        } else if (!moff_timer[i]) {
+            /* 如果设置了马达停转定时, 则尝试到时间关闭软驱马达 */
             current_DOR &= ~mask;
             outb(current_DOR, FD_DOR);
-        } else /* 否则马达停转计时递减 */
+        } else {
+            /* 否则马达停转计时递减 */
             moff_timer[i]--;
+        }
     }
 }
 
@@ -486,21 +524,26 @@ void add_timer(long jiffies, void (*fn)(void))
     struct timer_list *p;
 
     /* 必须有处理函数 */
-    if (!fn)
+    if (!fn) {
         return;
+    }
 
     cli(); /* 清中断 */
 
-    if (jiffies <= 0)
-        /* 如果定时值 <= 0, 则立刻调用其处理程序, 并且该定时器不加入链表中 */
+    if (jiffies <=
+        0) { /* 如果定时值 <= 0, 则立刻调用其处理程序, 并且该定时器不加入链表中 */
         (fn)();
-    else {
+    } else {
         /* 在定时器数组里面, 找一个空闲的位置 */
-        for (p = timer_list; p < timer_list + TIME_REQUESTS; p++)
-            if (!p->fn)
+        for (p = timer_list; p < timer_list + TIME_REQUESTS; p++) {
+            if (!p->fn) {
                 break;
-        if (p >= timer_list + TIME_REQUESTS)
+            }
+        }
+
+        if (p >= timer_list + TIME_REQUESTS) {
             panic("No more time requests free");
+        }
 
         /* 设置定时器 */
         p->fn = fn;
@@ -547,10 +590,13 @@ void do_timer(long cpl)
      * 计数不为零, 则递减之, 并且复位黑屏标志
      * TODO: 以后有时间再看看这块是怎么弄的, 和核心流程没关系, 跳过 */
     if (blankcount || !blankinterval) {
-        if (blanked)
+        if (blanked) {
             unblank_screen();
-        if (blankcount)
+        }
+
+        if (blankcount) {
             blankcount--;
+        }
         blanked = 0;
     } else if (!blanked) {
         blank_screen();
@@ -558,25 +604,30 @@ void do_timer(long cpl)
     }
 
     /* 硬盘访问超时处理 */
-    if (hd_timeout)
-        if (!--hd_timeout)
+    if (hd_timeout) {
+        if (!--hd_timeout) {
             hd_times_out();
+        }
+    }
 
     /* 蜂鸣计数次到, 关闭发声 */
-    if (beepcount)
-        if (!--beepcount)
+    if (beepcount) {
+        if (!--beepcount) {
             sysbeepstop();
+        }
+    }
 
     /* 根据 cpl, 追加时间片统计 */
-    if (cpl)
+    if (cpl) {
         current->utime++;
-    else
+    } else {
         current->stime++;
+    }
 
     /* 如果有定时器存在, 则遍历定时器列表 */
     if (next_timer) {
         next_timer->jiffies--; /* 减掉相应的时间片 */
-                               /* 时间到 */
+        /* 时间到 */
         while (next_timer && next_timer->jiffies <= 0) {
             void (*fn)(void);
 
@@ -589,16 +640,21 @@ void do_timer(long cpl)
 
     /* 如果当前软盘控制器 FDC 的数字输出寄存器中马达启动位有置位的,
      * 则执行软盘定时程序 */
-    if (current_DOR & 0xf0)
+    if (current_DOR & 0xf0) {
         do_floppy_timer();
+    }
 
     // 如果进程运行时间还没完, 则退出. 否则置当前任务运行计数值为 0,
     // 并且若发生时钟中断时 正在内核代码中运行则返回, 否则调用执行调度函数
-    if ((--current->counter) > 0)
+    if ((--current->counter) > 0) {
         return;
+    }
+
     current->counter = 0;
-    if (!cpl)
+    if (!cpl) {
         return; /* 内核态程序不予重调度 */
+    }
+
     schedule();
 }
 
@@ -616,36 +672,58 @@ int sys_alarm(long seconds)
 {
     int old = current->alarm;
 
-    if (old)
+    if (old) {
         old = (old - jiffies) / HZ;
+    }
+
     current->alarm = (seconds > 0) ? (jiffies + HZ * seconds) : 0;
     return (old);
 }
 
 /* 取进程号 pid */
-int sys_getpid(void) { return current->pid; }
+int sys_getpid(void)
+{
+    return current->pid;
+}
 
 /* 取父进程号 pid */
-int sys_getppid(void) { return current->p_pptr->pid; }
+int sys_getppid(void)
+{
+    return current->p_pptr->pid;
+}
 
 /* 取用户号 uid */
-int sys_getuid(void) { return current->uid; }
+int sys_getuid(void)
+{
+    return current->uid;
+}
 
 /* 取有效的用户号 euid */
-int sys_geteuid(void) { return current->euid; }
+int sys_geteuid(void)
+{
+    return current->euid;
+}
 
 /* 取组号 gid */
-int sys_getgid(void) { return current->gid; }
+int sys_getgid(void)
+{
+    return current->gid;
+}
 
 /* 取有效的组号 egid */
-int sys_getegid(void) { return current->egid; }
+int sys_getegid(void)
+{
+    return current->egid;
+}
 
 /* 系统调用功能 -- 降低对 CPU 的使用优先权
  * 应该限制 increment 为大于 0 的值, 否则可使优先权增大!!! */
 int sys_nice(long increment)
 {
-    if (current->priority - increment > 0)
+    if (current->priority - increment > 0) {
         current->priority -= increment;
+    }
+
     return 0;
 }
 
@@ -656,8 +734,9 @@ void sched_init(void)
     int i;
     struct desc_struct *p;
 
-    if (sizeof(struct sigaction) != 16)
+    if (sizeof(struct sigaction) != 16) {
         panic("Struct sigaction MUST be 16 bytes");
+    }
 
     /* 在 GDT 里面设置第 0 个任务的 TSS 和 LDT 描述符 */
     set_tss_desc(gdt + FIRST_TSS_ENTRY, &(init_task.task.tss));
@@ -675,7 +754,9 @@ void sched_init(void)
 
     /* Clear NT, so that we won't have troubles with that later on
      * 清理 NT 位 */
-    __asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
+    __asm__("pushfl"
+            "andl $0xffffbfff, (%esp)"
+            "popfl");
 
     ltr(0);  /* 装载第 0 个任务的 TSS */
     lldt(0); /* 装载第 0 个任务的 LDT */
@@ -690,6 +771,7 @@ void sched_init(void)
     /* 设置时钟中断处理程序句柄(设置时钟中断门)
      * IRQ0 ~ 0x20 号中断 */
     set_intr_gate(0x20, &timer_interrupt);
+
     /* 修改 8259A 主片中断控制器屏蔽码, 允许时钟中断 */
     outb(inb_p(0x21) & ~0x01, 0x21);
 

@@ -148,19 +148,40 @@ struct swd {
 
 // 常数定义
 #define CONSTZ                                                                 \
-    (temp_real_unaligned) { 0x0000, 0x0000, 0x0000, 0x0000, 0x0000 } // 0
+    (temp_real_unaligned)                                                      \
+    {                                                                          \
+        0x0000, 0x0000, 0x0000, 0x0000, 0x0000                                 \
+    } // 0
 #define CONST1                                                                 \
-    (temp_real_unaligned) { 0x0000, 0x0000, 0x0000, 0x8000, 0x3FFF } // 1.0
+    (temp_real_unaligned)                                                      \
+    {                                                                          \
+        0x0000, 0x0000, 0x0000, 0x8000, 0x3FFF                                 \
+    } // 1.0
 #define CONSTPI                                                                \
-    (temp_real_unaligned) { 0xC235, 0x2168, 0xDAA2, 0xC90F, 0x4000 } // Pi
+    (temp_real_unaligned)                                                      \
+    {                                                                          \
+        0xC235, 0x2168, 0xDAA2, 0xC90F, 0x4000                                 \
+    } // Pi
 #define CONSTLN2                                                               \
-    (temp_real_unaligned) { 0x79AC, 0xD1CF, 0x17F7, 0xB172, 0x3FFE } // Loge(2)
+    (temp_real_unaligned)                                                      \
+    {                                                                          \
+        0x79AC, 0xD1CF, 0x17F7, 0xB172, 0x3FFE                                 \
+    } // Loge(2)
 #define CONSTLG2                                                               \
-    (temp_real_unaligned) { 0xF799, 0xFBCF, 0x9A84, 0x9A20, 0x3FFD } // Log10(2)
+    (temp_real_unaligned)                                                      \
+    {                                                                          \
+        0xF799, 0xFBCF, 0x9A84, 0x9A20, 0x3FFD                                 \
+    } // Log10(2)
 #define CONSTL2E                                                               \
-    (temp_real_unaligned) { 0xF0BC, 0x5C17, 0x3B29, 0xB8AA, 0x3FFF } // Log2(e)
+    (temp_real_unaligned)                                                      \
+    {                                                                          \
+        0xF0BC, 0x5C17, 0x3B29, 0xB8AA, 0x3FFF                                 \
+    } // Log2(e)
 #define CONSTL2T                                                               \
-    (temp_real_unaligned) { 0x8AFE, 0xCD1B, 0x784B, 0xD49A, 0x4000 } // Log2(10)
+    (temp_real_unaligned)                                                      \
+    {                                                                          \
+        0x8AFE, 0xCD1B, 0x784B, 0xD49A, 0x4000                                 \
+    } // Log2(10)
 
 // 设置80387各状态
 #define set_IE() (I387.swd |= 1)

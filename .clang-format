@@ -16,6 +16,14 @@ BraceWrapping:
   SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
+AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+
+# AllowAllParametersOfDeclarationOnNextLine: false
+# BinPackArguments: false
+# BinPackParameters: false
+# AllowAllParametersOfDeclarationOnNextLine: false
+
 BreakBeforeBinaryOperators: None
 BreakBeforeBraces: Custom
 IndentWidth: 4

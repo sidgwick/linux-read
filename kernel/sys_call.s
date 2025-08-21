@@ -346,16 +346,17 @@ _hd_interrupt:
 	jmp 1f			# give port chance to breathe
 1:	jmp 1f
 
-# do_hd 定义为一个函数指针, 将被赋值 read_intr 或 write_intr 函数地址. 放到 edx 寄存器后
-# 就将 do_hd 指针变量置为 NULL. 然后测试得到的函数指针, 若该指针为空, 则赋予该指针指向 C
-# 函数 unexpected_hd_interrupt, 以处理未知硬盘中断
-1:	xorl %edx,%edx
-	movl %edx,_hd_timeout # hd_timeout 置为 0, 表示控制器已在规定时间内产生了中断
-	xchgl _do_hd,%edx
-	testl %edx,%edx
+# do_hd 定义为一个函数指针, 将被赋值 read_intr 或 write_intr 函数地址
+# 放到 edx 寄存器后就将 do_hd 指针变量置为 NULL. 然后测试得到的函数指针,
+# 若该指针为空, 则赋予该指针指向 C 函数 unexpected_hd_interrupt, 以处理未知硬盘中断
+# 每次 hd_interrupt 之前都应该重新设置 do_hd
+1:	xorl %edx, %edx
+	movl %edx, _hd_timeout # hd_timeout 置为 0, 表示控制器已在规定时间内产生了中断
+	xchgl _do_hd, %edx
+	testl %edx, %edx
 	jne 1f
 	movl $_unexpected_hd_interrupt, %edx # 默认的中断处理函数
-1:	outb %al,$0x20 # EOI
+1:	outb %al, $0x20 # EOI
 	call *%edx		# "interesting" way of handling intr.
 	pop %fs
 	pop %es
@@ -366,12 +367,15 @@ _hd_interrupt:
 	iret
 
 
-
 # 其处理过程与上面对硬盘的处理基本一样(kernel/blk_drv/floppy.c)
 # 首先向 8259A 中断控制器主芯片发送 EOI 指令, 然后取变量 do_floppy 中的函数指针放入 eax 寄存器中,
 # 并置 do_floppy 为 NULL, 接着判断 eax 函数指针是否为空. 如为空, 则给 eax 赋值指向
-# unexpected_floppy_interrupt, 用于显示出错信息. 随后调用 eax 指向的函: rw_interrupt,
-# seek_interrupt, recal_interrupt, reset_interrupt或unexpected_floppy_interrupt
+# unexpected_floppy_interrupt, 用于显示出错信息. 随后调用 eax 指向的函数:
+#  - rw_interrupt,
+#  - seek_interrupt
+#  - recal_interrupt
+#  - reset_interrupt
+#  - unexpected_floppy_interrupt
 _floppy_interrupt:
 	pushl %eax
 	pushl %ecx
@@ -389,11 +393,13 @@ _floppy_interrupt:
 	movb $0x20,%al
 	outb %al,$0x20		# EOI to interrupt controller #1
 
-	xorl %eax,%eax
-	xchgl _do_floppy,%eax
-	testl %eax,%eax
+    # do_floppy = NULL
+    # 每次 floppy_interrupt 之前都应该重新设置 do_floppy
+	xorl %eax, %eax
+	xchgl _do_floppy, %eax
+	testl %eax, %eax
 	jne 1f
-	movl $_unexpected_floppy_interrupt,%eax
+	movl $_unexpected_floppy_interrupt, %eax
 1:	call *%eax		# "interesting" way of handling intr.
 	pop %fs
 	pop %es

@@ -250,6 +250,8 @@ repeat:
     return bh;
 }
 
+/*
+ * TODO: 块设备 hd.c 里面用到了这块, 回过头来在读一读*/
 void brelse(struct buffer_head *buf)
 {
     if (!buf)
@@ -263,6 +265,8 @@ void brelse(struct buffer_head *buf)
 /*
  * bread() reads a specified block and returns the buffer that contains
  * it. It returns NULL if the block was unreadable.
+ *
+ * TODO: 块设备 hd.c 里面用到了这块, 回过头来在读一读
  */
 struct buffer_head *bread(int dev, int block)
 {
@@ -318,6 +322,8 @@ void bread_page(unsigned long address, int dev, int b[4])
  * Ok, breada can be used as bread, but additionally to mark other
  * blocks for reading as well. End the argument list with a negative
  * number.
+ *
+ * TODO: RAMDISK 里面用到了
  */
 struct buffer_head *breada(int dev, int first, ...)
 {

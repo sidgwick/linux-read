@@ -241,6 +241,7 @@ int sys_mount(char *dev_name, char *dir_name, int rw_flag)
     return 0;          /* we do that in umount */
 }
 
+/* TODO: 在块设备 hd.c 里面有使用, 联系起来看看 */
 void mount_root(void)
 {
     int i, free;

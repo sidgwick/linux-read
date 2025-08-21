@@ -144,7 +144,10 @@ static int _bmap(struct m_inode *inode, int block, int create)
 }
 
 /* TODO: 内存缺页那个地方有调用, 回过头去品味相关逻辑 */
-int bmap(struct m_inode *inode, int block) { return _bmap(inode, block, 0); }
+int bmap(struct m_inode *inode, int block)
+{
+    return _bmap(inode, block, 0);
+}
 
 int create_block(struct m_inode *inode, int block)
 {

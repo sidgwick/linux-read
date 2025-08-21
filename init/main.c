@@ -23,9 +23,10 @@
 
 /* fork 函数复制了一份当前运行任务的副本
  * 然后更新属于新进程栈等等参数, 追加到任务队列里面, 等待调度 */
-static inline _syscall0(int, fork) static inline _syscall0(
-    int, pause) static inline _syscall1(int, setup, void *,
-                                        BIOS) static inline _syscall0(int, sync)
+static inline _syscall0(int, fork);
+static inline _syscall0(int, pause);
+static inline _syscall1(int, setup, void *, BIOS);
+static inline _syscall0(int, sync);
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -43,7 +44,7 @@ static inline _syscall0(int, fork) static inline _syscall0(
 
 #include <string.h>
 
-    static char printbuf[1024];
+static char printbuf[1024];
 
 extern char *strcpy();
 extern int vsprintf();
@@ -164,22 +165,27 @@ void main(void) /* This really IS void, no error here. */
     // 高速缓存末端地址 buffer_memory_end, 机器内存容量 memory_end
     // 主内存开始地址 main_memory_start
 
-    memory_end =
-        (1 << 20) + (EXT_MEM_K << 10); // 内存大小=1Mb + 扩展内存(k)*1024字节
+    /* 内存大小=1Mb + 扩展内存(k)*1024字节 */
+    memory_end = (1 << 20) + (EXT_MEM_K << 10);
     memory_end &= 0xfffff000; // 忽略掉高处没有 4K 对齐的部分
-    if (memory_end > 16 * 1024 * 1024) // 最多支持 16M 内存
+    if (memory_end > 16 * 1024 * 1024) {
+        /* 最多支持 16M 内存 */
         memory_end = 16 * 1024 * 1024;
-    if (memory_end >
-        12 * 1024 * 1024) // 如果内存容量大于 12M, 给 buffer_memory_end 分配 4M
+    }
+
+    if (memory_end > 12 * 1024 * 1024) {
+        /* 如果内存容量大于 12M, 给 buffer_memory_end 分配 4M */
         buffer_memory_end = 4 * 1024 * 1024;
-    else if (memory_end >
-             6 * 1024 *
-                 1024) // 如果内存容量大于 6M, 给 buffer_memory_end 分配 2M
+    } else if (memory_end > 6 * 1024 * 1024) {
+        /* 如果内存容量大于 6M, 给 buffer_memory_end 分配 2M */
         buffer_memory_end = 2 * 1024 * 1024;
-    else // 如果内存容量小于等于 6M, 给 buffer_memory_end 分配 1M
+    } else {
+        /* 如果内存容量小于等于 6M, 给 buffer_memory_end 分配 1M */
         buffer_memory_end = 1 * 1024 * 1024;
-    main_memory_start = buffer_memory_end; // 内存布局上 0 ->
-        // buffer_memory_end(main_memory_start) -> end
+    }
+
+    /* 内存布局上 0 -> buffer_memory_end(main_memory_start) -> end */
+    main_memory_start = buffer_memory_end;
 
 #ifdef RAMDISK
     // 如果使用 RAMDISK, 在 buffer_memory_end 和 main_memory_start 之间,
@@ -209,6 +215,7 @@ void main(void) /* This really IS void, no error here. */
     if (!fork()) { /* we count on this going ok */
         init();
     }
+
     /*
      *   NOTE!!   For any other task 'pause()' would mean we have to get a
      * signal to awaken, but task0 is the sole exception (see 'schedule()')

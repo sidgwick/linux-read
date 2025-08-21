@@ -54,4 +54,7 @@ void fcom(const temp_real *src1, const temp_real *src2)
     ftst(&a);
 }
 
-void fucom(const temp_real *src1, const temp_real *src2) { fcom(src1, src2); }
+void fucom(const temp_real *src1, const temp_real *src2)
+{
+    fcom(src1, src2);
+}

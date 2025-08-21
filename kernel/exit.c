@@ -553,7 +553,10 @@ volatile void do_exit(long code)
  *
  * 如果进程处于暂停状态(TASK_STOPPED), 那么其低字节就等于 0x7f
  * wait 或 waitpid 利用这些宏就可以取得子进程的退出状态码或子进程终止的原因(信号) */
-int sys_exit(int error_code) { do_exit((error_code & 0xff) << 8); }
+int sys_exit(int error_code)
+{
+    do_exit((error_code & 0xff) << 8);
+}
 
 /* 系统调用 waitpid
  * 挂起当前进程, 直到 pid 指定的子进程:
@@ -608,9 +611,7 @@ repeat:
          * 程序无须立刻返回, 或者子进程此时的退出码等于 0, 于是继续扫描处理其他子进程
          * 如果 WUNTRACED 置位且子进程退出码不为 0, 则把退出码移入高字节, 或上状态信息 0x7f 后放入
          * stat_addr, 在复位子进程退出码后就立刻返回子进程号 pid
-         * 这里 0x7f 表示的返回状态使 WIFSTOPPED 宏为真
-         *
-         * TODO: 退出码等于 0, 意味着什么???? */
+         * 这里 0x7f 表示的返回状态使 WIFSTOPPED 宏为真  */
         switch (p->state) {
         case TASK_STOPPED:
             /* 用 exit_code 判断可避免 waitpid 函数多次报告 p 的状态 */

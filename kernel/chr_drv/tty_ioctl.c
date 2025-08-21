@@ -44,10 +44,12 @@ static void flush(struct tty_queue *queue)
 }
 
 static void wait_until_sent(struct tty_struct *tty)
-{ /* do nothing - not implemented */ }
+{ /* do nothing - not implemented */
+}
 
 static void send_break(struct tty_struct *tty)
-{ /* do nothing - not implemented */ }
+{ /* do nothing - not implemented */
+}
 
 static int get_termios(struct tty_struct *tty, struct termios *termios)
 {

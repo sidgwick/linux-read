@@ -31,11 +31,20 @@ static int rw_tty(int rw, unsigned minor, char *buf, int count, off_t *pos)
     return rw_ttyx(rw, current->tty, buf, count, pos);
 }
 
-static int rw_ram(int rw, char *buf, int count, off_t *pos) { return -EIO; }
+static int rw_ram(int rw, char *buf, int count, off_t *pos)
+{
+    return -EIO;
+}
 
-static int rw_mem(int rw, char *buf, int count, off_t *pos) { return -EIO; }
+static int rw_mem(int rw, char *buf, int count, off_t *pos)
+{
+    return -EIO;
+}
 
-static int rw_kmem(int rw, char *buf, int count, off_t *pos) { return -EIO; }
+static int rw_kmem(int rw, char *buf, int count, off_t *pos)
+{
+    return -EIO;
+}
 
 static int rw_port(int rw, char *buf, int count, off_t *pos)
 {

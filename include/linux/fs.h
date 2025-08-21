@@ -29,8 +29,8 @@
 
 #define READ 0
 #define WRITE 1
-#define READA 2  /* read-ahead - don't pause */
-#define WRITEA 3 /* "write-ahead" - silly, but somewhat useful */
+#define READA 2  /* read-ahead(预读) - don't pause */
+#define WRITEA 3 /* write-ahead(预写) - silly, but somewhat useful */
 
 void buffer_init(long buffer_end); // 高速缓冲区初始化函数
 
@@ -47,10 +47,10 @@ void buffer_init(long buffer_end); // 高速缓冲区初始化函数
 #define NR_OPEN 20  // 进程最多打开文件数
 #define NR_INODE 64 // 系统同时最多使用I节点个数
 #define NR_FILE 64  // 系统最多文件个数（文件数组项数）
-#define NR_SUPER 8  // 系统所含超级块个数（超级块数组项数）
+#define NR_SUPER 8  // 系统所含超级块个数(超级块数组项数)
 #define NR_HASH 307 // 缓冲区Hash表数组项数值
 #define NR_BUFFERS nr_buffers // 系统所含缓冲块个数。初始化后不再改变
-#define BLOCK_SIZE 1024    // 数据块长度（字节值）
+#define BLOCK_SIZE 1024    // 数据块长度(字节值)
 #define BLOCK_SIZE_BITS 10 // 数据块长度所占比特位数
 
 #ifndef NULL
@@ -83,17 +83,20 @@ typedef char buffer_block[BLOCK_SIZE];
 // 缓冲块头数据结构(极为重要!!!)
 // 在程序中常用 bh 来表示 buffer_head 类型的缩写
 struct buffer_head {
-    char *b_data;             /* pointer to data block (1024 bytes), 指针 */
+    char *b_data; /* pointer to data block (1024 bytes), 指针 */
+
     unsigned long b_blocknr;  /* block number, 块号 */
     unsigned short b_dev;     /* device (0 = free), 数据源的设备号 */
-    unsigned char b_uptodate; /* 更新标志：表示数据是否已更新 */
+    unsigned char b_uptodate; /* 更新标志: 表示数据是否已更新 */
     unsigned char b_dirt; /* 0-clean,1-dirty, 修改标志:0未修改,1已修改 */
     unsigned char b_count; /* users using this block, 使用的用户数 */
     unsigned char b_lock;  /* 0 - ok, 1 -locked, 缓冲区是否被锁定 */
+
     struct task_struct *b_wait; /* 指向等待该缓冲区解锁的任务 */
-    struct buffer_head
-        *b_prev; /* hash队列上前一块（这四个指针用于缓冲区的管理） */
-    struct buffer_head *b_next;      /* hash队列上下一块 */
+
+    /* 以下四个指针用于缓冲区的管理 */
+    struct buffer_head *b_prev;      /* hash 队列上前一块 */
+    struct buffer_head *b_next;      /* hash 队列上下一块 */
     struct buffer_head *b_prev_free; /* 空闲表上前一块 */
     struct buffer_head *b_next_free; /* 空闲表上下一块 */
 };

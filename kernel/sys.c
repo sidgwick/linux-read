@@ -33,23 +33,44 @@ extern int session_of_pgrp(int pgrp);
 // 返回值是 -ENOSYS 的系统调用函数均表示在本版本内核中还未实现
 
 // 返回日期和时间(ftime = Fetch time)
-int sys_ftime() { return -ENOSYS; }
+int sys_ftime()
+{
+    return -ENOSYS;
+}
 
-int sys_break() { return -ENOSYS; }
+int sys_break()
+{
+    return -ENOSYS;
+}
 
 // 用于当前进程对子进程进行调试(debugging)
-int sys_ptrace() { return -ENOSYS; }
+int sys_ptrace()
+{
+    return -ENOSYS;
+}
 
 // 改变并打印终端行设置
-int sys_stty() { return -ENOSYS; }
+int sys_stty()
+{
+    return -ENOSYS;
+}
 
 // 取终端行设置信息
-int sys_gtty() { return -ENOSYS; }
+int sys_gtty()
+{
+    return -ENOSYS;
+}
 
 // 修改文件名
-int sys_rename() { return -ENOSYS; }
+int sys_rename()
+{
+    return -ENOSYS;
+}
 
-int sys_prof() { return -ENOSYS; }
+int sys_prof()
+{
+    return -ENOSYS;
+}
 
 /*
  * This is done BSD-style, with no consideration of the saved gid, except
@@ -111,16 +132,31 @@ int sys_setgid(int gid)
 }
 
 /* 打开或关闭进程计帐功能 */
-int sys_acct() { return -ENOSYS; }
+int sys_acct()
+{
+    return -ENOSYS;
+}
 
 /* 映射任意物理内存到进程的虚拟地址空间 */
-int sys_phys() { return -ENOSYS; }
+int sys_phys()
+{
+    return -ENOSYS;
+}
 
-int sys_lock() { return -ENOSYS; }
+int sys_lock()
+{
+    return -ENOSYS;
+}
 
-int sys_mpx() { return -ENOSYS; }
+int sys_mpx()
+{
+    return -ENOSYS;
+}
 
-int sys_ulimit() { return -ENOSYS; }
+int sys_ulimit()
+{
+    return -ENOSYS;
+}
 
 /* 返回从 1970-01-01 00:00:00 GMT 开始计时的时间值(秒).
  *
@@ -317,7 +353,10 @@ int sys_setpgid(int pid, int pgid)
 }
 
 /* 返回当前进程的进程组号, 与 getpgid(0) 等同 */
-int sys_getpgrp(void) { return current->pgrp; }
+int sys_getpgrp(void)
+{
+    return current->pgrp;
+}
 
 /* 创建一个会话(session)(即设置其leader=1), 并且设置其会话号=其组号=其进程号
  *
@@ -654,7 +693,10 @@ int sys_settimeofday(struct timeval *tv, struct timezone *tz)
  *
  * 把系统启动时间调整为以 GMT 为标准的时间
  * startup_time 是秒值, 因此这里需要把时区分钟值乘上 60 */
-void adjust_clock() { startup_time += sys_tz.tz_minuteswest * 60; }
+void adjust_clock()
+{
+    startup_time += sys_tz.tz_minuteswest * 60;
+}
 
 /* 设置当前进程创建文件属性屏蔽码为 mask & 0777, 并返回原屏蔽码 */
 int sys_umask(int mask)

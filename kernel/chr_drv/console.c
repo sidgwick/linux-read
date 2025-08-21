@@ -563,7 +563,10 @@ static void save_cur(int currcons)
     saved_y = y;
 }
 
-static void restore_cur(int currcons) { gotoxy(currcons, saved_x, saved_y); }
+static void restore_cur(int currcons)
+{
+    gotoxy(currcons, saved_x, saved_y);
+}
 
 enum {
     ESnormal,

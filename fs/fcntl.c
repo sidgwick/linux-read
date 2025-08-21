@@ -39,7 +39,10 @@ int sys_dup2(unsigned int oldfd, unsigned int newfd)
     return dupfd(oldfd, newfd);
 }
 
-int sys_dup(unsigned int fildes) { return dupfd(fildes, 0); }
+int sys_dup(unsigned int fildes)
+{
+    return dupfd(fildes, 0);
+}
 
 int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {

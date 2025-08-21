@@ -138,15 +138,18 @@ struct tss_struct {
 // 下面是任务(进程)数据结构, 或称为进程描述符
 struct task_struct {
     /* these are hardcoded - don't touch */
-    long state;   /* -1 unrunnable, 0 runnable, >0 stopped,
-                     任务的运行状态(-1不可运行, 0可运行(就绪), >0已停止) */
+
+    /* -1 unrunnable, 0 runnable, >0 stopped,
+     * 任务的运行状态(-1不可运行, 0可运行(就绪), >0已停止) */
+    long state;
+
     long counter; // 任务运行时间计数(递减)(滴答数), 运行时间片
     long priority; // 优先数. 任务开始运行时counter=priority, 越大运行越长
 
     /* 信号处理相关的字段 */
-    long signal; // 信号位图, 每个比特位代表一种信号, 信号值=位偏移值+1
-    struct sigaction
-        sigaction[32]; // 信号执行属性结构, 对应信号将要执行的操作和标志信息
+    long signal; /* 信号位图, 每个比特位代表一种信号, 信号值=位偏移值+1 */
+    /* 信号执行属性结构, 对应信号将要执行的操作和标志信息 */
+    struct sigaction sigaction[32];
     long blocked; /* bitmap of masked signals, 进程信号屏蔽码(对应信号位图) */
 
     /* various fields */
@@ -190,8 +193,7 @@ struct task_struct {
     unsigned short sgid; // 保存的组id
 
     unsigned long timeout; // 内核定时超时值
-    unsigned long
-        alarm; // 报警定时值(滴答数) ~ 无须担心溢出, 最多可以表示 58494241735 年
+    unsigned long alarm;   // 报警定时值(滴答数)
 
     long utime;      // 用户态运行时间(滴答数)
     long stime;      // 系统态运行时间(滴答数)
@@ -201,28 +203,34 @@ struct task_struct {
 
     struct rlimit rlim[RLIM_NLIMITS]; // 进程资源使用统计数组
 
+    /* per process flags, defined below, 各进程的标志, 在下面第149行开始定义(还未使用) */
     unsigned int flags;
-    /* per process flags, defined below */ // 各进程的标志,
-    // 在下面第149行开始定义(还未使用)
+
     unsigned short used_math; // 标志：是否使用了协处理器
-                              /* file system info */
+
+    /* file system info */
+
+    /* -1 if no tty, so it must be signed, 进程使用tty终端的子设备号. -1表示没有使用 */
     int tty;
-    /* -1 if no tty, so it must be signed */ // 进程使用tty终端的子设备号.
-                                             // -1表示没有使用
-    unsigned short umask;                    // 文件创建属性屏蔽位
+
+    unsigned short umask;       // 文件创建属性屏蔽位
     struct m_inode *pwd;        // 当前工作目录 i 节点结构指针
     struct m_inode *root;       // 根目录 i 节点结构指针
     struct m_inode *executable; // 执行文件 i 节点结构指针
     struct m_inode *library;    // 被加载库文件 i 节点结构指针
-    unsigned long
-        close_on_exec; // 执行时关闭文件句柄位图标志. (参见include/fcntl.h)
-    struct file
-        *filp[NR_OPEN]; // 文件结构指针表, 最多 32 项, 表项号即是文件描述符的值
-    /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
-    struct desc_struct
-        ldt[3]; // 局部描述符表. 0-空, 1-代码段cs, 2-数据和堆栈段ds&ss
-                /* tss for this task */
-    struct tss_struct tss; // 进程的任务状态段信息结构
+
+    /* 执行时关闭文件句柄位图标志. (参见include/fcntl.h) */
+    unsigned long close_on_exec;
+
+    /* 文件结构指针表, 最多 32 项, 表项号即是文件描述符的值 */
+    struct file *filp[NR_OPEN];
+
+    /* ldt for this task: 0-zero, 1-cs, 2-ds&ss
+     局部描述符表. 0-空, 1-代码段cs, 2-数据和堆栈段ds&ss */
+    struct desc_struct ldt[3];
+
+    /* tss for this task, 进程的任务状态段信息结构 */
+    struct tss_struct tss;
 };
 
 /*

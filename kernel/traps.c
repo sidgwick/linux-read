@@ -128,16 +128,25 @@ void do_int3(long *esp, long error_code, long fs, long es, long ds, long ebp,
     printk("EIP: %8x   CS: %4x  EFLAGS: %8x\n\r", esp[0], esp[1], esp[2]);
 }
 
-void do_nmi(long esp, long error_code) { die("nmi", esp, error_code); }
+void do_nmi(long esp, long error_code)
+{
+    die("nmi", esp, error_code);
+}
 
-void do_debug(long esp, long error_code) { die("debug", esp, error_code); }
+void do_debug(long esp, long error_code)
+{
+    die("debug", esp, error_code);
+}
 
 void do_overflow(long esp, long error_code)
 {
     die("overflow", esp, error_code);
 }
 
-void do_bounds(long esp, long error_code) { die("bounds", esp, error_code); }
+void do_bounds(long esp, long error_code)
+{
+    die("bounds", esp, error_code);
+}
 
 void do_invalid_op(long esp, long error_code)
 {

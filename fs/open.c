@@ -17,7 +17,10 @@
 
 #include <asm/segment.h>
 
-int sys_ustat(int dev, struct ustat *ubuf) { return -ENOSYS; }
+int sys_ustat(int dev, struct ustat *ubuf)
+{
+    return -ENOSYS;
+}
 
 int sys_utime(char *filename, struct utimbuf *times)
 {

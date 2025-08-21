@@ -13,7 +13,10 @@
 
 /* 获取当前任务信号屏蔽位图(屏蔽码或阻塞码)
  * sgetmask 可分解为 signal-get-mask */
-int sys_sgetmask() { return current->blocked; }
+int sys_sgetmask()
+{
+    return current->blocked;
+}
 
 /* 设置新的信号屏蔽位图
  * 信号 SIGKILL 和 SIGSTOP 不能被屏蔽, 返回值是原信号屏蔽位图 */
@@ -191,7 +194,10 @@ int sys_sigaction(int signum, const struct sigaction *action,
 
 /* Routine writes a core dump image in the current directory.
  * Currently not implemented. */
-int core_dump(long signr) { return (0); /* We didn't do a dump */ }
+int core_dump(long signr)
+{
+    return (0); /* We didn't do a dump */
+}
 
 /* 系统调用的中断处理程序中真正的信号预处理程序(在 kernel/sys_call.s)
  *

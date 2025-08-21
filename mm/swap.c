@@ -297,18 +297,19 @@ void init_swapping(void)
     if (!SWAP_DEV)
         return;
 
-    /* 如果交换设备没有设置块数数组, 则显示信息并返回
-     * TODO: blk_size 在磁盘或者软盘程序里面设置好的, 这里先用,
-     * 了解完块设备再回来看 */
+    /* 如果交换设备没有设置块数组, 则显示信息并返回
+     * 这个值通常在软/硬盘的初始化里面就会设置好, 取不到说明设备初始化的不对 */
     if (!blk_size[MAJOR(SWAP_DEV)]) {
         printk("Unable to get size of swap device\n\r");
         return;
     }
 
-    /* 取指定交换设备号的交换区数据块总数 swap_size */
+    /* 取指定交换设备号的交换区数据块总数 swap_size
+     * 每个 block 是 1KB, 交换分区一共就是 swap_size KB */
     swap_size = blk_size[MAJOR(SWAP_DEV)][MINOR(SWAP_DEV)];
-    if (!swap_size)
+    if (!swap_size) {
         return;
+    }
 
     /* 交换设备需要足够大才行 */
     if (swap_size < 100) {
@@ -322,8 +323,9 @@ void init_swapping(void)
      * 比特代表 1 页交换页面
      * TODO: 这里 >> 2 是什么?? */
     swap_size >>= 2;
-    if (swap_size > SWAP_BITS)
+    if (swap_size > SWAP_BITS) {
         swap_size = SWAP_BITS;
+    }
 
     /* 准备一张空页面, 这个页面使用位图来记录交换区域的使用情况 */
     swap_bitmap = (char *)get_free_page();
