@@ -192,8 +192,8 @@ struct task_struct {
     unsigned short egid; // 有效组id
     unsigned short sgid; // 保存的组id
 
-    unsigned long timeout; // 内核定时超时值
-    unsigned long alarm;   // 报警定时值(滴答数)
+    unsigned long timeout; // 内核定时超时值(用于 tty 的读写队列控制)
+    unsigned long alarm; // 报警定时值(滴答数)
 
     long utime;      // 用户态运行时间(滴答数)
     long stime;      // 系统态运行时间(滴答数)

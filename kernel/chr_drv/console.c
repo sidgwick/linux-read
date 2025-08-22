@@ -945,6 +945,7 @@ void con_init(void)
     outb_p(a, 0x61);
 }
 
+/* TODO: 了解工作原理 */
 void update_screen(void)
 {
     set_origin(fg_console);

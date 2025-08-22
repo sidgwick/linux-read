@@ -228,8 +228,8 @@ int do_signal(long signr, long eax, long ebx, long ecx, long edx, long orig_eax,
      *
      * 在 kernel/exit.c 的 waitpid 函数中, 如果收到了 SIGCHLD 信号, 或者在读管道
      * 函数 fs/pipe.c 中管道当前读数据但没有读到任何数据等情况下,
-     * 进程收到了任何一个 非阻塞的信号, 则都会以 -ERESTARTSYS 返回值返回.
-     * 它表示进程可以被中断, 但是在 继续执行后会重新启动系统调用.
+     * 进程收到了任何一个非阻塞的信号, 则都会以 -ERESTARTSYS 返回值返回.
+     * 它表示进程可以被中断, 但是在继续执行后会重新启动系统调用.
      *
      * 返回码 -ERESTARTNOINTR 说明在处理完信号后要求返回到原系统调用中继续运行,
      * 即系统 调用不会被中断

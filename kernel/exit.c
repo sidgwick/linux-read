@@ -228,16 +228,19 @@ int session_of_pgrp(int pgrp)
     return -1;
 }
 
-/* 终止进程组(向进程组发送信号)
- * 参数:
- *      - pgrp: 指定的进程组号
- *      - sig: 指定的信号
- *      - priv: 权限
+/**
+ * @brief  终止进程组(向进程组发送信号)
  *
- * 即向指定进程组 pgrp 中的每个进程发送指定信号 sig.
- * 只要向一个进程发送成功最后就会返回 0
- * 如果没有找到指定进程组号 pgrp 的任何一个进程, 则返回出错号 -ESRCH
- * 若找到进程组号是 pgrp 的进程, 但是发送信号失败, 则返回发送失败的错误码 */
+ * 向指定进程组 pgrp 中的每个进程发送指定信号 sig
+ *
+ * @param pgrp 指定的进程组号
+ * @param sig 指定的信号
+ * @param priv 强制发送标记
+ *
+ * @retval 0              向组内任意一个进程发送成功最后就会返回
+ * @retval -ESRCH         如果没有找到指定进程组号 pgrp 的任何一个进程
+ * @retval 发送失败的错误码  若找到进程组号是 pgrp 的进程, 但是发送信号失败
+ */
 int kill_pg(int pgrp, int sig, int priv)
 {
     struct task_struct **p;
@@ -287,27 +290,30 @@ int kill_proc(int pid, int sig, int priv)
     return (-ESRCH);
 }
 
-/*
+/* */
+
+/**
+ * @brief 系统调用 kill
+ *
  * POSIX specifies that kill(-1,sig) is unspecified, but what we have
  * is probably wrong.  Should make it like BSD or SYSV.
- *
- *
- * 系统调用 kill
- * 此函数可用于向任何进程或进程组发送任何信号, 而并非只是杀死进程
- *
- * 参数:
- *      - pid 是进程号
- *      - sig 是需要发送的信号
  *
  * 如果 pid > 0, 则信号被发送给进程号是 pid 的进程
  * 如果 pid = 0, 那么信号就会被发送给当前进程的进程组中所有的进程
  * 如果 pid = -1, 则信号 sig 就会发送给除第一个进程(初始进程)外的所有进程
  * 如果 pid < -1, 则信号 sig 将发送给进程组 -pid 的所有进程
  * 如果信号 sig = 0, 则不发送信号, 但仍会进行错误检查. 如果成功则返回 0
+ *
  * TODO: send_sig 对 sig=0 如何处理?
  *
  * 该函数扫描任务数组表, 并根据 pid 对满足条件的进程发送指定信号 sig.
- * 若 pid 等于 0 表明当前进程是进程组组长, 需要向所有组内的进程强制发送信号 */
+ * 若 pid 等于 0 表明当前进程是进程组组长, 需要向所有组内的进程强制发送信号
+ *
+ * @param pid 是进程号
+ * @param sig 是需要发送的信号
+ * @return int
+ * @note 此函数可用于向任何进程或进程组发送任何信号, 而并非只是杀死进程
+ */
 int sys_kill(int pid, int sig)
 {
     struct task_struct **p = NR_TASKS + task;
@@ -334,7 +340,9 @@ int sys_kill(int pid, int sig)
     return (kill_proc(pid, sig, 0));
 }
 
-/*
+/**
+ * @brief 判断进程组是不是孤儿进程组
+ *
  * Determine if a process group is "orphaned", according to the POSIX
  * definition in 2.2.2.52.  Orphaned process groups are not to be affected
  * by terminal-generated stop signals.  Newly orphaned process groups are
@@ -347,7 +355,10 @@ int sys_kill(int pid, int sig)
  * 孤儿进程组: 这个进程组里面的进程, 他们的父进程要么是这个组的成员, 要么在别的会话中
  * 更多资料参考: https://blog.csdn.net/q1007729991/article/details/57413719
  *
- * 判断进程组是不是孤儿进程组 */
+ * @param pgrp 进程组号
+ * @retval 0 不是孤儿进程组
+ * @retval 1 是孤儿进程组
+ */
 int is_orphaned_pgrp(int pgrp)
 {
     struct task_struct **p;

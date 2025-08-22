@@ -173,8 +173,7 @@ struct termios {
     tcflag_t c_oflag; /* output mode flags, 输出模式标志 */
     tcflag_t c_cflag; /* control mode flags, 控制模式标志 */
     tcflag_t c_lflag; /* local mode flags, 本地模式标志 */
-    cc_t c_line; /* line discipline, 线路规程(速率), 这里是不是改用 speed_t
-                    类型?? */
+    cc_t c_line; /* line discipline, 线路规程(速率), 这里是不是改用 speed_t 类型?? */
     cc_t c_cc[NCCS]; /* control characters, 控制字符数组 */
 };
 

@@ -1,10 +1,42 @@
-下面代码截取自 Linux 0.12, 请问 `task[1]->p_cptr->p_ysptr = p;` 看上去是把最老的子进程赋值给了 init 原来子进程最年轻的子进程, 这块不应该直接赋值 `current->p_cptr` 吗?
+解释下述程序代码, 重点说明里面涉及到的端口号和相关的用法?
 
-```c
-p->p_osptr = task[1]->p_cptr;
-task[1]->p_cptr->p_ysptr = p;
-task[1]->p_cptr = current->p_cptr;
-current->p_cptr = 0;
+```asm
+rs_int:
+	pushl %edx
+	pushl %ecx
+	pushl %ebx
+	pushl %eax
+	push %es
+	push %ds		/* as this is an interrupt, we cannot */
+	pushl $0x10		/* know that bs is ok. Load it */
+	pop %ds
+	pushl $0x10
+	pop %es
+	movl 24(%esp),%edx
+	movl (%edx),%edx
+	movl rs_addr(%edx),%edx
+	addl $2,%edx		/* interrupt ident. reg */
+rep_int:
+	xorl %eax,%eax
+	inb %dx,%al
+	testb $1,%al
+	jne end
+	cmpb $6,%al		/* this shouldn't happen, but ... */
+	ja end
+	movl 24(%esp),%ecx
+	pushl %edx
+	subl $2,%edx
+	call jmp_table(,%eax,2)		/* NOTE! not *4, bit0 is 0 already */
+	popl %edx
+	jmp rep_int
+end:	movb $0x20,%al
+	outb %al,$0x20		/* EOI */
+	pop %ds
+	pop %es
+	popl %eax
+	popl %ebx
+	popl %ecx
+	popl %edx
+	addl $4,%esp		# jump over _table_list entry
+	iret
 ```
-
-

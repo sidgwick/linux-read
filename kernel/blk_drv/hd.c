@@ -545,7 +545,7 @@ static void read_intr(void)
     CURRENT->sector++;
 
     /* 递减请求项所需读取的扇区数值, 如果所需读取的扇区数值 > 0, 则继续读取
-     * TODO: 下一次硬盘中断是如何触发的? */
+     * TODO: 下一次硬盘中断是如何触发的? - 是否是硬盘自己主动发起的? */
     if (--CURRENT->nr_sectors) {
         SET_INTR(&read_intr);
         return;
