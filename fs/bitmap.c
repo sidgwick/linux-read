@@ -12,15 +12,16 @@
 
 #define clear_block(addr)                                                      \
     __asm__("cld\n\t"                                                          \
-            "rep\n\t"                                                          \
-            "stosl" ::"a"(0),                                                  \
-            "c"(BLOCK_SIZE / 4), "D"((long)(addr))                             \
+            "rep stosl"                                                        \
+            :                                                                  \
+            : "a"(0), "c"(BLOCK_SIZE / 4), "D"((long)(addr))                   \
             : "cx", "di")
 
 #define set_bit(nr, addr)                                                      \
     ({                                                                         \
         register int res __asm__("ax");                                        \
-        __asm__ __volatile__("btsl %2,%3\n\tsetb %%al"                         \
+        __asm__ __volatile__("btsl %2,%3\n\t"                                  \
+                             "setb %%al"                                       \
                              : "=a"(res)                                       \
                              : "0"(0), "r"(nr), "m"(*(addr)));                 \
         res;                                                                   \
@@ -29,7 +30,8 @@
 #define clear_bit(nr, addr)                                                    \
     ({                                                                         \
         register int res __asm__("ax");                                        \
-        __asm__ __volatile__("btrl %2,%3\n\tsetnb %%al"                        \
+        __asm__ __volatile__("btrl %2,%3\n\t"                                  \
+                             "setnb %%al"                                      \
                              : "=a"(res)                                       \
                              : "0"(0), "r"(nr), "m"(*(addr)));                 \
         res;                                                                   \
