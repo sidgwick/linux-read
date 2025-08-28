@@ -19,22 +19,22 @@
 
 #include <linux/math_emu.h>
 
-#define NEGINT(a)                                         \
-    __asm__("notl %0 ; notl %1 ; addl $1,%0 ; adcl $0,%1" \
-            : "=r"(a->a), "=r"(a->b)                      \
+#define NEGINT(a)                                                                                  \
+    __asm__("notl %0 ; notl %1 ; addl $1,%0 ; adcl $0,%1"                                          \
+            : "=r"(a->a), "=r"(a->b)                                                               \
             : "0"(a->a), "1"(a->b))
 
-static void signify(temp_real *a) {
+static void signify(temp_real *a)
+{
     a->exponent += 2;
-    __asm__("shrdl $2,%1,%0 ; shrl $2,%1"
-            : "=r"(a->a), "=r"(a->b)
-            : "0"(a->a), "1"(a->b));
+    __asm__("shrdl $2,%1,%0 ; shrl $2,%1" : "=r"(a->a), "=r"(a->b) : "0"(a->a), "1"(a->b));
     if (a->exponent < 0)
         NEGINT(a);
     a->exponent &= 0x7fff;
 }
 
-static void unsignify(temp_real *a) {
+static void unsignify(temp_real *a)
+{
     if (!(a->a || a->b)) {
         a->exponent = 0;
         return;
@@ -46,13 +46,12 @@ static void unsignify(temp_real *a) {
     }
     while (a->b >= 0) {
         a->exponent--;
-        __asm__("addl %0,%0 ; adcl %1,%1"
-                : "=r"(a->a), "=r"(a->b)
-                : "0"(a->a), "1"(a->b));
+        __asm__("addl %0,%0 ; adcl %1,%1" : "=r"(a->a), "=r"(a->b) : "0"(a->a), "1"(a->b));
     }
 }
 
-void fadd(const temp_real *src1, const temp_real *src2, temp_real *result) {
+void fadd(const temp_real *src1, const temp_real *src2, temp_real *result)
+{
     temp_real a, b;
     int x1, x2, shift;
 

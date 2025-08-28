@@ -10,31 +10,36 @@
 
 #include <linux/math_emu.h>
 
-static void shift_left(int *c) {
-    __asm__ __volatile__(
-        "movl (%0),%%eax ; addl %%eax,(%0)\n\t"
-        "movl 4(%0),%%eax ; adcl %%eax,4(%0)\n\t"
-        "movl 8(%0),%%eax ; adcl %%eax,8(%0)\n\t"
-        "movl 12(%0),%%eax ; adcl %%eax,12(%0)" ::"r"((long)c) : "ax");
+static void shift_left(int *c)
+{
+    __asm__ __volatile__("movl (%0),%%eax ; addl %%eax,(%0)\n\t"
+                         "movl 4(%0),%%eax ; adcl %%eax,4(%0)\n\t"
+                         "movl 8(%0),%%eax ; adcl %%eax,8(%0)\n\t"
+                         "movl 12(%0),%%eax ; adcl %%eax,12(%0)" ::"r"((long)c)
+                         : "ax");
 }
 
-static void shift_right(int *c) {
+static void shift_right(int *c)
+{
     __asm__("shrl $1,12(%0) ; rcrl $1,8(%0) ; rcrl $1,4(%0) ; rcrl $1,(%0)" ::"r"((long)c));
 }
 
-static int try_sub(int *a, int *b) {
+static int try_sub(int *a, int *b)
+{
     char ok;
 
-    __asm__ __volatile__(
-        "movl (%1),%%eax ; subl %%eax,(%2)\n\t"
-        "movl 4(%1),%%eax ; sbbl %%eax,4(%2)\n\t"
-        "movl 8(%1),%%eax ; sbbl %%eax,8(%2)\n\t"
-        "movl 12(%1),%%eax ; sbbl %%eax,12(%2)\n\t"
-        "setae %%al" : "=a"(ok) : "c"((long)a), "d"((long)b));
+    __asm__ __volatile__("movl (%1),%%eax ; subl %%eax,(%2)\n\t"
+                         "movl 4(%1),%%eax ; sbbl %%eax,4(%2)\n\t"
+                         "movl 8(%1),%%eax ; sbbl %%eax,8(%2)\n\t"
+                         "movl 12(%1),%%eax ; sbbl %%eax,12(%2)\n\t"
+                         "setae %%al"
+                         : "=a"(ok)
+                         : "c"((long)a), "d"((long)b));
     return ok;
 }
 
-static void div64(int *a, int *b, int *c) {
+static void div64(int *a, int *b, int *c)
+{
     int tmp[4];
     int i;
     unsigned int mask = 0;
@@ -60,7 +65,8 @@ static void div64(int *a, int *b, int *c) {
     }
 }
 
-void fdiv(const temp_real *src1, const temp_real *src2, temp_real *result) {
+void fdiv(const temp_real *src1, const temp_real *src2, temp_real *result)
+{
     int i, sign;
     int a[4], b[4], tmp[4] = {0, 0, 0, 0};
 

@@ -75,16 +75,11 @@ struct _bucket_dir { /* 8 bytes */
  * Note that this list *must* be kept in order.
  */
 struct _bucket_dir bucket_dir[] = {
-    {16, (struct bucket_desc *)0},
-    {32, (struct bucket_desc *)0},
-    {64, (struct bucket_desc *)0},
-    {128, (struct bucket_desc *)0},
-    {256, (struct bucket_desc *)0},
-    {512, (struct bucket_desc *)0},
-    {1024, (struct bucket_desc *)0},
-    {2048, (struct bucket_desc *)0},
-    {4096, (struct bucket_desc *)0},
-    {0, (struct bucket_desc *)0}}; /* End of list marker */
+    {16, (struct bucket_desc *)0},   {32, (struct bucket_desc *)0},
+    {64, (struct bucket_desc *)0},   {128, (struct bucket_desc *)0},
+    {256, (struct bucket_desc *)0},  {512, (struct bucket_desc *)0},
+    {1024, (struct bucket_desc *)0}, {2048, (struct bucket_desc *)0},
+    {4096, (struct bucket_desc *)0}, {0, (struct bucket_desc *)0}}; /* End of list marker */
 
 /*
  * This contains a linked list of free bucket descriptor blocks
@@ -94,7 +89,8 @@ struct bucket_desc *free_bucket_desc = (struct bucket_desc *)0;
 /*
  * This routine initializes a bucket description page.
  */
-static inline void init_bucket_desc() {
+static inline void init_bucket_desc()
+{
     struct bucket_desc *bdesc, *first;
     int i;
 
@@ -113,7 +109,8 @@ static inline void init_bucket_desc() {
     free_bucket_desc = first;
 }
 
-void *malloc(unsigned int len) {
+void *malloc(unsigned int len)
+{
     struct _bucket_dir *bdir;
     struct bucket_desc *bdesc;
     void *retval;
@@ -126,8 +123,7 @@ void *malloc(unsigned int len) {
         if (bdir->size >= len)
             break;
     if (!bdir->size) {
-        printk("malloc called with impossibly large argument (%d)\n",
-               len);
+        printk("malloc called with impossibly large argument (%d)\n", len);
         panic("malloc: bad arg");
     }
     /*
@@ -177,7 +173,8 @@ void *malloc(unsigned int len) {
  *
  * We will #define a macro so that "free(x)" is becomes "free_s(x, 0)"
  */
-void free_s(void *obj, int size) {
+void free_s(void *obj, int size)
+{
     void *page;
     struct _bucket_dir *bdir;
     struct bucket_desc *bdesc, *prev;
@@ -207,8 +204,7 @@ found:
          * We need to make sure that prev is still accurate.  It
          * may not be, if someone rudely interrupted us....
          */
-        if ((prev && (prev->next != bdesc)) ||
-            (!prev && (bdir->chain != bdesc)))
+        if ((prev && (prev->next != bdesc)) || (!prev && (bdir->chain != bdesc)))
             for (prev = bdir->chain; prev; prev = prev->next)
                 if (prev->next == bdesc)
                     break;

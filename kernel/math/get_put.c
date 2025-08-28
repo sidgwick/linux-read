@@ -9,13 +9,14 @@
  * ints/reals/BCD etc. This is the only part that concerns itself with
  * other than temporary real format. All other cals are strictly temp_real.
  */
+#include <signal.h>
+
 #include <asm/segment.h>
 #include <linux/kernel.h>
 #include <linux/math_emu.h>
-#include <signal.h>
 
-void get_short_real(temp_real *tmp,
-                    struct info *info, unsigned short code) {
+void get_short_real(temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     short_real sr;
 
@@ -24,8 +25,8 @@ void get_short_real(temp_real *tmp,
     short_to_temp(&sr, tmp);
 }
 
-void get_long_real(temp_real *tmp,
-                   struct info *info, unsigned short code) {
+void get_long_real(temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     long_real lr;
 
@@ -35,8 +36,8 @@ void get_long_real(temp_real *tmp,
     long_to_temp(&lr, tmp);
 }
 
-void get_temp_real(temp_real *tmp,
-                   struct info *info, unsigned short code) {
+void get_temp_real(temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
 
     addr = ea(info, code);
@@ -45,8 +46,8 @@ void get_temp_real(temp_real *tmp,
     tmp->exponent = get_fs_word(4 + (unsigned short *)addr);
 }
 
-void get_short_int(temp_real *tmp,
-                   struct info *info, unsigned short code) {
+void get_short_int(temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     temp_int ti;
 
@@ -58,8 +59,8 @@ void get_short_int(temp_real *tmp,
     int_to_real(&ti, tmp);
 }
 
-void get_long_int(temp_real *tmp,
-                  struct info *info, unsigned short code) {
+void get_long_int(temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     temp_int ti;
 
@@ -71,8 +72,8 @@ void get_long_int(temp_real *tmp,
     int_to_real(&ti, tmp);
 }
 
-void get_longlong_int(temp_real *tmp,
-                      struct info *info, unsigned short code) {
+void get_longlong_int(temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     temp_int ti;
 
@@ -80,29 +81,30 @@ void get_longlong_int(temp_real *tmp,
     ti.a = get_fs_long((unsigned long *)addr);
     ti.b = get_fs_long(1 + (unsigned long *)addr);
     if (ti.sign = (ti.b < 0))
-        __asm__(
-            "notl %0 ; notl %1\n\t"
-            "addl $1,%0 ; adcl $0,%1"
-            : "=r"(ti.a), "=r"(ti.b)
-            : "0"(ti.a), "1"(ti.b));
+        __asm__("notl %0 ; notl %1\n\t"
+                "addl $1,%0 ; adcl $0,%1"
+                : "=r"(ti.a), "=r"(ti.b)
+                : "0"(ti.a), "1"(ti.b));
     int_to_real(&ti, tmp);
 }
 
-#define MUL10(low, high)                    \
-    __asm__(                                \
-        "addl %0,%0 ; adcl %1,%1\n\t"       \
-        "movl %0,%%ecx ; movl %1,%%ebx\n\t" \
-        "addl %0,%0 ; adcl %1,%1\n\t"       \
-        "addl %0,%0 ; adcl %1,%1\n\t"       \
-        "addl %%ecx,%0 ; adcl %%ebx,%1"     \
-        : "=a"(low), "=d"(high)             \
-        : "0"(low), "1"(high) : "cx", "bx")
+#define MUL10(low, high)                                                                           \
+    __asm__("addl %0,%0 ; adcl %1,%1\n\t"                                                          \
+            "movl %0,%%ecx ; movl %1,%%ebx\n\t"                                                    \
+            "addl %0,%0 ; adcl %1,%1\n\t"                                                          \
+            "addl %0,%0 ; adcl %1,%1\n\t"                                                          \
+            "addl %%ecx,%0 ; adcl %%ebx,%1"                                                        \
+            : "=a"(low), "=d"(high)                                                                \
+            : "0"(low), "1"(high)                                                                  \
+            : "cx", "bx")
 
-#define ADD64(val, low, high)                                 \
-    __asm__("addl %4,%0 ; adcl $0,%1" : "=r"(low), "=r"(high) \
+#define ADD64(val, low, high)                                                                      \
+    __asm__("addl %4,%0 ; adcl $0,%1"                                                              \
+            : "=r"(low), "=r"(high)                                                                \
             : "0"(low), "1"(high), "r"((unsigned long)(val)))
 
-void get_BCD(temp_real *tmp, struct info *info, unsigned short code) {
+void get_BCD(temp_real *tmp, struct info *info, unsigned short code)
+{
     int k;
     char *addr;
     temp_int i;
@@ -122,8 +124,8 @@ void get_BCD(temp_real *tmp, struct info *info, unsigned short code) {
     int_to_real(&i, tmp);
 }
 
-void put_short_real(const temp_real *tmp,
-                    struct info *info, unsigned short code) {
+void put_short_real(const temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     short_real sr;
 
@@ -133,8 +135,8 @@ void put_short_real(const temp_real *tmp,
     put_fs_long(sr, (unsigned long *)addr);
 }
 
-void put_long_real(const temp_real *tmp,
-                   struct info *info, unsigned short code) {
+void put_long_real(const temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     long_real lr;
 
@@ -145,8 +147,8 @@ void put_long_real(const temp_real *tmp,
     put_fs_long(lr.b, 1 + (unsigned long *)addr);
 }
 
-void put_temp_real(const temp_real *tmp,
-                   struct info *info, unsigned short code) {
+void put_temp_real(const temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
 
     addr = ea(info, code);
@@ -156,8 +158,8 @@ void put_temp_real(const temp_real *tmp,
     put_fs_word(tmp->exponent, 4 + (short *)addr);
 }
 
-void put_short_int(const temp_real *tmp,
-                   struct info *info, unsigned short code) {
+void put_short_int(const temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     temp_int ti;
 
@@ -169,8 +171,8 @@ void put_short_int(const temp_real *tmp,
     put_fs_word(ti.a, (short *)addr);
 }
 
-void put_long_int(const temp_real *tmp,
-                  struct info *info, unsigned short code) {
+void put_long_int(const temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     temp_int ti;
 
@@ -182,8 +184,8 @@ void put_long_int(const temp_real *tmp,
     put_fs_long(ti.a, (unsigned long *)addr);
 }
 
-void put_longlong_int(const temp_real *tmp,
-                      struct info *info, unsigned short code) {
+void put_longlong_int(const temp_real *tmp, struct info *info, unsigned short code)
+{
     char *addr;
     temp_int ti;
 
@@ -191,21 +193,21 @@ void put_longlong_int(const temp_real *tmp,
     real_to_int(tmp, &ti);
     verify_area(addr, 8);
     if (ti.sign)
-        __asm__(
-            "notl %0 ; notl %1\n\t"
-            "addl $1,%0 ; adcl $0,%1"
-            : "=r"(ti.a), "=r"(ti.b)
-            : "0"(ti.a), "1"(ti.b));
+        __asm__("notl %0 ; notl %1\n\t"
+                "addl $1,%0 ; adcl $0,%1"
+                : "=r"(ti.a), "=r"(ti.b)
+                : "0"(ti.a), "1"(ti.b));
     put_fs_long(ti.a, (unsigned long *)addr);
     put_fs_long(ti.b, 1 + (unsigned long *)addr);
 }
 
-#define DIV10(low, high, rem)                  \
-    __asm__("divl %6 ; xchgl %1,%2 ; divl %6"  \
-            : "=d"(rem), "=a"(low), "=b"(high) \
+#define DIV10(low, high, rem)                                                                      \
+    __asm__("divl %6 ; xchgl %1,%2 ; divl %6"                                                      \
+            : "=d"(rem), "=a"(low), "=b"(high)                                                     \
             : "0"(0), "1"(high), "2"(low), "c"(10))
 
-void put_BCD(const temp_real *tmp, struct info *info, unsigned short code) {
+void put_BCD(const temp_real *tmp, struct info *info, unsigned short code)
+{
     int k, rem;
     char *addr;
     temp_int i;

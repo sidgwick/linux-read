@@ -24,12 +24,12 @@
 
 #include <fcntl.h>
 #include <linux/fs.h>
-#include <stdio.h> /* fprintf */
+#include <stdio.h>  /* fprintf */
 #include <stdlib.h> /* contains exit */
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h> /* unistd.h needs this */
-#include <unistd.h> /* contains read/write */
+#include <unistd.h>    /* contains read/write */
 
 #define MINIX_HEADER 32
 #define GCC_HEADER 1024
@@ -48,16 +48,19 @@
 
 #define STRINGIFY(x) #x
 
-void die(char *str) {
+void die(char *str)
+{
     fprintf(stderr, "%s\n", str);
     exit(1);
 }
 
-void usage(void) {
+void usage(void)
+{
     die("Usage: build bootsect setup system [rootdev] [> image]");
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     int i, c, id;
     char buf[1024];
     char major_root, minor_root;
@@ -100,18 +103,16 @@ int main(int argc, char **argv) {
     }
     fprintf(stderr, "Root device is (%d, %d)\n", major_root, minor_root);
     fprintf(stderr, "Swap device is (%d, %d)\n", major_swap, minor_swap);
-    if ((major_root != 2) && (major_root != 3) &&
-        (major_root != 0)) {
-        fprintf(stderr, "Illegal root device (major = %d)\n",
-                major_root);
+    if ((major_root != 2) && (major_root != 3) && (major_root != 0)) {
+        fprintf(stderr, "Illegal root device (major = %d)\n", major_root);
         die("Bad root device --- major #");
     }
     if (major_swap && major_swap != 3) {
-        fprintf(stderr, "Illegal swap device (major = %d)\n",
-                major_swap);
+        fprintf(stderr, "Illegal swap device (major = %d)\n", major_swap);
         die("Bad root device --- major #");
     }
-    for (i = 0; i < sizeof buf; i++) buf[i] = 0;
+    for (i = 0; i < sizeof buf; i++)
+        buf[i] = 0;
     if ((id = open(argv[1], O_RDONLY, 0)) < 0)
         die("Unable to open 'boot'");
     if (read(id, buf, MINIX_HEADER) != MINIX_HEADER)

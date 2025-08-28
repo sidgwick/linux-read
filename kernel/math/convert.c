@@ -18,7 +18,8 @@
  * if the temp-real number simply won't fit in a short- or long-real.)
  */
 
-void short_to_temp(const short_real *a, temp_real *b) {
+void short_to_temp(const short_real *a, temp_real *b)
+{
     if (!(*a & 0x7fffffff)) {
         b->a = b->b = 0;
         if (*a)
@@ -34,7 +35,8 @@ void short_to_temp(const short_real *a, temp_real *b) {
     b->a = 0;
 }
 
-void long_to_temp(const long_real *a, temp_real *b) {
+void long_to_temp(const long_real *a, temp_real *b)
+{
     if (!a->a && !(a->b & 0x7fffffff)) {
         b->a = b->b = 0;
         if (a->b)
@@ -50,7 +52,8 @@ void long_to_temp(const long_real *a, temp_real *b) {
     b->a = a->a << 11;
 }
 
-void temp_to_short(const temp_real *a, short_real *b) {
+void temp_to_short(const temp_real *a, short_real *b)
+{
     if (!(a->exponent & 0x7fff)) {
         *b = (a->exponent) ? 0x80000000 : 0;
         return;
@@ -75,7 +78,8 @@ void temp_to_short(const temp_real *a, short_real *b) {
     }
 }
 
-void temp_to_long(const temp_real *a, long_real *b) {
+void temp_to_long(const temp_real *a, long_real *b)
+{
     if (!(a->exponent & 0x7fff)) {
         b->a = 0;
         b->b = (a->exponent) ? 0x80000000 : 0;
@@ -90,26 +94,21 @@ void temp_to_long(const temp_real *a, long_real *b) {
     switch (ROUNDING) {
     case ROUND_NEAREST:
         if ((a->a & 0x7ff) > 0x400)
-            __asm__("addl $1,%0 ; adcl $0,%1"
-                    : "=r"(b->a), "=r"(b->b)
-                    : "0"(b->a), "1"(b->b));
+            __asm__("addl $1,%0 ; adcl $0,%1" : "=r"(b->a), "=r"(b->b) : "0"(b->a), "1"(b->b));
         break;
     case ROUND_DOWN:
         if ((a->exponent & 0x8000) && (a->b & 0xff))
-            __asm__("addl $1,%0 ; adcl $0,%1"
-                    : "=r"(b->a), "=r"(b->b)
-                    : "0"(b->a), "1"(b->b));
+            __asm__("addl $1,%0 ; adcl $0,%1" : "=r"(b->a), "=r"(b->b) : "0"(b->a), "1"(b->b));
         break;
     case ROUND_UP:
         if (!(a->exponent & 0x8000) && (a->b & 0xff))
-            __asm__("addl $1,%0 ; adcl $0,%1"
-                    : "=r"(b->a), "=r"(b->b)
-                    : "0"(b->a), "1"(b->b));
+            __asm__("addl $1,%0 ; adcl $0,%1" : "=r"(b->a), "=r"(b->b) : "0"(b->a), "1"(b->b));
         break;
     }
 }
 
-void real_to_int(const temp_real *a, temp_int *b) {
+void real_to_int(const temp_real *a, temp_int *b)
+{
     int shift = 16383 + 63 - (a->exponent & 0x7fff);
     unsigned long underflow;
 
@@ -134,12 +133,8 @@ void real_to_int(const temp_real *a, temp_int *b) {
     __asm__("shrdl %2,%1,%0"
             : "=r"(underflow), "=r"(b->a)
             : "c"((char)shift), "0"(underflow), "1"(b->a));
-    __asm__("shrdl %2,%1,%0"
-            : "=r"(b->a), "=r"(b->b)
-            : "c"((char)shift), "0"(b->a), "1"(b->b));
-    __asm__("shrl %1,%0"
-            : "=r"(b->b)
-            : "c"((char)shift), "0"(b->b));
+    __asm__("shrdl %2,%1,%0" : "=r"(b->a), "=r"(b->b) : "c"((char)shift), "0"(b->a), "1"(b->b));
+    __asm__("shrl %1,%0" : "=r"(b->b) : "c"((char)shift), "0"(b->b));
     switch (ROUNDING) {
     case ROUND_NEAREST:
         __asm__("addl %4,%5 ; adcl $0,%0 ; adcl $0,%1"
@@ -148,20 +143,17 @@ void real_to_int(const temp_real *a, temp_int *b) {
         break;
     case ROUND_UP:
         if (!b->sign && underflow)
-            __asm__("addl $1,%0 ; adcl $0,%1"
-                    : "=r"(b->a), "=r"(b->b)
-                    : "0"(b->a), "1"(b->b));
+            __asm__("addl $1,%0 ; adcl $0,%1" : "=r"(b->a), "=r"(b->b) : "0"(b->a), "1"(b->b));
         break;
     case ROUND_DOWN:
         if (b->sign && underflow)
-            __asm__("addl $1,%0 ; adcl $0,%1"
-                    : "=r"(b->a), "=r"(b->b)
-                    : "0"(b->a), "1"(b->b));
+            __asm__("addl $1,%0 ; adcl $0,%1" : "=r"(b->a), "=r"(b->b) : "0"(b->a), "1"(b->b));
         break;
     }
 }
 
-void int_to_real(const temp_int *a, temp_real *b) {
+void int_to_real(const temp_int *a, temp_real *b)
+{
     b->a = a->a;
     b->b = a->b;
     if (b->a || b->b)
@@ -172,8 +164,6 @@ void int_to_real(const temp_int *a, temp_real *b) {
     }
     while (b->b >= 0) {
         b->exponent--;
-        __asm__("addl %0,%0 ; adcl %1,%1"
-                : "=r"(b->a), "=r"(b->b)
-                : "0"(b->a), "1"(b->b));
+        __asm__("addl %0,%0 ; adcl %1,%1" : "=r"(b->a), "=r"(b->b) : "0"(b->a), "1"(b->b));
     }
 }

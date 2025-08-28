@@ -1,0 +1,35 @@
+#### bochs -debugger -f bochsrc.txt
+#### ------------------
+
+# 图形模式设置，这两个一起开启
+magic_break: enabled=1
+display_library: sdl2
+
+# bios 和 vga bios
+romimage: file=$BXSHARE/BIOS-bochs-latest, options=fastboot
+vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest.bin
+
+# RTC
+clock: sync=realtime, rtc_sync=1, time0=local
+
+# 硬盘启动
+boot: disk
+ata0-master: type=disk, mode=flat, path="a.img"
+ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+
+# # 软盘启动
+# floppya: 1_44=a.img, status=inserted
+# boot: floppy
+
+# 输出日志
+log: bochsout.txt
+
+# 鼠标不可用
+mouse: enabled=0
+
+# 键盘配置
+keyboard: keymap=#$BXSHARE/keymaps/x11-pc-us.map
+
+# 内存容量
+megs: 128
+

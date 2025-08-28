@@ -49,7 +49,8 @@ static void fpush(void);
 static void fxchg(temp_real_unaligned *a, temp_real_unaligned *b);
 static temp_real_unaligned *__st(int i);
 
-static void do_emu(struct info *info) {
+static void do_emu(struct info *info)
+{
     unsigned short code;
     temp_real tmp;
     char *address;
@@ -339,22 +340,19 @@ static void do_emu(struct info *info) {
     case 0x24:
         address = ea(info, code);
         for (code = 0; code < 7; code++) {
-            ((long *)&I387)[code] =
-                get_fs_long((unsigned long *)address);
+            ((long *)&I387)[code] = get_fs_long((unsigned long *)address);
             address += 4;
         }
         return;
     case 0x25:
         address = ea(info, code);
-        *(unsigned short *)&I387.cwd =
-            get_fs_word((unsigned short *)address);
+        *(unsigned short *)&I387.cwd = get_fs_word((unsigned short *)address);
         return;
     case 0x26:
         address = ea(info, code);
         verify_area(address, 28);
         for (code = 0; code < 7; code++) {
-            put_fs_long(((long *)&I387)[code],
-                        (unsigned long *)address);
+            put_fs_long(((long *)&I387)[code], (unsigned long *)address);
             address += 4;
         }
         return;
@@ -389,8 +387,7 @@ static void do_emu(struct info *info) {
     case 0xa4:
         address = ea(info, code);
         for (code = 0; code < 27; code++) {
-            ((long *)&I387)[code] =
-                get_fs_long((unsigned long *)address);
+            ((long *)&I387)[code] = get_fs_long((unsigned long *)address);
             address += 4;
         }
         return;
@@ -398,8 +395,7 @@ static void do_emu(struct info *info) {
         address = ea(info, code);
         verify_area(address, 108);
         for (code = 0; code < 27; code++) {
-            put_fs_long(((long *)&I387)[code],
-                        (unsigned long *)address);
+            put_fs_long(((long *)&I387)[code], (unsigned long *)address);
             address += 4;
         }
         I387.cwd = 0x037f;
@@ -494,7 +490,8 @@ static void do_emu(struct info *info) {
     math_abort(info, 1 << (SIGFPE - 1));
 }
 
-void math_emulate(long ___false) {
+void math_emulate(long ___false)
+{
     if (!current->used_math) {
         current->used_math = 1;
         I387.cwd = 0x037f;
@@ -505,13 +502,15 @@ void math_emulate(long ___false) {
     do_emu((struct info *)((&___false) - 1));
 }
 
-void __math_abort(struct info *info, unsigned int signal) {
+void __math_abort(struct info *info, unsigned int signal)
+{
     EIP = ORIG_EIP;
     current->signal |= signal;
     __asm__("movl %0,%%esp ; ret" ::"g"((long)info));
 }
 
-static void fpop(void) {
+static void fpop(void)
+{
     unsigned long tmp;
 
     tmp = I387.swd & 0xffffc7ff;
@@ -520,7 +519,8 @@ static void fpop(void) {
     I387.swd |= tmp;
 }
 
-static void fpush(void) {
+static void fpush(void)
+{
     unsigned long tmp;
 
     tmp = I387.swd & 0xffffc7ff;
@@ -529,7 +529,8 @@ static void fpush(void) {
     I387.swd |= tmp;
 }
 
-static void fxchg(temp_real_unaligned *a, temp_real_unaligned *b) {
+static void fxchg(temp_real_unaligned *a, temp_real_unaligned *b)
+{
     temp_real_unaligned c;
 
     c = *a;
@@ -537,7 +538,8 @@ static void fxchg(temp_real_unaligned *a, temp_real_unaligned *b) {
     *b = c;
 }
 
-static temp_real_unaligned *__st(int i) {
+static temp_real_unaligned *__st(int i)
+{
     i += I387.swd >> 11;
     i &= 7;
     return (temp_real_unaligned *)(i * 10 + (char *)(I387.st_space));

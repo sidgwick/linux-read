@@ -8,23 +8,20 @@
  * Calculate the effective address.
  */
 
-#include <asm/segment.h>
-#include <linux/math_emu.h>
 #include <stddef.h>
 
-static int __regoffset[] = {
-    offsetof(struct info, ___eax),
-    offsetof(struct info, ___ecx),
-    offsetof(struct info, ___edx),
-    offsetof(struct info, ___ebx),
-    offsetof(struct info, ___esp),
-    offsetof(struct info, ___ebp),
-    offsetof(struct info, ___esi),
-    offsetof(struct info, ___edi)};
+#include <asm/segment.h>
+#include <linux/math_emu.h>
+
+static int __regoffset[] = {offsetof(struct info, ___eax), offsetof(struct info, ___ecx),
+                            offsetof(struct info, ___edx), offsetof(struct info, ___ebx),
+                            offsetof(struct info, ___esp), offsetof(struct info, ___ebp),
+                            offsetof(struct info, ___esi), offsetof(struct info, ___edi)};
 
 #define REG(x) (*(long *)(__regoffset[(x)] + (char *)info))
 
-static char *sib(struct info *info, int mod) {
+static char *sib(struct info *info, int mod)
+{
     unsigned char ss, index, base;
     long offset = 0;
 
@@ -52,7 +49,8 @@ static char *sib(struct info *info, int mod) {
     return (char *)offset;
 }
 
-char *ea(struct info *info, unsigned short code) {
+char *ea(struct info *info, unsigned short code)
+{
     unsigned char mod, rm;
     long *tmp = &EAX;
     int offset = 0;

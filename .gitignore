@@ -1,1 +1,13 @@
 .DS_Store
+*.o
+*.a
+boot/setup.s
+boot/bootsect.s
+kernel/chr_drv/keyboard.s
+Image
+System.map
+boot/bootsect
+boot/setup
+tools/build
+tools/system
+explain.txt
