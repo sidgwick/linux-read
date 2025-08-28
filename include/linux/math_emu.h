@@ -9,25 +9,25 @@
 #include <linux/sched.h>
 
 struct info {
-	long ___math_ret;
-	long ___orig_eip;
-	long ___edi;
-	long ___esi;
-	long ___ebp;
-	long ___sys_call_ret;
-	long ___eax;
-	long ___ebx;
-	long ___ecx;
-	long ___edx;
-	long ___orig_eax;
-	long ___fs;
-	long ___es;
-	long ___ds;
-	long ___eip;
-	long ___cs;
-	long ___eflags;
-	long ___esp;
-	long ___ss;
+    long ___math_ret;
+    long ___orig_eip;
+    long ___edi;
+    long ___esi;
+    long ___ebp;
+    long ___sys_call_ret;
+    long ___eax;
+    long ___ebx;
+    long ___ecx;
+    long ___edx;
+    long ___orig_eax;
+    long ___fs;
+    long ___es;
+    long ___ds;
+    long ___eip;
+    long ___cs;
+    long ___eflags;
+    long ___esp;
+    long ___ss;
 };
 
 #define EAX (info->___eax)
@@ -41,16 +41,16 @@ struct info {
 #define EIP (info->___eip)
 #define ORIG_EIP (info->___orig_eip)
 #define EFLAGS (info->___eflags)
-#define DS (*(unsigned short *) &(info->___ds))
-#define ES (*(unsigned short *) &(info->___es))
-#define FS (*(unsigned short *) &(info->___fs))
-#define CS (*(unsigned short *) &(info->___cs))
-#define SS (*(unsigned short *) &(info->___ss))
+#define DS (*(unsigned short *)&(info->___ds))
+#define ES (*(unsigned short *)&(info->___es))
+#define FS (*(unsigned short *)&(info->___fs))
+#define CS (*(unsigned short *)&(info->___cs))
+#define SS (*(unsigned short *)&(info->___ss))
 
 void __math_abort(struct info *, unsigned int);
 
-#define math_abort(x,y) \
-(((volatile void (*)(struct info *,unsigned int)) __math_abort)((x),(y)))
+#define math_abort(x, y) \
+    (((volatile void (*)(struct info *, unsigned int))__math_abort)((x), (y)))
 
 /*
  * Gcc forces this stupid alignment problem: I want to use only two longs
@@ -60,67 +60,67 @@ void __math_abort(struct info *, unsigned int);
  */
 
 typedef struct {
-	long a,b;
-	short exponent;
+    long a, b;
+    short exponent;
 } temp_real;
 
 typedef struct {
-	short m0,m1,m2,m3;
-	short exponent;
+    short m0, m1, m2, m3;
+    short exponent;
 } temp_real_unaligned;
 
-#define real_to_real(a,b) \
-((*(long long *) (b) = *(long long *) (a)),((b)->exponent = (a)->exponent))
+#define real_to_real(a, b) \
+    ((*(long long *)(b) = *(long long *)(a)), ((b)->exponent = (a)->exponent))
 
 typedef struct {
-	long a,b;
+    long a, b;
 } long_real;
 
 typedef long short_real;
 
 typedef struct {
-	long a,b;
-	short sign;
+    long a, b;
+    short sign;
 } temp_int;
 
 struct swd {
-	int ie:1;
-	int de:1;
-	int ze:1;
-	int oe:1;
-	int ue:1;
-	int pe:1;
-	int sf:1;
-	int ir:1;
-	int c0:1;
-	int c1:1;
-	int c2:1;
-	int top:3;
-	int c3:1;
-	int b:1;
+    int ie : 1;
+    int de : 1;
+    int ze : 1;
+    int oe : 1;
+    int ue : 1;
+    int pe : 1;
+    int sf : 1;
+    int ir : 1;
+    int c0 : 1;
+    int c1 : 1;
+    int c2 : 1;
+    int top : 3;
+    int c3 : 1;
+    int b : 1;
 };
 
 #define I387 (current->tss.i387)
-#define SWD (*(struct swd *) &I387.swd)
+#define SWD (*(struct swd *)&I387.swd)
 #define ROUNDING ((I387.cwd >> 10) & 3)
 #define PRECISION ((I387.cwd >> 8) & 3)
 
-#define BITS24	0
-#define BITS53	2
-#define BITS64	3
+#define BITS24 0
+#define BITS53 2
+#define BITS64 3
 
-#define ROUND_NEAREST	0
-#define ROUND_DOWN	1
-#define ROUND_UP	2
-#define ROUND_0		3
+#define ROUND_NEAREST 0
+#define ROUND_DOWN 1
+#define ROUND_UP 2
+#define ROUND_0 3
 
-#define CONSTZ   (temp_real_unaligned) {0x0000,0x0000,0x0000,0x0000,0x0000}
-#define CONST1   (temp_real_unaligned) {0x0000,0x0000,0x0000,0x8000,0x3FFF}
-#define CONSTPI  (temp_real_unaligned) {0xC235,0x2168,0xDAA2,0xC90F,0x4000}
-#define CONSTLN2 (temp_real_unaligned) {0x79AC,0xD1CF,0x17F7,0xB172,0x3FFE}
-#define CONSTLG2 (temp_real_unaligned) {0xF799,0xFBCF,0x9A84,0x9A20,0x3FFD}
-#define CONSTL2E (temp_real_unaligned) {0xF0BC,0x5C17,0x3B29,0xB8AA,0x3FFF}
-#define CONSTL2T (temp_real_unaligned) {0x8AFE,0xCD1B,0x784B,0xD49A,0x4000}
+#define CONSTZ (temp_real_unaligned){0x0000, 0x0000, 0x0000, 0x0000, 0x0000}
+#define CONST1 (temp_real_unaligned){0x0000, 0x0000, 0x0000, 0x8000, 0x3FFF}
+#define CONSTPI (temp_real_unaligned){0xC235, 0x2168, 0xDAA2, 0xC90F, 0x4000}
+#define CONSTLN2 (temp_real_unaligned){0x79AC, 0xD1CF, 0x17F7, 0xB172, 0x3FFE}
+#define CONSTLG2 (temp_real_unaligned){0xF799, 0xFBCF, 0x9A84, 0x9A20, 0x3FFD}
+#define CONSTL2E (temp_real_unaligned){0xF0BC, 0x5C17, 0x3B29, 0xB8AA, 0x3FFF}
+#define CONSTL2T (temp_real_unaligned){0x8AFE, 0xCD1B, 0x784B, 0xD49A, 0x4000}
 
 #define set_IE() (I387.swd |= 1)
 #define set_DE() (I387.swd |= 2)
@@ -136,16 +136,16 @@ struct swd {
 
 /* ea.c */
 
-char * ea(struct info * __info, unsigned short __code);
+char *ea(struct info *__info, unsigned short __code);
 
 /* convert.c */
 
-void short_to_temp(const short_real * __a, temp_real * __b);
-void long_to_temp(const long_real * __a, temp_real * __b);
-void temp_to_short(const temp_real * __a, short_real * __b);
-void temp_to_long(const temp_real * __a, long_real * __b);
-void real_to_int(const temp_real * __a, temp_int * __b);
-void int_to_real(const temp_int * __a, temp_real * __b);
+void short_to_temp(const short_real *__a, temp_real *__b);
+void long_to_temp(const long_real *__a, temp_real *__b);
+void temp_to_short(const temp_real *__a, short_real *__b);
+void temp_to_long(const temp_real *__a, long_real *__b);
+void real_to_int(const temp_real *__a, temp_int *__b);
+void int_to_real(const temp_int *__a, temp_real *__b);
 
 /* get_put.c */
 

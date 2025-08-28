@@ -4,14 +4,14 @@
 #define __GNU_EXEC_MACROS__
 
 struct exec {
-  unsigned long a_magic;	/* Use macros N_MAGIC, etc for access */
-  unsigned a_text;		/* length of text, in bytes */
-  unsigned a_data;		/* length of data, in bytes */
-  unsigned a_bss;		/* length of uninitialized data area for file, in bytes */
-  unsigned a_syms;		/* length of symbol table data in file, in bytes */
-  unsigned a_entry;		/* start address */
-  unsigned a_trsize;		/* length of relocation info for text, in bytes */
-  unsigned a_drsize;		/* length of relocation info for data, in bytes */
+    unsigned long a_magic; /* Use macros N_MAGIC, etc for access */
+    unsigned a_text; /* length of text, in bytes */
+    unsigned a_data; /* length of data, in bytes */
+    unsigned a_bss; /* length of uninitialized data area for file, in bytes */
+    unsigned a_syms; /* length of symbol table data in file, in bytes */
+    unsigned a_entry; /* start address */
+    unsigned a_trsize; /* length of relocation info for text, in bytes */
+    unsigned a_drsize; /* length of relocation info for data, in bytes */
 };
 
 #ifndef N_MAGIC
@@ -28,20 +28,18 @@ struct exec {
 #endif /* not OMAGIC */
 
 #ifndef N_BADMAG
-#define N_BADMAG(x)					\
- (N_MAGIC(x) != OMAGIC && N_MAGIC(x) != NMAGIC		\
-  && N_MAGIC(x) != ZMAGIC)
+#define N_BADMAG(x) \
+    (N_MAGIC(x) != OMAGIC && N_MAGIC(x) != NMAGIC && N_MAGIC(x) != ZMAGIC)
 #endif
 
-#define _N_BADMAG(x)					\
- (N_MAGIC(x) != OMAGIC && N_MAGIC(x) != NMAGIC		\
-  && N_MAGIC(x) != ZMAGIC)
+#define _N_BADMAG(x) \
+    (N_MAGIC(x) != OMAGIC && N_MAGIC(x) != NMAGIC && N_MAGIC(x) != ZMAGIC)
 
-#define _N_HDROFF(x) (SEGMENT_SIZE - sizeof (struct exec))
+#define _N_HDROFF(x) (SEGMENT_SIZE - sizeof(struct exec))
 
 #ifndef N_TXTOFF
 #define N_TXTOFF(x) \
- (N_MAGIC(x) == ZMAGIC ? _N_HDROFF((x)) + sizeof (struct exec) : sizeof (struct exec))
+    (N_MAGIC(x) == ZMAGIC ? _N_HDROFF((x)) + sizeof(struct exec) : sizeof(struct exec))
 #endif
 
 #ifndef N_DATOFF
@@ -75,12 +73,12 @@ struct exec {
 #if defined(vax) || defined(hp300) || defined(pyr)
 #define SEGMENT_SIZE PAGE_SIZE
 #endif
-#ifdef	hp300
-#define	PAGE_SIZE	4096
+#ifdef hp300
+#define PAGE_SIZE 4096
 #endif
-#ifdef	sony
-#define	SEGMENT_SIZE	0x2000
-#endif	/* Sony.  */
+#ifdef sony
+#define SEGMENT_SIZE 0x2000
+#endif /* Sony.  */
 #ifdef is68k
 #define SEGMENT_SIZE 0x20000
 #endif
@@ -94,12 +92,12 @@ struct exec {
 
 #define _N_SEGMENT_ROUND(x) (((x) + SEGMENT_SIZE - 1) & ~(SEGMENT_SIZE - 1))
 
-#define _N_TXTENDADDR(x) (N_TXTADDR(x)+(x).a_text)
+#define _N_TXTENDADDR(x) (N_TXTADDR(x) + (x).a_text)
 
 #ifndef N_DATADDR
-#define N_DATADDR(x) \
-    (N_MAGIC(x)==OMAGIC? (_N_TXTENDADDR(x)) \
-     : (_N_SEGMENT_ROUND (_N_TXTENDADDR(x))))
+#define N_DATADDR(x)                           \
+    (N_MAGIC(x) == OMAGIC ? (_N_TXTENDADDR(x)) \
+                          : (_N_SEGMENT_ROUND(_N_TXTENDADDR(x))))
 #endif
 
 /* Address of bss segment in memory after it is loaded.  */
@@ -109,15 +107,15 @@ struct exec {
 
 #ifndef N_NLIST_DECLARED
 struct nlist {
-  union {
-    char *n_name;
-    struct nlist *n_next;
-    long n_strx;
-  } n_un;
-  unsigned char n_type;
-  char n_other;
-  short n_desc;
-  unsigned long n_value;
+    union {
+        char *n_name;
+        struct nlist *n_next;
+        long n_strx;
+    } n_un;
+    unsigned char n_type;
+    char n_other;
+    short n_desc;
+    unsigned long n_value;
 };
 #endif
 
@@ -175,13 +173,13 @@ struct nlist {
    in that it can satisfy undefined external references.  */
 
 /* These appear as input to LD, in a .o file.  */
-#define	N_SETA	0x14		/* Absolute set element symbol */
-#define	N_SETT	0x16		/* Text set element symbol */
-#define	N_SETD	0x18		/* Data set element symbol */
-#define	N_SETB	0x1A		/* Bss set element symbol */
+#define N_SETA 0x14 /* Absolute set element symbol */
+#define N_SETT 0x16 /* Text set element symbol */
+#define N_SETD 0x18 /* Data set element symbol */
+#define N_SETB 0x1A /* Bss set element symbol */
 
 /* This is output from LD.  */
-#define N_SETV	0x1C		/* Pointer to set vector in data area.  */
+#define N_SETV 0x1C /* Pointer to set vector in data area.  */
 
 #ifndef N_RELOCATION_INFO_DECLARED
 
@@ -190,31 +188,29 @@ struct nlist {
    all of which apply to the text section.
    Likewise, the data-relocation section applies to the data section.  */
 
-struct relocation_info
-{
-  /* Address (within segment) to be relocated.  */
-  int r_address;
-  /* The meaning of r_symbolnum depends on r_extern.  */
-  unsigned int r_symbolnum:24;
-  /* Nonzero means value is a pc-relative offset
-     and it should be relocated for changes in its own address
-     as well as for changes in the symbol or section specified.  */
-  unsigned int r_pcrel:1;
-  /* Length (as exponent of 2) of the field to be relocated.
-     Thus, a value of 2 indicates 1<<2 bytes.  */
-  unsigned int r_length:2;
-  /* 1 => relocate with value of symbol.
-          r_symbolnum is the index of the symbol
-	  in file's the symbol table.
-     0 => relocate with the address of a segment.
-          r_symbolnum is N_TEXT, N_DATA, N_BSS or N_ABS
-	  (the N_EXT bit may be set also, but signifies nothing).  */
-  unsigned int r_extern:1;
-  /* Four bits that aren't used, but when writing an object file
-     it is desirable to clear them.  */
-  unsigned int r_pad:4;
+struct relocation_info {
+    /* Address (within segment) to be relocated.  */
+    int r_address;
+    /* The meaning of r_symbolnum depends on r_extern.  */
+    unsigned int r_symbolnum : 24;
+    /* Nonzero means value is a pc-relative offset
+       and it should be relocated for changes in its own address
+       as well as for changes in the symbol or section specified.  */
+    unsigned int r_pcrel : 1;
+    /* Length (as exponent of 2) of the field to be relocated.
+       Thus, a value of 2 indicates 1<<2 bytes.  */
+    unsigned int r_length : 2;
+    /* 1 => relocate with value of symbol.
+            r_symbolnum is the index of the symbol
+        in file's the symbol table.
+       0 => relocate with the address of a segment.
+            r_symbolnum is N_TEXT, N_DATA, N_BSS or N_ABS
+        (the N_EXT bit may be set also, but signifies nothing).  */
+    unsigned int r_extern : 1;
+    /* Four bits that aren't used, but when writing an object file
+       it is desirable to clear them.  */
+    unsigned int r_pad : 4;
 };
 #endif /* no N_RELOCATION_INFO_DECLARED.  */
-
 
 #endif /* __A_OUT_GNU_H__ */
