@@ -18,15 +18,16 @@
  */
 
 #include <a.out.h>
-#include <asm/segment.h>
 #include <errno.h>
+#include <signal.h>
+#include <string.h>
+#include <sys/stat.h>
+
+#include <asm/segment.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
-#include <signal.h>
-#include <string.h>
-#include <sys/stat.h>
 
 extern int sys_exit(int exit_code);
 extern int sys_close(int fd);
@@ -38,7 +39,8 @@ extern int sys_close(int fd);
  */
 #define MAX_ARG_PAGES 32
 
-int sys_uselib(const char *library) {
+int sys_uselib(const char *library)
+{
     struct m_inode *inode;
     unsigned long base;
 
@@ -64,7 +66,8 @@ int sys_uselib(const char *library) {
  * memory and creates the pointer tables from them, and puts their
  * addresses on the "stack", returning the new stack pointer value.
  */
-static unsigned long *create_tables(char *p, int argc, int envc) {
+static unsigned long *create_tables(char *p, int argc, int envc)
+{
     unsigned long *argv, *envp;
     unsigned long *sp;
 
@@ -94,7 +97,8 @@ static unsigned long *create_tables(char *p, int argc, int envc) {
 /*
  * count() counts the number of arguments/envelopes
  */
-static int count(char **argv) {
+static int count(char **argv)
+{
     int i = 0;
     char **tmp;
 
@@ -122,8 +126,9 @@ static int count(char **argv) {
  * it is expensive to load a segment register, we try to avoid calling
  * set_fs() unless we absolutely have to.
  */
-static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
-                                  unsigned long p, int from_kmem) {
+static unsigned long copy_strings(int argc, char **argv, unsigned long *page, unsigned long p,
+                                  int from_kmem)
+{
     char *tmp, *pag;
     int len, offset = 0;
     unsigned long old_fs, new_fs;
@@ -158,8 +163,7 @@ static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
                 if (from_kmem == 2)
                     set_fs(old_fs);
                 if (!(pag = (char *)page[p / PAGE_SIZE]) &&
-                    !(pag = (char *)page[p / PAGE_SIZE] =
-                          (unsigned long *)get_free_page()))
+                    !(pag = (char *)page[p / PAGE_SIZE] = (unsigned long *)get_free_page()))
                     return 0;
                 if (from_kmem == 2)
                     set_fs(new_fs);
@@ -172,7 +176,8 @@ static unsigned long copy_strings(int argc, char **argv, unsigned long *page,
     return p;
 }
 
-static unsigned long change_ldt(unsigned long text_size, unsigned long *page) {
+static unsigned long change_ldt(unsigned long text_size, unsigned long *page)
+{
     unsigned long code_limit, data_limit, code_base, data_base;
     int i;
 
@@ -201,8 +206,8 @@ static unsigned long change_ldt(unsigned long text_size, unsigned long *page) {
  * NOTE! We leave 4MB free at the top of the data-area for a loadable
  * library.
  */
-int do_execve(unsigned long *eip, long tmp, char *filename,
-              char **argv, char **envp) {
+int do_execve(unsigned long *eip, long tmp, char *filename, char **argv, char **envp)
+{
     struct m_inode *inode;
     struct buffer_head *bh;
     struct exec ex;
@@ -234,8 +239,7 @@ restart_interp:
         i >>= 6;
     else if (in_group_p(inode->i_gid))
         i >>= 3;
-    if (!(i & 1) &&
-        !((inode->i_mode & 0111) && suser())) {
+    if (!(i & 1) && !((inode->i_mode & 0111) && suser())) {
         retval = -ENOEXEC;
         goto exec_error2;
     }
@@ -259,7 +263,8 @@ restart_interp:
         buf[127] = '\0';
         if (cp = strchr(buf, '\n')) {
             *cp = '\0';
-            for (cp = buf; (*cp == ' ') || (*cp == '\t'); cp++);
+            for (cp = buf; (*cp == ' ') || (*cp == '\t'); cp++)
+                ;
         }
         if (!cp || *cp == '\0') {
             retval = -ENOEXEC; /* No interpreter name found */
@@ -360,14 +365,12 @@ restart_interp:
     p += change_ldt(ex.a_text, page);
     p -= LIBRARY_SIZE + MAX_ARG_PAGES * PAGE_SIZE;
     p = (unsigned long)create_tables((char *)p, argc, envc);
-    current->brk = ex.a_bss +
-                   (current->end_data = ex.a_data +
-                                        (current->end_code = ex.a_text));
+    current->brk = ex.a_bss + (current->end_data = ex.a_data + (current->end_code = ex.a_text));
     current->start_stack = p & 0xfffff000;
     current->suid = current->euid = e_uid;
     current->sgid = current->egid = e_gid;
     eip[0] = ex.a_entry; /* eip, magic happens :-) */
-    eip[3] = p; /* stack pointer */
+    eip[3] = p;          /* stack pointer */
     return 0;
 exec_error2:
     iput(inode);

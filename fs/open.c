@@ -4,22 +4,26 @@
  *  (C) 1991  Linus Torvalds
  */
 
-#include <asm/segment.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/tty.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <utime.h>
 
-int sys_ustat(int dev, struct ustat *ubuf) {
+#include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/tty.h>
+
+#include <asm/segment.h>
+
+int sys_ustat(int dev, struct ustat *ubuf)
+{
     return -ENOSYS;
 }
 
-int sys_utime(char *filename, struct utimbuf *times) {
+int sys_utime(char *filename, struct utimbuf *times)
+{
     struct m_inode *inode;
     long actime, modtime;
 
@@ -41,7 +45,8 @@ int sys_utime(char *filename, struct utimbuf *times) {
  * XXX should we use the real or effective uid?  BSD uses the real uid,
  * so as to make this call useful to setuid programs.
  */
-int sys_access(const char *filename, int mode) {
+int sys_access(const char *filename, int mode)
+{
     struct m_inode *inode;
     int res, i_mode;
 
@@ -62,13 +67,13 @@ int sys_access(const char *filename, int mode) {
      * and then calling suser() routine.  If we do call the
      * suser() routine, it needs to be called last.
      */
-    if ((!current->uid) &&
-        (!(mode & 1) || (i_mode & 0111)))
+    if ((!current->uid) && (!(mode & 1) || (i_mode & 0111)))
         return 0;
     return -EACCES;
 }
 
-int sys_chdir(const char *filename) {
+int sys_chdir(const char *filename)
+{
     struct m_inode *inode;
 
     if (!(inode = namei(filename)))
@@ -82,7 +87,8 @@ int sys_chdir(const char *filename) {
     return (0);
 }
 
-int sys_chroot(const char *filename) {
+int sys_chroot(const char *filename)
+{
     struct m_inode *inode;
 
     if (!(inode = namei(filename)))
@@ -96,7 +102,8 @@ int sys_chroot(const char *filename) {
     return (0);
 }
 
-int sys_chmod(const char *filename, int mode) {
+int sys_chmod(const char *filename, int mode)
+{
     struct m_inode *inode;
 
     if (!(inode = namei(filename)))
@@ -111,7 +118,8 @@ int sys_chmod(const char *filename, int mode) {
     return 0;
 }
 
-int sys_chown(const char *filename, int uid, int gid) {
+int sys_chown(const char *filename, int uid, int gid)
+{
     struct m_inode *inode;
 
     if (!(inode = namei(filename)))
@@ -127,7 +135,8 @@ int sys_chown(const char *filename, int uid, int gid) {
     return 0;
 }
 
-static int check_char_dev(struct m_inode *inode, int dev, int flag) {
+static int check_char_dev(struct m_inode *inode, int dev, int flag)
+{
     struct tty_struct *tty;
     int min;
 
@@ -141,10 +150,7 @@ static int check_char_dev(struct m_inode *inode, int dev, int flag) {
         if ((IS_A_PTY_MASTER(min)) && (inode->i_count > 1))
             return -1;
         tty = TTY_TABLE(min);
-        if (!(flag & O_NOCTTY) &&
-            current->leader &&
-            current->tty < 0 &&
-            tty->session == 0) {
+        if (!(flag & O_NOCTTY) && current->leader && current->tty < 0 && tty->session == 0) {
             current->tty = min;
             tty->session = current->session;
             tty->pgrp = current->pgrp;
@@ -158,7 +164,8 @@ static int check_char_dev(struct m_inode *inode, int dev, int flag) {
     return 0;
 }
 
-int sys_open(const char *filename, int flag, int mode) {
+int sys_open(const char *filename, int flag, int mode)
+{
     struct m_inode *inode;
     struct file *f;
     int i, fd;
@@ -172,7 +179,8 @@ int sys_open(const char *filename, int flag, int mode) {
     current->close_on_exec &= ~(1 << fd);
     f = 0 + file_table;
     for (i = 0; i < NR_FILE; i++, f++)
-        if (!f->f_count) break;
+        if (!f->f_count)
+            break;
     if (i >= NR_FILE)
         return -EINVAL;
     (current->filp[fd] = f)->f_count++;
@@ -200,11 +208,13 @@ int sys_open(const char *filename, int flag, int mode) {
     return (fd);
 }
 
-int sys_creat(const char *pathname, int mode) {
+int sys_creat(const char *pathname, int mode)
+{
     return sys_open(pathname, O_CREAT | O_TRUNC, mode);
 }
 
-int sys_close(unsigned int fd) {
+int sys_close(unsigned int fd)
+{
     struct file *filp;
 
     if (fd >= NR_OPEN)

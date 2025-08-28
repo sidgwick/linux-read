@@ -5,9 +5,11 @@
  */
 
 #include <linux/sched.h>
+
 #include <sys/stat.h>
 
-static int free_ind(int dev, int block) {
+static int free_ind(int dev, int block)
+{
     struct buffer_head *bh;
     unsigned short *p;
     int i;
@@ -33,7 +35,8 @@ static int free_ind(int dev, int block) {
         return free_block(dev, block);
 }
 
-static int free_dind(int dev, int block) {
+static int free_dind(int dev, int block)
+{
     struct buffer_head *bh;
     unsigned short *p;
     int i;
@@ -59,12 +62,12 @@ static int free_dind(int dev, int block) {
         return free_block(dev, block);
 }
 
-void truncate(struct m_inode *inode) {
+void truncate(struct m_inode *inode)
+{
     int i;
     int block_busy;
 
-    if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
-          S_ISLNK(inode->i_mode)))
+    if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)))
         return;
 repeat:
     block_busy = 0;

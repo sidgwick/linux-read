@@ -241,92 +241,107 @@ struct task_struct {
 #define PF_ALIGNWARN 0x00000001 /* Print alignment warning msgs */
                                 /* Not implemented yet, only for 486*/
 
-/*
+/**
+ * @brief idle 进程
+ *
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x9ffff (=640kB)
  *
- * INIT_TASK用于设置第1个任务表, 若想修改, 责任自负!
- * 基址Base = 0, 段长limit = 0x9ffff(=640kB).
+ * INIT_TASK 用于设置第 1 个任务表, 若想修改, 责任自负!
+ * 基址 Base = 0, 段长 limit = 0x9ffff(=640kB).
  *
  * 对应上面任务结构的第1个任务的信息
  */
 #define INIT_TASK                                                                                  \
-    /* state etc */ {                                                                              \
-        0,                                                                                         \
-        15,                                                                                        \
-        15,                                                                                        \
-        /* signals */ 0,                                                                           \
-        {                                                                                          \
-            {},                                                                                    \
-        },                                                                                         \
-        0,                                                                                         \
-        /* ec,brk... */ 0,                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        /* pid etc.. */ 0,                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0, /* suppl grps*/                                                                         \
-        {                                                                                          \
-            NOGROUP,                                                                               \
-        },                                                                                         \
-        /* proc links*/ &init_task.task,                                                           \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        /* uid etc */ 0,                                                                           \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        /* timeout */ 0,                                                                           \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0,                                                                                         \
-        0, /* rlimits */                                                                           \
-        {{0x7fffffff, 0x7fffffff},                                                                 \
-         {0x7fffffff, 0x7fffffff},                                                                 \
-         {0x7fffffff, 0x7fffffff},                                                                 \
-         {0x7fffffff, 0x7fffffff},                                                                 \
-         {0x7fffffff, 0x7fffffff},                                                                 \
-         {0x7fffffff, 0x7fffffff}},                                                                \
-        /* flags */ 0,                                                                             \
-        /* math */ 0,                                                                              \
-        /* fs info */ -1,                                                                          \
-        0022,                                                                                      \
-        NULL,                                                                                      \
-        NULL,                                                                                      \
-        NULL,                                                                                      \
-        NULL,                                                                                      \
-        0, /* filp */                                                                              \
-        {                                                                                          \
-            NULL,                                                                                  \
-        },                                                                                         \
-        {                                                                                          \
-            {0, 0},                                                                                \
-            /* ldt  */ {0x9f, 0xc0fa00},                                                           \
-            {0x9f, 0xc0f200},                                                                      \
-        },                                                                                         \
-        /*tss*/ {0,       PAGE_SIZE + (long)&init_task,                                            \
-                 0x10,    0,                                                                       \
-                 0,       0,                                                                       \
-                 0,       (long)&pg_dir,                                                           \
-                 0,       0,                                                                       \
-                 0,       0,                                                                       \
-                 0,       0,                                                                       \
-                 0,       0,                                                                       \
-                 0,       0,                                                                       \
-                 0x17,    0x17,                                                                    \
-                 0x17,    0x17,                                                                    \
-                 0x17,    0x17,                                                                    \
-                 _LDT(0), 0x80000000,                                                              \
-                 {}},                                                                              \
+    {                                                                                              \
+        .state = 0,                                                                                \
+        .counter = 15,                                                                             \
+        .priority = 15,                                                                            \
+        .signal = 0,                                                                               \
+        .sigaction = {{}},                                                                         \
+        .blocked = 0,                                                                              \
+        .exit_code = 0,                                                                            \
+        .start_code = 0,                                                                           \
+        .end_code = 0,                                                                             \
+        .end_data = 0,                                                                             \
+        .brk = 0,                                                                                  \
+        .start_stack = 0,                                                                          \
+        .pid = 0,                                                                                  \
+        .pgrp = 0,                                                                                 \
+        .session = 0,                                                                              \
+        .leader = 0,                                                                               \
+        .groups = {NOGROUP},                                                                       \
+        .p_pptr = &init_task.task, /* idle 进程的父进程还是他自己 */                               \
+        .p_cptr = 0,                                                                               \
+        .p_ysptr = 0,                                                                              \
+        .p_osptr = 0,                                                                              \
+        .uid = 0,                                                                                  \
+        .euid = 0,                                                                                 \
+        .suid = 0,                                                                                 \
+        .gid = 0,                                                                                  \
+        .egid = 0,                                                                                 \
+        .sgid = 0,                                                                                 \
+        .timeout = 0,                                                                              \
+        .alarm = 0,                                                                                \
+        .utime = 0,                                                                                \
+        .stime = 0,                                                                                \
+        .cutime = 0,                                                                               \
+        .cstime = 0,                                                                               \
+        .start_time = 0,                                                                           \
+        .rlim =                                                                                    \
+            {/* idle 进程资源被设置为没有限制 */                                                   \
+             {.rlim_cur = 0x7fffffff, .rlim_max = 0x7fffffff},                                     \
+             {.rlim_cur = 0x7fffffff, .rlim_max = 0x7fffffff},                                     \
+             {.rlim_cur = 0x7fffffff, .rlim_max = 0x7fffffff},                                     \
+             {.rlim_cur = 0x7fffffff, .rlim_max = 0x7fffffff},                                     \
+             {.rlim_cur = 0x7fffffff, .rlim_max = 0x7fffffff},                                     \
+             {.rlim_cur = 0x7fffffff, .rlim_max = 0x7fffffff}},                                    \
+        .flags = 0,                                                                                \
+        .used_math = 0,                                                                            \
+        .tty = -1,                                                                                 \
+        .umask = 0022,                                                                             \
+        .pwd = NULL,                                                                               \
+        .root = NULL,                                                                              \
+        .executable = NULL,                                                                        \
+        .library = NULL,                                                                           \
+        .close_on_exec = 0,                                                                        \
+        .filp = {NULL},                                                                            \
+        .ldt =                                                                                     \
+            {                                                                                      \
+                {0, 0},                                                                            \
+                {0x9f, 0xc0fa00},                                                                  \
+                {0x9f, 0xc0f200},                                                                  \
+            },                                                                                     \
+        .tss =                                                                                     \
+            {                                                                                      \
+                .back_link = 0,                                                                    \
+                .esp0 = PAGE_SIZE + (long)&init_task,                                              \
+                .ss0 = 0x10,                                                                       \
+                .esp1 = 0,                                                                         \
+                .ss1 = 0,                                                                          \
+                .esp2 = 0,                                                                         \
+                .ss2 = 0,                                                                          \
+                .cr3 = (long)&pg_dir,                                                              \
+                .eip = 0,                                                                          \
+                .eflags = 0,                                                                       \
+                .eax = 0,                                                                          \
+                .ecx = 0,                                                                          \
+                .edx = 0,                                                                          \
+                .ebx = 0,                                                                          \
+                .esp = 0,                                                                          \
+                .ebp = 0,                                                                          \
+                .esi = 0,                                                                          \
+                .edi = 0,                                                                          \
+                .es = 0x17,                                                                        \
+                .cs = 0x17,                                                                        \
+                .ss = 0x17,                                                                        \
+                .ds = 0x17,                                                                        \
+                .fs = 0x17,                                                                        \
+                .gs = 0x17,                                                                        \
+                .ldt = _LDT(0),                                                                    \
+                .trace_bitmap = 0x80000000,                                                        \
+                .i387 = {},                                                                        \
+            },                                                                                     \
     }
 
 /*
@@ -337,8 +352,8 @@ BBBB-LLLL == 0000-009f
 
 BASE= 00000000
 Limit = 9fFFF
-g_db_l_avl = C = 1100 = 4Kb, 32Bits
-p_dpl_s_type = fa = 1111_1010 = 存在, dpl=3, s=1, XCRA=1010
+g_db_l_avl = 0xC = 1100 = 4Kb, 32Bits
+p_dpl_s_type = 0xFA = 1111_1010 = 存在, dpl=3, s=1, XCRA=1010
 可执行非依从可读代码段 p_dpl_s_type = f2 = 1111_0010 = 存在, dpl=3, s=1,
 XERA=0010 不可执行正向生长可写数据段
 */
@@ -352,20 +367,19 @@ extern int jiffies_offset;                      // 用于累计需要调整的�
 
 #define CURRENT_TIME (startup_time + (jiffies + jiffies_offset) / HZ) // 当前时间(秒数)
 
-// 添加定时器函数(定时时间jiffies滴答数, 定时到时调用函数*fn()). (
-// kernel/sched.c )
+/* 添加定时器函数(定时时间jiffies滴答数, 定时到时调用函数 fn, 参考: kernel/sched.c) */
 extern void add_timer(long jiffies, void (*fn)(void));
 
-// 不可中断的等待睡眠. ( kernel/sched.c )
+/* 不可中断的等待睡眠(参考 kernel/sched.c) */
 extern void sleep_on(struct task_struct **p);
 
-// 可中断的等待睡眠. ( kernel/sched.c )
+/* 可中断的等待睡眠(参考 kernel/sched.c) */
 extern void interruptible_sleep_on(struct task_struct **p);
 
-// 明确唤醒睡眠的进程. ( kernel/sched.c )
+/* 明确唤醒睡眠的进程(参考 kernel/sched.c) */
 extern void wake_up(struct task_struct **p);
 
-// 检查当前进程是否在指定的用户组grp中.
+/* 检查当前进程是否在指定的用户组 grp 中 */
 extern int in_group_p(gid_t grp);
 
 /*

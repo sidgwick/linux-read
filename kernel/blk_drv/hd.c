@@ -657,11 +657,15 @@ void do_hd_request(void)
     /* 初始 EAX = block, EDX=0, 除以每磁道扇区数
      * 商 EAX 是到 block 对应的磁道数量, 余数 EDX 是到 block 的扇区位置
      * 商最后输出到 block, 余数最后输出到 sec */
-    __asm__("divl %4" : "=a"(block), "=d"(sec) : "0"(block), "1"(0), "r"(hd_info[dev].sect));
+    __asm__("divl %4" //
+            : "=a"(block), "=d"(sec)
+            : "0"(block), "1"(0), "r"(hd_info[dev].sect));
 
     /* 与上面计算类似, 不同的是这次结果
      * cyl 中保存的是到 block 需要的柱面数, head 是到 block 的磁头号 */
-    __asm__("divl %4" : "=a"(cyl), "=d"(head) : "0"(block), "1"(0), "r"(hd_info[dev].head));
+    __asm__("divl %4" //
+            : "=a"(cyl), "=d"(head)
+            : "0"(block), "1"(0), "r"(hd_info[dev].head));
 
     sec++;                       /* 扇区从 1 开始计数 */
     nsect = CURRENT->nr_sectors; /* 待读写的扇区数量 */

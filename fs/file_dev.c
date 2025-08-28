@@ -4,16 +4,18 @@
  *  (C) 1991  Linus Torvalds
  */
 
-#include <asm/segment.h>
 #include <errno.h>
 #include <fcntl.h>
+
+#include <asm/segment.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
-int file_read(struct m_inode *inode, struct file *filp, char *buf, int count) {
+int file_read(struct m_inode *inode, struct file *filp, char *buf, int count)
+{
     int left, chars, nr;
     struct buffer_head *bh;
 
@@ -43,7 +45,8 @@ int file_read(struct m_inode *inode, struct file *filp, char *buf, int count) {
     return (count - left) ? (count - left) : -ERROR;
 }
 
-int file_write(struct m_inode *inode, struct file *filp, char *buf, int count) {
+int file_write(struct m_inode *inode, struct file *filp, char *buf, int count)
+{
     off_t pos;
     int block, c;
     struct buffer_head *bh;
@@ -67,7 +70,8 @@ int file_write(struct m_inode *inode, struct file *filp, char *buf, int count) {
         p = c + bh->b_data;
         bh->b_dirt = 1;
         c = BLOCK_SIZE - c;
-        if (c > count - i) c = count - i;
+        if (c > count - i)
+            c = count - i;
         pos += c;
         if (pos > inode->i_size) {
             inode->i_size = pos;

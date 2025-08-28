@@ -242,34 +242,37 @@ int swap_out(void)
     return 0;
 }
 
-/*
+/**
+ * @brief Get the free page object
+ *
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
+ *
+ * @return unsigned long
  */
 unsigned long get_free_page(void)
 {
     register unsigned long __res asm("ax");
 
+    // scasb 比较 %al 和 (%edi), 比较完后 %edi+1, %ecx-1
+
 repeat:
-    __asm__("std ; repne ; scasb\n\t" /* 倒着找, mem_map 里面不为 0 的字节 */
-            "jne 1f\n\t" /* jne 说明没有找到, 否则说明找到了, 相关的值为 0
-                        的字节指针在 %edi+1 位置 */
-            "movb $1,1(%%edi)\n\t" /* 将那个 0 字节置 1, 表示这个页面现在被用了 */
-            "sall $12,%%ecx\n\t"   /* sall = shll, 都是左移, (PAGING_PAGS << 12)
-                                得相对页面起始地址 - 这个地址是相对 LOW_MEM 的
-                              */
-            "addl %2,%%ecx\n\t" /* 加上 LOW_MEM 之后, 得到的就是那个值为 0 的字节,
-                               对应的物理地址了 */
-            "movl %%ecx,%%edx\n\t"       /* 物理地址存到 EDX */
-            "movl $1024,%%ecx\n\t"       /* ECX = 1024 */
-            "leal 4092(%%edx),%%edi\n\t" /* EDI = 物理地址+4092, 实际上就是页的末尾
-                                      */
-            "rep ; stosl\n\t"            /* 上面已经 std, 这里倒着给页面填充 0 */
-            "movl %%edx,%%eax\n"         /* 返回页面地址 */
-            "1:"
-            : "=a"(__res)
-            : "0"(0), "i"(LOW_MEM), "c"(PAGING_PAGES), "D"(mem_map + PAGING_PAGES - 1)
-            : "di", "cx", "dx");
+    __asm__(
+        "std"
+        "repne scasb\n\t" /* 倒着找, mem_map 里面不为 0 的字节 */
+        "jne 1f\n\t" /* jne 说明没有找到, 否则说明找到了, 相关的值为 0 的字节指针在 %edi+1 位置 */
+        "movb $1, 1(%%edi)\n\t" /* 将那个 0 字节置 1, 表示这个页面现在被用了 */
+        "sall $12, %%ecx\n\t" /* sall = shll, 都是左移, (PAGING_PAGS << 12) 得相对页面起始地址 - 这个地址是相对 LOW_MEM 的 */
+        "addl %2, %%ecx\n\t" /* 加上 LOW_MEM 之后, 得到的就是那个值为 0 的字节, 对应的物理地址了 */
+        "movl %%ecx, %%edx\n\t"       /* 物理地址存到 EDX */
+        "movl $1024, %%ecx\n\t"       /* ECX = 1024 */
+        "leal 4092(%%edx), %%edi\n\t" /* EDI = 物理地址+4092, 实际上就是页的末尾 */
+        "rep stosl\n\t"               /* 上面已经 std, 这里倒着给页面填充 0 */
+        "movl %%edx, %%eax\n"         /* 返回页面地址 */
+        "1:"
+        : "=a"(__res)
+        : "0"(0), "i"(LOW_MEM), "c"(PAGING_PAGES), "D"(mem_map + PAGING_PAGES - 1)
+        : "di", "cx", "dx");
 
     /* 找的结果不对, 重找 */
     if (__res >= HIGH_MEMORY)

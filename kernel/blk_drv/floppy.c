@@ -189,7 +189,9 @@ void floppy_deselect(unsigned int nr)
     wake_up(&wait_on_floppy_select);
 }
 
-/*
+/**
+ * @brief 检测指定软驱中软盘更换情况
+ *
  * floppy-change is never called from an interrupt, so we can relax a bit
  * here, sleep etc. Note that floppy-on tries to set current_DOR to point
  * to the desired drive, but it will probably not survive the sleep if
@@ -199,23 +201,25 @@ void floppy_deselect(unsigned int nr)
  * 注意 floppy-on 会尝试设置 current_DOR 指向所需的驱动器, 但当同时使用几个
  * 软盘时不能睡眠: 因此此时只能使用循环方式
  *
- * 检测指定软驱中软盘更换情况
- *
- * 参数nr是软驱号. 如果软盘更换了则返回1, 否则返回0.
  * 该函数首先选定参数指定的软驱nr, 然后测试软盘控制器的数字输入寄存器DIR的值, 以判
  * 断驱动器中的软盘是否被更换过. 该函数由程序fs/buffer.c中的 check_disk_change()函
  * 数调用 (第119行) .
+ *
+ * @param nr 软驱号
+ * @return int 如果软盘更换了则返回1, 否则返回0
  */
 int floppy_change(unsigned int nr)
 {
 repeat:
-    /* 首先要让软驱中软盘旋转起来并达到正常工作转速
-    * 这需要花费一定时间. 采用的方法是利用 kernel/sched.c 中软盘定时函数 do_floppy_timer
-    * 进行一定的延时处理. floppy_on 函数则用于判断延时是否到, 若没有到则让当前进程继续睡眠等待.
-    * 若延时到则 do_floppy_timer 会唤醒当前进程 */
+    /* 首先要让软驱中软盘旋转起来并达到正常工作转速, 这需要花费一定时间.
+     * 采用的方法是利用 kernel/sched.c 中软盘定时函数 do_floppy_timer 进行一定的
+     * 延时处理. floppy_on 函数则用于判断延时是否到, 若没有到则让当前进程继续睡眠等待.
+     * 若延时到则 do_floppy_timer 会唤醒当前进程 */
     floppy_on(nr);
 
-    /* 在软盘启动(旋转)之后, 查看一下当前选择的软驱是不是函数参数指定的软驱 nr
+    /* 等软盘驱动器为当前进程提供服务
+     *
+     * 在软盘启动(旋转)之后, 查看一下当前选择的软驱是不是函数参数指定的软驱 nr
      *
      * 如果当前选择的软驱不是指定的软驱 nr, 并且已经选定了其他软驱, 则让当前任务进入可
      * 中断等待状态, 以等待其他软驱被取消选定. 参见上面 floppy_deselect
@@ -231,9 +235,13 @@ repeat:
     }
 
     /* 现在软盘控制器已选定我们指定的软驱 nr
+     *
      * 取数字输入寄存器 DIR 的值, 如果其 `位7` 置位, 则表示软盘已更换,
      * 此时即可关闭马达并返回 1 退出, 否则关闭马达返回 0 退出. 表示磁盘没有被更换
-     * TODO: 了解一下 DIR 各位的含义 */
+     *
+     * TODO-DONE: 了解一下 DIR 各位的含义
+     * 答: DIR 寄存器只有位 7 有效, 用于表示软盘更换状态, 其余用于硬盘控制器
+     */
     if (inb(FD_DIR) & 0x80) {
         floppy_off(nr);
         return 1;

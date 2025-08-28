@@ -9,16 +9,16 @@
  */
 
 #include <asm/segment.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
+
 #include <const.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
 #include <string.h>
 #include <sys/stat.h>
 
-static struct m_inode *_namei(const char *filename, struct m_inode *base,
-                              int follow_links);
+static struct m_inode *_namei(const char *filename, struct m_inode *base, int follow_links);
 
 #define ACC_MODE(x) ("\004\002\006\377"[(x) & O_ACCMODE])
 
@@ -39,7 +39,8 @@ static struct m_inode *_namei(const char *filename, struct m_inode *base,
  * I don't know if we should look at just the euid or both euid and
  * uid, but that should be easily changed.
  */
-static int permission(struct m_inode *inode, int mask) {
+static int permission(struct m_inode *inode, int mask)
+{
     int mode = inode->i_mode;
 
     /* special case: not even root can read/write a deleted file */
@@ -61,7 +62,8 @@ static int permission(struct m_inode *inode, int mask) {
  *
  * NOTE! unlike strncmp, match returns 1 for success, 0 for failure.
  */
-static int match(int len, const char *name, struct dir_entry *de) {
+static int match(int len, const char *name, struct dir_entry *de)
+{
     register int same __asm__("ax");
 
     if (!de || !de->inode || len > NAME_LEN)
@@ -71,13 +73,12 @@ static int match(int len, const char *name, struct dir_entry *de) {
         return 1;
     if (len < NAME_LEN && de->name[len])
         return 0;
-    __asm__(
-        "cld\n\t"
-        "fs ; repe ; cmpsb\n\t"
-        "setz %%al"
-        : "=a"(same)
-        : "0"(0), "S"((long)name), "D"((long)de->name), "c"(len)
-        : "cx", "di", "si");
+    __asm__("cld\n\t"
+            "fs ; repe ; cmpsb\n\t"
+            "setz %%al"
+            : "=a"(same)
+            : "0"(0), "S"((long)name), "D"((long)de->name), "c"(len)
+            : "cx", "di", "si");
     return same;
 }
 
@@ -92,8 +93,9 @@ static int match(int len, const char *name, struct dir_entry *de) {
  * This also takes care of the few special cases due to '..'-traversal
  * over a pseudo-root and a mount point.
  */
-static struct buffer_head *find_entry(struct m_inode **dir,
-                                      const char *name, int namelen, struct dir_entry **res_dir) {
+static struct buffer_head *find_entry(struct m_inode **dir, const char *name, int namelen,
+                                      struct dir_entry **res_dir)
+{
     int entries;
     int block, i;
     struct buffer_head *bh;
@@ -115,8 +117,9 @@ static struct buffer_head *find_entry(struct m_inode **dir,
         if ((*dir) == current->root)
             namelen = 1;
         else if ((*dir)->i_num == ROOT_INO) {
-            /* '..' over a mount-point results in 'dir' being exchanged for the mounted
-               directory-inode. NOTE! We set mounted, so that we can iput the new dir */
+            /* '..' over a mount-point results in 'dir' being exchanged for the
+               mounted directory-inode. NOTE! We set mounted, so that we can
+               iput the new dir */
             sb = get_super((*dir)->i_dev);
             if (sb->s_imount) {
                 iput(*dir);
@@ -163,8 +166,9 @@ static struct buffer_head *find_entry(struct m_inode **dir,
  * may not sleep between calling this and putting something into
  * the entry, as someone else might have used it while you slept.
  */
-static struct buffer_head *add_entry(struct m_inode *dir,
-                                     const char *name, int namelen, struct dir_entry **res_dir) {
+static struct buffer_head *add_entry(struct m_inode *dir, const char *name, int namelen,
+                                     struct dir_entry **res_dir)
+{
     int block, i;
     struct buffer_head *bh;
     struct dir_entry *de;
@@ -219,7 +223,8 @@ static struct buffer_head *add_entry(struct m_inode *dir,
     return NULL;
 }
 
-static struct m_inode *follow_link(struct m_inode *dir, struct m_inode *inode) {
+static struct m_inode *follow_link(struct m_inode *dir, struct m_inode *inode)
+{
     unsigned short fs;
     struct buffer_head *bh;
 
@@ -236,8 +241,7 @@ static struct m_inode *follow_link(struct m_inode *dir, struct m_inode *inode) {
         return inode;
     }
     __asm__("mov %%fs,%0" : "=r"(fs));
-    if (fs != 0x17 || !inode->i_zone[0] ||
-        !(bh = bread(inode->i_dev, inode->i_zone[0]))) {
+    if (fs != 0x17 || !inode->i_zone[0] || !(bh = bread(inode->i_dev, inode->i_zone[0]))) {
         iput(dir);
         iput(inode);
         return NULL;
@@ -256,7 +260,8 @@ static struct m_inode *follow_link(struct m_inode *dir, struct m_inode *inode) {
  * Getdir traverses the pathname until it hits the topmost directory.
  * It returns NULL on failure.
  */
-static struct m_inode *get_dir(const char *pathname, struct m_inode *inode) {
+static struct m_inode *get_dir(const char *pathname, struct m_inode *inode)
+{
     char c;
     const char *thisname;
     struct buffer_head *bh;
@@ -306,8 +311,9 @@ static struct m_inode *get_dir(const char *pathname, struct m_inode *inode) {
  * dir_namei() returns the inode of the directory of the
  * specified name, and the name within that directory.
  */
-static struct m_inode *dir_namei(const char *pathname,
-                                 int *namelen, const char **name, struct m_inode *base) {
+static struct m_inode *dir_namei(const char *pathname, int *namelen, const char **name,
+                                 struct m_inode *base)
+{
     char c;
     const char *basename;
     struct m_inode *dir;
@@ -323,8 +329,8 @@ static struct m_inode *dir_namei(const char *pathname,
     return dir;
 }
 
-struct m_inode *_namei(const char *pathname, struct m_inode *base,
-                       int follow_links) {
+struct m_inode *_namei(const char *pathname, struct m_inode *base, int follow_links)
+{
     const char *basename;
     int inr, namelen;
     struct m_inode *inode;
@@ -355,7 +361,8 @@ struct m_inode *_namei(const char *pathname, struct m_inode *base,
     return inode;
 }
 
-struct m_inode *lnamei(const char *pathname) {
+struct m_inode *lnamei(const char *pathname)
+{
     return _namei(pathname, NULL, 0);
 }
 
@@ -366,7 +373,8 @@ struct m_inode *lnamei(const char *pathname) {
  * Open, link etc use their own routines, but this is enough for things
  * like 'chmod' etc.
  */
-struct m_inode *namei(const char *pathname) {
+struct m_inode *namei(const char *pathname)
+{
     return _namei(pathname, NULL, 1);
 }
 
@@ -375,8 +383,8 @@ struct m_inode *namei(const char *pathname) {
  *
  * namei for open - this is in fact almost the whole open-routine.
  */
-int open_namei(const char *pathname, int flag, int mode,
-               struct m_inode **res_inode) {
+int open_namei(const char *pathname, int flag, int mode, struct m_inode **res_inode)
+{
     const char *basename;
     int inr, dev, namelen;
     struct m_inode *dir, *inode;
@@ -438,8 +446,7 @@ int open_namei(const char *pathname, int flag, int mode,
     }
     if (!(inode = follow_link(dir, iget(dev, inr))))
         return -EACCES;
-    if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) ||
-        !permission(inode, ACC_MODE(flag))) {
+    if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) || !permission(inode, ACC_MODE(flag))) {
         iput(inode);
         return -EPERM;
     }
@@ -450,7 +457,8 @@ int open_namei(const char *pathname, int flag, int mode,
     return 0;
 }
 
-int sys_mknod(const char *filename, int mode, int dev) {
+int sys_mknod(const char *filename, int mode, int dev)
+{
     const char *basename;
     int namelen;
     struct m_inode *dir, *inode;
@@ -500,7 +508,8 @@ int sys_mknod(const char *filename, int mode, int dev) {
     return 0;
 }
 
-int sys_mkdir(const char *pathname, int mode) {
+int sys_mkdir(const char *pathname, int mode)
+{
     const char *basename;
     int namelen;
     struct m_inode *dir, *inode;
@@ -575,21 +584,21 @@ int sys_mkdir(const char *pathname, int mode) {
 /*
  * routine to check that the specified directory is empty (for rmdir)
  */
-static int empty_dir(struct m_inode *inode) {
+static int empty_dir(struct m_inode *inode)
+{
     int nr, block;
     int len;
     struct buffer_head *bh;
     struct dir_entry *de;
 
     len = inode->i_size / sizeof(struct dir_entry);
-    if (len < 2 || !inode->i_zone[0] ||
-        !(bh = bread(inode->i_dev, inode->i_zone[0]))) {
+    if (len < 2 || !inode->i_zone[0] || !(bh = bread(inode->i_dev, inode->i_zone[0]))) {
         printk("warning - bad directory on dev %04x\n", inode->i_dev);
         return 0;
     }
     de = (struct dir_entry *)bh->b_data;
-    if (de[0].inode != inode->i_num || !de[1].inode ||
-        strcmp(".", de[0].name) || strcmp("..", de[1].name)) {
+    if (de[0].inode != inode->i_num || !de[1].inode || strcmp(".", de[0].name) ||
+        strcmp("..", de[1].name)) {
         printk("warning - bad directory on dev %04x\n", inode->i_dev);
         return 0;
     }
@@ -618,7 +627,8 @@ static int empty_dir(struct m_inode *inode) {
     return 1;
 }
 
-int sys_rmdir(const char *name) {
+int sys_rmdir(const char *name)
+{
     const char *basename;
     int namelen;
     struct m_inode *dir, *inode;
@@ -645,8 +655,7 @@ int sys_rmdir(const char *name) {
         brelse(bh);
         return -EPERM;
     }
-    if ((dir->i_mode & S_ISVTX) && current->euid &&
-        inode->i_uid != current->euid) {
+    if ((dir->i_mode & S_ISVTX) && current->euid && inode->i_uid != current->euid) {
         iput(dir);
         iput(inode);
         brelse(bh);
@@ -691,7 +700,8 @@ int sys_rmdir(const char *name) {
     return 0;
 }
 
-int sys_unlink(const char *name) {
+int sys_unlink(const char *name)
+{
     const char *basename;
     int namelen;
     struct m_inode *dir, *inode;
@@ -718,8 +728,7 @@ int sys_unlink(const char *name) {
         brelse(bh);
         return -ENOENT;
     }
-    if ((dir->i_mode & S_ISVTX) && !suser() &&
-        current->euid != inode->i_uid &&
+    if ((dir->i_mode & S_ISVTX) && !suser() && current->euid != inode->i_uid &&
         current->euid != dir->i_uid) {
         iput(dir);
         iput(inode);
@@ -733,8 +742,8 @@ int sys_unlink(const char *name) {
         return -EPERM;
     }
     if (!inode->i_nlinks) {
-        printk("Deleting nonexistent file (%04x:%d), %d\n",
-               inode->i_dev, inode->i_num, inode->i_nlinks);
+        printk("Deleting nonexistent file (%04x:%d), %d\n", inode->i_dev, inode->i_num,
+               inode->i_nlinks);
         inode->i_nlinks = 1;
     }
     de->inode = 0;
@@ -748,7 +757,8 @@ int sys_unlink(const char *name) {
     return 0;
 }
 
-int sys_symlink(const char *oldname, const char *newname) {
+int sys_symlink(const char *oldname, const char *newname)
+{
     struct dir_entry *de;
     struct m_inode *dir, *inode;
     struct buffer_head *bh, *name_block;
@@ -817,7 +827,8 @@ int sys_symlink(const char *oldname, const char *newname) {
     return 0;
 }
 
-int sys_link(const char *oldname, const char *newname) {
+int sys_link(const char *oldname, const char *newname)
+{
     struct dir_entry *de;
     struct m_inode *oldinode, *dir;
     struct buffer_head *bh;

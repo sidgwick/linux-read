@@ -60,8 +60,15 @@ void verify_area(void *addr, int size)
     }
 }
 
-/* 复制 p 的内存页表系统
- * p 是从 current fork 出来的, 因此这里本质上是复制 current 的页表系统 */
+/**
+ * @brief 复制 p 的内存页表系统
+ *
+ * p 是从 current fork 出来的, 因此这里本质上是复制 current 的页表系统
+ *
+ * @param nr 新任务号
+ * @param p 复制出来的新任务结构
+ * @return int 返回不为 0 表示出错
+ */
 int copy_mem(int nr, struct task_struct *p)
 {
     unsigned long old_data_base, new_data_base, data_limit;
@@ -73,13 +80,15 @@ int copy_mem(int nr, struct task_struct *p)
     data_limit = get_limit(0x17);
     old_code_base = get_base(current->ldt[1]);
     old_data_base = get_base(current->ldt[2]);
-    if (old_data_base != old_code_base)
+    if (old_data_base != old_code_base) {
         /* Linux 0.12 要求代码段和数据段, 从相同位置开始 */
         panic("We don't support separate I&D");
+    }
 
-    if (data_limit < code_limit)
+    if (data_limit < code_limit) {
         /* 数据段长度必须要大于代码段 */
         panic("Bad data_limit");
+    }
 
     /* 新的段位置对齐在 nr 任务的 64MB 边界上 */
     new_data_base = new_code_base = nr * TASK_SIZE;
@@ -121,8 +130,9 @@ int copy_process(int nr, long ebp, long edi, long esi,
 
     /* 首先为新任务数据结构分配内存 */
     p = (struct task_struct *)get_free_page();
-    if (!p)
+    if (!p) {
         return -EAGAIN;
+    }
 
     /* 将新任务结构指针放入任务数组 */
     task[nr] = p;
@@ -131,11 +141,9 @@ int copy_process(int nr, long ebp, long edi, long esi,
     *p = *current; /* NOTE! this doesn't copy the supervisor stack */
 
     /* 修改新任务的参数 */
-    p->state = TASK_UNINTERRUPTIBLE; /* 新进程状态置为不可中断等待状态,
-                                        以防止内核调度其执行 */
+    p->state = TASK_UNINTERRUPTIBLE; /* 新进程状态置为不可中断等待状态, 以防止内核调度其执行 */
     p->pid = last_pid;
-    p->counter = p->priority;  /* 运行时间片(嘀嗒数), TODO: p->priority
-                                 最开始在哪里设置的? */
+    p->counter = p->priority;  /* 运行时间片(嘀嗒数), TODO: p->priority 最开始在哪里设置的? */
     p->signal = 0;             /* 信号位图 */
     p->alarm = 0;              /* 报警定时值(嘀嗒数) */
     p->leader = 0;             /* process leadership doesn't inherit, 进程的领导权是不能继承的 */
@@ -177,7 +185,11 @@ int copy_process(int nr, long ebp, long edi, long esi,
      * fnsave 用于把协处理器的所有状态保存到目的操作数指定的内存区域中(tss.i387)
      */
     if (last_task_used_math == current)
-        __asm__("clts ; fnsave %0 ; frstor %0" ::"m"(p->tss.i387));
+        __asm__("clts"
+                "fnsave %0"
+                "frstor %0"
+                :
+                : "m"(p->tss.i387));
 
     /* 接下来复制进程页表, 即在线性地址空间中设置新任务代码段和数据段
      * 描述符中的基址和限长, 并复制页表 */
@@ -190,18 +202,27 @@ int copy_process(int nr, long ebp, long edi, long esi,
     /* 如果父进程中有文件是打开的, 则将对应文件的打开次数增 1
      * 因为这里创建的子进程会与父进程共享这些打开的文件
      * TODO: 学完文件系统, 再回来看看这里的计数操作 */
-    for (i = 0; i < NR_OPEN; i++)
-        if (f = p->filp[i])
+    for (i = 0; i < NR_OPEN; i++) {
+        if (f = p->filp[i]) {
             f->f_count++;
+        }
+    }
 
-    if (current->pwd)
+    if (current->pwd) {
         current->pwd->i_count++;
-    if (current->root)
+    }
+
+    if (current->root) {
         current->root->i_count++;
-    if (current->executable)
+    }
+
+    if (current->executable) {
         current->executable->i_count++;
-    if (current->library)
+    }
+
+    if (current->library) {
         current->library->i_count++;
+    }
 
     /* 在 GDT 里面, 更新 TSS 和 LDT 描述符的内容为当先 Task 的内容 */
     set_tss_desc(gdt + (nr << 1) + FIRST_TSS_ENTRY, &(p->tss));
@@ -213,9 +234,9 @@ int copy_process(int nr, long ebp, long edi, long esi,
     p->p_cptr = 0;                /* 子进程 */
     p->p_ysptr = 0;               /* 比自己年轻的兄弟进程 */
     p->p_osptr = current->p_cptr; /* 比自己老的兄弟进程(是父进程的子进程) */
-    if (p->p_osptr)
-        /* 自己的老兄弟的最新兄弟是自己 */
+    if (p->p_osptr) {             /* 自己的老兄弟的最新兄弟是自己 */
         p->p_osptr->p_ysptr = p;
+    }
     current->p_cptr = p; /* 父进程的子进程 */
 
     /* 最后改一下状态, 允许被调度 */
@@ -230,18 +251,24 @@ int find_empty_process(void)
 
 repeat:
     /* 超出最大整数表示范围, 从 0 重新开始 */
-    if ((++last_pid) < 0)
+    if ((++last_pid) < 0) {
         last_pid = 1;
+    }
+
     /* 如果 last_pid 已经被使用, 尝试下一个 last_pid 数值 */
-    for (i = 0; i < NR_TASKS; i++)
-        if (task[i] && ((task[i]->pid == last_pid) || (task[i]->pgrp == last_pid)))
+    for (i = 0; i < NR_TASKS; i++) {
+        if (task[i] && ((task[i]->pid == last_pid) || (task[i]->pgrp == last_pid))) {
             goto repeat;
+        }
+    }
 
     /* 检索任务数组, 找到空闲的数组项, 就返回这个项的索引
      * 注意这里任务 0 项被排除在外 */
-    for (i = 1; i < NR_TASKS; i++)
-        if (!task[i])
+    for (i = 1; i < NR_TASKS; i++) {
+        if (!task[i]) {
             return i;
+        }
+    }
 
     return -EAGAIN;
 }

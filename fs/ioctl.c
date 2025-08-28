@@ -5,9 +5,10 @@
  */
 
 #include <errno.h>
-#include <linux/sched.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#include <linux/sched.h>
 
 extern int tty_ioctl(int dev, int cmd, int arg);
 extern int pipe_ioctl(struct m_inode *pino, int cmd, int arg);
@@ -16,17 +17,17 @@ typedef int (*ioctl_ptr)(int dev, int cmd, int arg);
 
 #define NRDEVS ((sizeof(ioctl_table)) / (sizeof(ioctl_ptr)))
 
-static ioctl_ptr ioctl_table[] = {
-    NULL, /* nodev */
-    NULL, /* /dev/mem */
-    NULL, /* /dev/fd */
-    NULL, /* /dev/hd */
-    tty_ioctl, /* /dev/ttyx */
-    tty_ioctl, /* /dev/tty */
-    NULL, /* /dev/lp */
-    NULL}; /* named pipes */
+static ioctl_ptr ioctl_table[] = {NULL,      /* nodev */
+                                  NULL,      /* /dev/mem */
+                                  NULL,      /* /dev/fd */
+                                  NULL,      /* /dev/hd */
+                                  tty_ioctl, /* /dev/ttyx */
+                                  tty_ioctl, /* /dev/tty */
+                                  NULL,      /* /dev/lp */
+                                  NULL};     /* named pipes */
 
-int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg) {
+int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
     struct file *filp;
     int dev, mode;
 

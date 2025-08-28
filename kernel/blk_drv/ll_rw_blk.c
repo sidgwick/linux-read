@@ -187,6 +187,7 @@ static void make_request(int major, int rw, struct buffer_head *bh)
         if (bh->b_lock) {
             return;
         }
+
         if (rw == READA) {
             rw = READ;
         } else {

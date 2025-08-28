@@ -6,15 +6,17 @@
 
 #include <asm/segment.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <string.h>
+
+#include <fcntl.h>
 #include <sys/stat.h>
 
 extern int sys_close(int fd);
 
-static int dupfd(unsigned int fd, unsigned int arg) {
+static int dupfd(unsigned int fd, unsigned int arg)
+{
     if (fd >= NR_OPEN || !current->filp[fd])
         return -EBADF;
     if (arg >= NR_OPEN)
@@ -31,16 +33,19 @@ static int dupfd(unsigned int fd, unsigned int arg) {
     return arg;
 }
 
-int sys_dup2(unsigned int oldfd, unsigned int newfd) {
+int sys_dup2(unsigned int oldfd, unsigned int newfd)
+{
     sys_close(newfd);
     return dupfd(oldfd, newfd);
 }
 
-int sys_dup(unsigned int fildes) {
+int sys_dup(unsigned int fildes)
+{
     return dupfd(fildes, 0);
 }
 
-int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg) {
+int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
     struct file *filp;
 
     if (fd >= NR_OPEN || !(filp = current->filp[fd]))

@@ -4,15 +4,17 @@
  *  (C) 1991  Linus Torvalds
  */
 
-#include <asm/segment.h>
 #include <errno.h>
-#include <linux/kernel.h>
-#include <linux/mm.h> /* for get_free_page */
-#include <linux/sched.h>
 #include <signal.h>
 #include <termios.h>
 
-int read_pipe(struct m_inode *inode, char *buf, int count) {
+#include <asm/segment.h>
+#include <linux/kernel.h>
+#include <linux/mm.h> /* for get_free_page */
+#include <linux/sched.h>
+
+int read_pipe(struct m_inode *inode, char *buf, int count)
+{
     int chars, size, read = 0;
 
     while (count > 0) {
@@ -41,7 +43,8 @@ int read_pipe(struct m_inode *inode, char *buf, int count) {
     return read;
 }
 
-int write_pipe(struct m_inode *inode, char *buf, int count) {
+int write_pipe(struct m_inode *inode, char *buf, int count)
+{
     int chars, size, written = 0;
 
     while (count > 0) {
@@ -70,7 +73,8 @@ int write_pipe(struct m_inode *inode, char *buf, int count) {
     return written;
 }
 
-int sys_pipe(unsigned long *fildes) {
+int sys_pipe(unsigned long *fildes)
+{
     struct m_inode *inode;
     struct file *f[2];
     int fd[2];
@@ -97,8 +101,7 @@ int sys_pipe(unsigned long *fildes) {
         return -1;
     }
     if (!(inode = get_pipe_inode())) {
-        current->filp[fd[0]] =
-            current->filp[fd[1]] = NULL;
+        current->filp[fd[0]] = current->filp[fd[1]] = NULL;
         f[0]->f_count = f[1]->f_count = 0;
         return -1;
     }
@@ -111,7 +114,8 @@ int sys_pipe(unsigned long *fildes) {
     return 0;
 }
 
-int pipe_ioctl(struct m_inode *pino, int cmd, int arg) {
+int pipe_ioctl(struct m_inode *pino, int cmd, int arg)
+{
     switch (cmd) {
     case FIONREAD:
         verify_area((void *)arg, 4);

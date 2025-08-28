@@ -4,14 +4,16 @@
  *  (C) 1991  Linus Torvalds
  */
 
-#include <asm/segment.h>
 #include <errno.h>
+#include <sys/stat.h>
+
+#include <asm/segment.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <sys/stat.h>
 
-static void cp_stat(struct m_inode *inode, struct stat *statbuf) {
+static void cp_stat(struct m_inode *inode, struct stat *statbuf)
+{
     struct stat tmp;
     int i;
 
@@ -31,7 +33,8 @@ static void cp_stat(struct m_inode *inode, struct stat *statbuf) {
         put_fs_byte(((char *)&tmp)[i], i + (char *)statbuf);
 }
 
-int sys_stat(char *filename, struct stat *statbuf) {
+int sys_stat(char *filename, struct stat *statbuf)
+{
     struct m_inode *inode;
 
     if (!(inode = namei(filename)))
@@ -41,7 +44,8 @@ int sys_stat(char *filename, struct stat *statbuf) {
     return 0;
 }
 
-int sys_lstat(char *filename, struct stat *statbuf) {
+int sys_lstat(char *filename, struct stat *statbuf)
+{
     struct m_inode *inode;
 
     if (!(inode = lnamei(filename)))
@@ -51,7 +55,8 @@ int sys_lstat(char *filename, struct stat *statbuf) {
     return 0;
 }
 
-int sys_fstat(unsigned int fd, struct stat *statbuf) {
+int sys_fstat(unsigned int fd, struct stat *statbuf)
+{
     struct file *f;
     struct m_inode *inode;
 
@@ -61,7 +66,8 @@ int sys_fstat(unsigned int fd, struct stat *statbuf) {
     return 0;
 }
 
-int sys_readlink(const char *path, char *buf, int bufsiz) {
+int sys_readlink(const char *path, char *buf, int bufsiz)
+{
     struct m_inode *inode;
     struct buffer_head *bh;
     int i;

@@ -5,14 +5,16 @@
  * patches by Peter MacDonald. Heavily edited by Linus.
  */
 
-#include <asm/segment.h>
-#include <asm/system.h>
-#include <const.h>
-#include <errno.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/tty.h>
+
+#include <asm/segment.h>
+#include <asm/system.h>
+
+#include <const.h>
+#include <errno.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -23,8 +25,8 @@
  * Ok, Peter made a complicated, but straightforward multiple_wait() function.
  * I have rewritten this, taking some shortcuts: This code may not be easy to
  * follow, but it should be free of race-conditions, and it's practical. If you
- * understand what I'm doing here, then you understand how the linux sleep/wakeup
- * mechanism works.
+ * understand what I'm doing here, then you understand how the linux
+ * sleep/wakeup mechanism works.
  *
  * Two very simple procedures, add_wait() and free_wait() make all the work. We
  * have to have interrupts disabled throughout the select, but that's not really
@@ -42,7 +44,8 @@ typedef struct {
     wait_entry entry[NR_OPEN * 3];
 } select_table;
 
-static void add_wait(struct task_struct **wait_address, select_table *p) {
+static void add_wait(struct task_struct **wait_address, select_table *p)
+{
     int i;
 
     if (!wait_address)
@@ -56,7 +59,8 @@ static void add_wait(struct task_struct **wait_address, select_table *p) {
     p->nr++;
 }
 
-static void free_wait(select_table *p) {
+static void free_wait(select_table *p)
+{
     int i;
     struct task_struct **tpp;
 
@@ -75,7 +79,8 @@ static void free_wait(select_table *p) {
     p->nr = 0;
 }
 
-static struct tty_struct *get_tty(struct m_inode *inode) {
+static struct tty_struct *get_tty(struct m_inode *inode)
+{
     int major, minor;
 
     if (!S_ISCHR(inode->i_mode))
@@ -95,7 +100,8 @@ static struct tty_struct *get_tty(struct m_inode *inode) {
  * The check_XX functions check out a file. We know it's either
  * a pipe, a character device or a fifo (fifo's not implemented)
  */
-static int check_in(select_table *wait, struct m_inode *inode) {
+static int check_in(select_table *wait, struct m_inode *inode)
+{
     struct tty_struct *tty;
 
     if (tty = get_tty(inode))
@@ -111,7 +117,8 @@ static int check_in(select_table *wait, struct m_inode *inode) {
     return 0;
 }
 
-static int check_out(select_table *wait, struct m_inode *inode) {
+static int check_out(select_table *wait, struct m_inode *inode)
+{
     struct tty_struct *tty;
 
     if (tty = get_tty(inode))
@@ -127,7 +134,8 @@ static int check_out(select_table *wait, struct m_inode *inode) {
     return 0;
 }
 
-static int check_ex(select_table *wait, struct m_inode *inode) {
+static int check_ex(select_table *wait, struct m_inode *inode)
+{
     struct tty_struct *tty;
 
     if (tty = get_tty(inode))
@@ -143,8 +151,8 @@ static int check_ex(select_table *wait, struct m_inode *inode) {
     return 0;
 }
 
-int do_select(fd_set in, fd_set out, fd_set ex,
-              fd_set *inp, fd_set *outp, fd_set *exp) {
+int do_select(fd_set in, fd_set out, fd_set ex, fd_set *inp, fd_set *outp, fd_set *exp)
+{
     int count;
     select_table wait_table;
     int i;
@@ -188,8 +196,7 @@ repeat:
                 count++;
             }
     }
-    if (!(current->signal & ~current->blocked) &&
-        (wait_table.nr || current->timeout) && !count) {
+    if (!(current->signal & ~current->blocked) && (wait_table.nr || current->timeout) && !count) {
         current->state = TASK_INTERRUPTIBLE;
         schedule();
         free_wait(&wait_table);
@@ -204,7 +211,8 @@ repeat:
  * parameters. Sad, but there you are. We could do some tweaking in
  * the library function ...
  */
-int sys_select(unsigned long *buffer) {
+int sys_select(unsigned long *buffer)
+{
     /* Perform the select(nd, in, out, ex, tv) system call. */
     int i;
     fd_set res_in, in = 0, *inp;

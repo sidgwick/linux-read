@@ -79,7 +79,7 @@ extern int system_call(void);
 // 每个任务(进程)在内核态运行时都有自己的内核态堆栈.
 // 这里定义了任务的内核态堆栈结构
 // 这里定义任务联合(任务结构成员和stack字符数组成员),
-// 因为一个任务的数据结构与其内核 态堆栈放在同一内存页中,
+// 因为一个任务的数据结构与其内核态堆栈放在同一内存页中,
 // 所以从堆栈段寄存器ss可以获得其数据段选择符
 union task_union {
     struct task_struct task;
@@ -264,6 +264,7 @@ int sys_pause(void)
     return 0;
 }
 
+/*
 // 把当前任务置为指定的睡眠状态(可中断的或不可中断的),
 // 并让睡眠队列头指针指向当前任务。
 // 函数参数p是等待任务队列头指针。指针是含有一个变量地址的变量。这里参数p使用了指针的
@@ -278,7 +279,7 @@ int sys_pause(void)
 // 可以通过信号、任务超时等手段唤醒(置为就绪状态 TASK_RUNNING)
 // ***
 // 注意，由于本内核代码不是很成熟，因此下列与睡眠相关的代码存在一些问题，不宜深究。
-// TODO: 重新读一读这个函数
+// TODO: 重新读一读这个函数 */
 static inline void __sleep_on(struct task_struct **p, int state)
 {
     struct task_struct *tmp;
@@ -294,7 +295,15 @@ static inline void __sleep_on(struct task_struct **p, int state)
 
     /* 让 tmp 指向已经在等待队列上的任务(如果有的话), 例如 inode->i_wait.
      * 并且将睡眠队列头的等待指针指向当前任务, 这样就把当前任务插入到了 *p
-     * 的等待队列中 然后将当前任务置为指定的等待状态, 并执行重新调度 */
+     * 的等待队列中 然后将当前任务置为指定的等待状态, 并执行重新调度
+     *
+     * TODO-DONE: 有没有可能两个进程用了同一个 **p, 这样之前进程永远在 sleep 状态出不来?
+     * 答: 是有可能的, 但是这里用 tmp 把 *p 保存了下来, 然后把 current 保存到 *p, 此时
+     *     原来的进程和 current 进程都处于阻塞状态. 等以后 wake_up 的时候, wake_up 的
+     *     是 current, 程序继续向本函数后面执行, 也有对 tmp 唤醒(恢复状态 0)的操作, 因此
+     *     原来的那个线程也会被唤醒
+     *     更多参考: https://blog.csdn.net/jmh1996/article/details/90139485
+     */
     tmp = *p;
     *p = current;
     current->state = state;
@@ -396,11 +405,15 @@ static int moff_timer[4] = {0, 0, 0, 0};
  * 这里设置初值为: 允许DMA和中断请求, 启动 FDC */
 unsigned char current_DOR = 0x0C; /* 0000_1100 */
 
-/* 指定软驱启动到正常运转状态所需等待时间
- * 参数 nr 是软驱号(0~3), 返回值为滴答数
+/**
+ * @brief 查询指定软驱启动到正常运转状态所需等待时间
  *
  * selected 是选中软驱标志(blk_drv/floppy.c)
- * mask 是所选软驱对应 DOR 中启动马达比特位, 高 4 位是各软驱启动马达标志 */
+ * mask 是所选软驱对应 DOR 中启动马达比特位, 高 4 位是各软驱启动马达标志
+ *
+ * @param nr 软驱号(0~3)
+ * @return int 等待的滴答数
+ */
 int ticks_to_floppy_on(unsigned int nr)
 {
     extern unsigned char selected;
@@ -411,8 +424,8 @@ int ticks_to_floppy_on(unsigned int nr)
         panic("floppy_on: nr>3");
     }
 
-    // 首先预先设置好指定软驱nr停转之前需要经过的时间(100秒)
-    // 然后取当前DOR寄存器值到临时变量mask中, 并把指定软驱的马达启动标志置位
+    // 首先预先设置好指定软驱 nr 停转之前需要经过的时间(100秒), 这个关闭软驱的时候会用到(在 do_floppy_timer 里面)
+    // 然后取当前 DOR 寄存器值到临时变量 mask 中, 并把指定软驱的马达启动标志置位
     moff_timer[nr] = 10000; /* 100 s = very big :-) */
     cli();                  /* use floppy_off to turn it off */
     mask |= current_DOR;
@@ -424,8 +437,7 @@ int ticks_to_floppy_on(unsigned int nr)
     }
 
     if (mask != current_DOR) {
-        /* 如果数字输出寄存器的当前值与要求的值不同, 则向 FDC 的 DOR
-         * 输出新值(mask) */
+        /* 如果数字输出寄存器的当前值与要求的值不同, 则向 FDC 的 DOR 输出新值(mask) */
         outb(mask, FD_DOR);
 
         /* 异或操作 `^` 结果是相同位置 0, 不同置 1
@@ -494,12 +506,14 @@ void do_floppy_timer(void)
         }
 
         if (mon_timer[i]) {
-            /* 如果设置了马达启动定时尝试到时间唤醒进程 */
+            /* 软盘启动的时候, 达到正常转速需要一定的事件, mon_timer 定时器就是记录这个时间的
+             * 进程在设置了 mon_timer 之后会进入休眠, 等马达转速够了的时候再被唤醒 */
             if (!--mon_timer[i]) {
                 wake_up(i + wait_motor);
             }
         } else if (!moff_timer[i]) {
-            /* 如果设置了马达停转定时, 则尝试到时间关闭软驱马达 */
+            /* 当软盘关闭的时候, 马达停下来也需要一定时间, moff_timer 就是做这个事情的
+             * 计时结束, 说明软盘已经完全关闭, 这时候就把对应软驱的马达关掉 */
             current_DOR &= ~mask;
             outb(current_DOR, FD_DOR);
         } else {

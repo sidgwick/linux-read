@@ -4,38 +4,41 @@
  *  (C) 1991  Linus Torvalds
  */
 
-#include <asm/segment.h>
 #include <errno.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include <asm/segment.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
 
 extern int rw_char(int rw, int dev, char *buf, int count, off_t *pos);
 extern int read_pipe(struct m_inode *inode, char *buf, int count);
 extern int write_pipe(struct m_inode *inode, char *buf, int count);
 extern int block_read(int dev, off_t *pos, char *buf, int count);
 extern int block_write(int dev, off_t *pos, char *buf, int count);
-extern int file_read(struct m_inode *inode, struct file *filp,
-                     char *buf, int count);
-extern int file_write(struct m_inode *inode, struct file *filp,
-                      char *buf, int count);
+extern int file_read(struct m_inode *inode, struct file *filp, char *buf, int count);
+extern int file_write(struct m_inode *inode, struct file *filp, char *buf, int count);
 
-int sys_lseek(unsigned int fd, off_t offset, int origin) {
+int sys_lseek(unsigned int fd, off_t offset, int origin)
+{
     struct file *file;
     int tmp;
 
-    if (fd >= NR_OPEN || !(file = current->filp[fd]) || !(file->f_inode) || !IS_SEEKABLE(MAJOR(file->f_inode->i_dev)))
+    if (fd >= NR_OPEN || !(file = current->filp[fd]) || !(file->f_inode) ||
+        !IS_SEEKABLE(MAJOR(file->f_inode->i_dev)))
         return -EBADF;
     if (file->f_inode->i_pipe)
         return -ESPIPE;
     switch (origin) {
     case 0:
-        if (offset < 0) return -EINVAL;
+        if (offset < 0)
+            return -EINVAL;
         file->f_pos = offset;
         break;
     case 1:
-        if (file->f_pos + offset < 0) return -EINVAL;
+        if (file->f_pos + offset < 0)
+            return -EINVAL;
         file->f_pos += offset;
         break;
     case 2:
@@ -49,7 +52,8 @@ int sys_lseek(unsigned int fd, off_t offset, int origin) {
     return file->f_pos;
 }
 
-int sys_read(unsigned int fd, char *buf, int count) {
+int sys_read(unsigned int fd, char *buf, int count)
+{
     struct file *file;
     struct m_inode *inode;
 
@@ -76,7 +80,8 @@ int sys_read(unsigned int fd, char *buf, int count) {
     return -EINVAL;
 }
 
-int sys_write(unsigned int fd, char *buf, int count) {
+int sys_write(unsigned int fd, char *buf, int count)
+{
     struct file *file;
     struct m_inode *inode;
 

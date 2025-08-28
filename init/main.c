@@ -152,7 +152,7 @@ struct drive_info {
  * 从函数栈帧角度来看, 进到 main 执行的时候, 栈上应该是(左顶右底): IP, P1, P2, P3 ..
  * TODO: setup.s 里面网栈上面压了三个 0, 怎么说没有参数呢?
  *
- *         |-- This really IS void, no error here.
+ *         |--- This really IS void, no error here.
  *         V    */
 void main(void)
 {
@@ -167,9 +167,7 @@ void main(void)
     envp_rc[1] = term;
     drive_info = DRIVE_INFO;
 
-    // 接着根据机器物理内存容量设置高速缓冲区和主内存区的位置和范围。
-    // 高速缓存末端地址 buffer_memory_end, 机器内存容量 memory_end
-    // 主内存开始地址 main_memory_start
+    /* 接着根据机器物理内存容量设置高速缓冲区和主内存区的位置和范围 */
 
     /* 内存大小=1Mb + 扩展内存(k)*1024字节 */
     memory_end = (1 << 20) + (EXT_MEM_K << 10);
@@ -190,16 +188,20 @@ void main(void)
         buffer_memory_end = 1 * 1024 * 1024;
     }
 
-    /* 内存布局上 0 -> buffer_memory_end(main_memory_start) -> end */
     main_memory_start = buffer_memory_end;
 
 #ifdef RAMDISK
-    // 如果使用 RAMDISK, 在 buffer_memory_end 和 main_memory_start 之间,
-    // 预留出给 RAMDISK 的空间
+    /* 如果使用 RAMDISK, 在 buffer_memory_end 和 main_memory_start 之间,
+     * 预留出给 RAMDISK 的空间 */
     main_memory_start += rd_init(main_memory_start, RAMDISK * 1024);
 #endif
 
-    // 以下是内核进行所有方面的初始化工作
+    /* 上面设置完成之后, 内存中的功能布局如下:
+     *
+     *    Kernel | buffer | RAMDISK | main memory
+     */
+
+    /* 以下是内核进行所有方面的初始化工作 */
 
     mem_init(main_memory_start, memory_end); /* 初始化主内存区域 */
     trap_init();                             /* 设置中断处理程序 */
