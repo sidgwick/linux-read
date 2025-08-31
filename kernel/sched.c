@@ -103,7 +103,7 @@ static union task_union init_task = {
 
 unsigned long volatile jiffies = 0; /* 开机后的滴答计数(每次滴答是 10ms) */
 unsigned long startup_time = 0;     /* 开机时间(单位为秒) */
-int jiffies_offset = 0;             /* # clock ticks to add to get "true
+int jiffies_offset = 0;             /* clock ticks to add to get "true
                                            time".  Should always be less than
                                            1 second's worth.  For time fanatics
                                            who like to syncronize their machines

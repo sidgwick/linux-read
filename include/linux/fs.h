@@ -64,13 +64,14 @@ void buffer_init(long buffer_end); // 高速缓冲区初始化函数
 #define DIR_ENTRIES_PER_BLOCK ((BLOCK_SIZE) / (sizeof(struct dir_entry)))
 
 // 管道头/管道尾/管道大小/管道空？/管道满？/管道头指针递增
-#define PIPE_READ_WAIT(inode) ((inode).i_wait)
-#define PIPE_WRITE_WAIT(inode) ((inode).i_wait2)
-#define PIPE_HEAD(inode) ((inode).i_zone[0])
-#define PIPE_TAIL(inode) ((inode).i_zone[1])
-#define PIPE_SIZE(inode) ((PIPE_HEAD(inode) - PIPE_TAIL(inode)) & (PAGE_SIZE - 1))
-#define PIPE_EMPTY(inode) (PIPE_HEAD(inode) == PIPE_TAIL(inode))
-#define PIPE_FULL(inode) (PIPE_SIZE(inode) == (PAGE_SIZE - 1))
+// 管道自身是一个环形缓冲区, zone[0] 是 HEAD 游标, zone[1] 是 tail 游标
+#define PIPE_READ_WAIT(inode) ((inode).i_wait)                                     /* 读等待 */
+#define PIPE_WRITE_WAIT(inode) ((inode).i_wait2)                                   /* 写等待 */
+#define PIPE_HEAD(inode) ((inode).i_zone[0])                                       /* HEAD 游标 */
+#define PIPE_TAIL(inode) ((inode).i_zone[1])                                       /* TAIL 游标 */
+#define PIPE_SIZE(inode) ((PIPE_HEAD(inode) - PIPE_TAIL(inode)) & (PAGE_SIZE - 1)) /* 缓冲区大小 */
+#define PIPE_EMPTY(inode) (PIPE_HEAD(inode) == PIPE_TAIL(inode))                   /* 缓冲区空 */
+#define PIPE_FULL(inode) (PIPE_SIZE(inode) == (PAGE_SIZE - 1))                     /* 缓冲区满 */
 
 #define NIL_FILP ((struct file *)0) // 空文件结构指针
 #define SEL_IN 1
@@ -140,7 +141,7 @@ struct m_inode {
     unsigned short i_mode;    // 文件类型和属性(rwx位)
     unsigned short i_uid;     // 用户id (文件拥有者标识符)
     unsigned long i_size;     // 文件大小 (字节数)
-    unsigned long i_time;     // 修改时间 (自1970.1.1:0算起, 秒)
+    unsigned long i_mtime;    // 修改时间 (自1970.1.1:0算起, 秒)
     unsigned char i_gid;      // 组id(文件拥有者所在的组)
     unsigned char i_nlinks;   // 链接数 (多少个文件目录项指向该inode )
     unsigned short i_zone[9]; // 直接(0-6)、间接(7)或双重间接(8)逻辑块号, zone 可译成区段, 或逻辑块
@@ -151,7 +152,7 @@ struct m_inode {
     unsigned long i_atime;       // 最后访问时间
     unsigned long i_ctime;       // inode 自身修改时间
     unsigned short i_dev;        // inode 所在的设备号
-    unsigned short i_num;        // inode 号, TODO: 从 1 开始计数?
+    unsigned short i_num;        // inode 号, TODO: 从 1 开始计数? - 从 0 开始计数的
     unsigned short i_count;      // inode 被使用的次数, 0 表示空闲
     unsigned char i_lock;        // 锁定标志
     unsigned char i_dirt;        // 已修改(脏)标志

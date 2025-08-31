@@ -3,7 +3,7 @@
     {
       "name": "Linux",
       "includePath": [
-        "${workspaceFolder}/include/**", // 项目路径（强制首位）
+        "${workspaceFolder}/include/**" // 项目路径（强制首位）
       ],
       "browse": {
         "path": [], // 禁用自动扫描，避免干扰

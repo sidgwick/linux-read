@@ -443,15 +443,20 @@ int in_group_p(gid_t grp)
      * 否则就在进程的辅助用户组数组中扫描是否有 grp 进程组号. 若有则函数也返回 1
      * 若扫描到值为 NOGROUP 的项, 表示已扫描完全部有效项而没有发现匹配的组号,
      * 函数返回 0 */
-    if (grp == current->egid)
+    if (grp == current->egid) {
         return 1;
+    }
 
     for (i = 0; i < NGROUPS; i++) {
-        if (current->groups[i] == NOGROUP)
+        if (current->groups[i] == NOGROUP) {
             break;
-        if (current->groups[i] == grp)
+        }
+
+        if (current->groups[i] == grp) {
             return 1;
+        }
     }
+
     return 0;
 }
 

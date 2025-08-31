@@ -16,9 +16,9 @@
       "init/main.o",
       "init/main.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read",
-    "file": "/Users/zhigang/Documents/devel/linux-read/init/main.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/init/main.o"
+    "directory": ".",
+    "file": "./init/main.c",
+    "output": "./init/main.o"
   },
   {
     "arguments": [
@@ -38,9 +38,9 @@
       "sched.o",
       "sched.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/sched.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/sched.o"
+    "directory": "./kernel",
+    "file": "./kernel/sched.c",
+    "output": "./kernel/sched.o"
   },
   {
     "arguments": [
@@ -60,9 +60,9 @@
       "traps.o",
       "traps.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/traps.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/traps.o"
+    "directory": "./kernel",
+    "file": "./kernel/traps.c",
+    "output": "./kernel/traps.o"
   },
   {
     "arguments": [
@@ -82,9 +82,9 @@
       "fork.o",
       "fork.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/fork.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/fork.o"
+    "directory": "./kernel",
+    "file": "./kernel/fork.c",
+    "output": "./kernel/fork.o"
   },
   {
     "arguments": [
@@ -104,9 +104,9 @@
       "panic.o",
       "panic.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/panic.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/panic.o"
+    "directory": "./kernel",
+    "file": "./kernel/panic.c",
+    "output": "./kernel/panic.o"
   },
   {
     "arguments": [
@@ -126,9 +126,9 @@
       "printk.o",
       "printk.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/printk.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/printk.o"
+    "directory": "./kernel",
+    "file": "./kernel/printk.c",
+    "output": "./kernel/printk.o"
   },
   {
     "arguments": [
@@ -148,9 +148,9 @@
       "vsprintf.o",
       "vsprintf.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/vsprintf.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/vsprintf.o"
+    "directory": "./kernel",
+    "file": "./kernel/vsprintf.c",
+    "output": "./kernel/vsprintf.o"
   },
   {
     "arguments": [
@@ -170,9 +170,9 @@
       "sys.o",
       "sys.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/sys.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/sys.o"
+    "directory": "./kernel",
+    "file": "./kernel/sys.c",
+    "output": "./kernel/sys.o"
   },
   {
     "arguments": [
@@ -192,9 +192,9 @@
       "exit.o",
       "exit.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/exit.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/exit.o"
+    "directory": "./kernel",
+    "file": "./kernel/exit.c",
+    "output": "./kernel/exit.o"
   },
   {
     "arguments": [
@@ -214,9 +214,9 @@
       "signal.o",
       "signal.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/signal.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/signal.o"
+    "directory": "./kernel",
+    "file": "./kernel/signal.c",
+    "output": "./kernel/signal.o"
   },
   {
     "arguments": [
@@ -236,9 +236,9 @@
       "mktime.o",
       "mktime.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/mktime.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/mktime.o"
+    "directory": "./kernel",
+    "file": "./kernel/mktime.c",
+    "output": "./kernel/mktime.o"
   },
   {
     "arguments": [
@@ -258,9 +258,9 @@
       "memory.o",
       "memory.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/mm",
-    "file": "/Users/zhigang/Documents/devel/linux-read/mm/memory.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/mm/memory.o"
+    "directory": "./mm",
+    "file": "./mm/memory.c",
+    "output": "./mm/memory.o"
   },
   {
     "arguments": [
@@ -280,9 +280,9 @@
       "swap.o",
       "swap.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/mm",
-    "file": "/Users/zhigang/Documents/devel/linux-read/mm/swap.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/mm/swap.o"
+    "directory": "./mm",
+    "file": "./mm/swap.c",
+    "output": "./mm/swap.o"
   },
   {
     "arguments": [
@@ -302,9 +302,9 @@
       "open.o",
       "open.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/open.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/open.o"
+    "directory": "./fs",
+    "file": "./fs/open.c",
+    "output": "./fs/open.o"
   },
   {
     "arguments": [
@@ -324,9 +324,9 @@
       "read_write.o",
       "read_write.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/read_write.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/read_write.o"
+    "directory": "./fs",
+    "file": "./fs/read_write.c",
+    "output": "./fs/read_write.o"
   },
   {
     "arguments": [
@@ -346,9 +346,9 @@
       "inode.o",
       "inode.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/inode.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/inode.o"
+    "directory": "./fs",
+    "file": "./fs/inode.c",
+    "output": "./fs/inode.o"
   },
   {
     "arguments": [
@@ -368,9 +368,9 @@
       "file_table.o",
       "file_table.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/file_table.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/file_table.o"
+    "directory": "./fs",
+    "file": "./fs/file_table.c",
+    "output": "./fs/file_table.o"
   },
   {
     "arguments": [
@@ -390,9 +390,9 @@
       "buffer.o",
       "buffer.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/buffer.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/buffer.o"
+    "directory": "./fs",
+    "file": "./fs/buffer.c",
+    "output": "./fs/buffer.o"
   },
   {
     "arguments": [
@@ -412,9 +412,9 @@
       "super.o",
       "super.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/super.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/super.o"
+    "directory": "./fs",
+    "file": "./fs/super.c",
+    "output": "./fs/super.o"
   },
   {
     "arguments": [
@@ -434,9 +434,9 @@
       "block_dev.o",
       "block_dev.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/block_dev.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/block_dev.o"
+    "directory": "./fs",
+    "file": "./fs/block_dev.c",
+    "output": "./fs/block_dev.o"
   },
   {
     "arguments": [
@@ -456,9 +456,9 @@
       "char_dev.o",
       "char_dev.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/char_dev.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/char_dev.o"
+    "directory": "./fs",
+    "file": "./fs/char_dev.c",
+    "output": "./fs/char_dev.o"
   },
   {
     "arguments": [
@@ -478,9 +478,9 @@
       "file_dev.o",
       "file_dev.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/file_dev.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/file_dev.o"
+    "directory": "./fs",
+    "file": "./fs/file_dev.c",
+    "output": "./fs/file_dev.o"
   },
   {
     "arguments": [
@@ -500,9 +500,9 @@
       "stat.o",
       "stat.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/stat.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/stat.o"
+    "directory": "./fs",
+    "file": "./fs/stat.c",
+    "output": "./fs/stat.o"
   },
   {
     "arguments": [
@@ -522,9 +522,9 @@
       "exec.o",
       "exec.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/exec.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/exec.o"
+    "directory": "./fs",
+    "file": "./fs/exec.c",
+    "output": "./fs/exec.o"
   },
   {
     "arguments": [
@@ -544,9 +544,9 @@
       "pipe.o",
       "pipe.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/pipe.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/pipe.o"
+    "directory": "./fs",
+    "file": "./fs/pipe.c",
+    "output": "./fs/pipe.o"
   },
   {
     "arguments": [
@@ -566,9 +566,9 @@
       "namei.o",
       "namei.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/namei.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/namei.o"
+    "directory": "./fs",
+    "file": "./fs/namei.c",
+    "output": "./fs/namei.o"
   },
   {
     "arguments": [
@@ -588,9 +588,9 @@
       "bitmap.o",
       "bitmap.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/bitmap.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/bitmap.o"
+    "directory": "./fs",
+    "file": "./fs/bitmap.c",
+    "output": "./fs/bitmap.o"
   },
   {
     "arguments": [
@@ -610,9 +610,9 @@
       "fcntl.o",
       "fcntl.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/fcntl.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/fcntl.o"
+    "directory": "./fs",
+    "file": "./fs/fcntl.c",
+    "output": "./fs/fcntl.o"
   },
   {
     "arguments": [
@@ -632,9 +632,9 @@
       "ioctl.o",
       "ioctl.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/ioctl.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/ioctl.o"
+    "directory": "./fs",
+    "file": "./fs/ioctl.c",
+    "output": "./fs/ioctl.o"
   },
   {
     "arguments": [
@@ -654,9 +654,9 @@
       "truncate.o",
       "truncate.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/truncate.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/truncate.o"
+    "directory": "./fs",
+    "file": "./fs/truncate.c",
+    "output": "./fs/truncate.o"
   },
   {
     "arguments": [
@@ -676,9 +676,9 @@
       "select.o",
       "select.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/fs",
-    "file": "/Users/zhigang/Documents/devel/linux-read/fs/select.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/fs/select.o"
+    "directory": "./fs",
+    "file": "./fs/select.c",
+    "output": "./fs/select.o"
   },
   {
     "arguments": [
@@ -698,9 +698,9 @@
       "ll_rw_blk.o",
       "ll_rw_blk.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/ll_rw_blk.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/ll_rw_blk.o"
+    "directory": "./kernel/blk_drv",
+    "file": "./kernel/blk_drv/ll_rw_blk.c",
+    "output": "./kernel/blk_drv/ll_rw_blk.o"
   },
   {
     "arguments": [
@@ -720,9 +720,9 @@
       "floppy.o",
       "floppy.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/floppy.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/floppy.o"
+    "directory": "./kernel/blk_drv",
+    "file": "./kernel/blk_drv/floppy.c",
+    "output": "./kernel/blk_drv/floppy.o"
   },
   {
     "arguments": [
@@ -742,9 +742,9 @@
       "hd.o",
       "hd.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/hd.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/hd.o"
+    "directory": "./kernel/blk_drv",
+    "file": "./kernel/blk_drv/hd.c",
+    "output": "./kernel/blk_drv/hd.o"
   },
   {
     "arguments": [
@@ -764,9 +764,9 @@
       "ramdisk.o",
       "ramdisk.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/ramdisk.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/blk_drv/ramdisk.o"
+    "directory": "./kernel/blk_drv",
+    "file": "./kernel/blk_drv/ramdisk.c",
+    "output": "./kernel/blk_drv/ramdisk.o"
   },
   {
     "arguments": [
@@ -786,9 +786,9 @@
       "tty_io.o",
       "tty_io.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/tty_io.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/tty_io.o"
+    "directory": "./kernel/chr_drv",
+    "file": "./kernel/chr_drv/tty_io.c",
+    "output": "./kernel/chr_drv/tty_io.o"
   },
   {
     "arguments": [
@@ -808,9 +808,9 @@
       "console.o",
       "console.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/console.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/console.o"
+    "directory": "./kernel/chr_drv",
+    "file": "./kernel/chr_drv/console.c",
+    "output": "./kernel/chr_drv/console.o"
   },
   {
     "arguments": [
@@ -830,9 +830,9 @@
       "serial.o",
       "serial.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/serial.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/serial.o"
+    "directory": "./kernel/chr_drv",
+    "file": "./kernel/chr_drv/serial.c",
+    "output": "./kernel/chr_drv/serial.o"
   },
   {
     "arguments": [
@@ -852,9 +852,9 @@
       "tty_ioctl.o",
       "tty_ioctl.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/tty_ioctl.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/tty_ioctl.o"
+    "directory": "./kernel/chr_drv",
+    "file": "./kernel/chr_drv/tty_ioctl.c",
+    "output": "./kernel/chr_drv/tty_ioctl.o"
   },
   {
     "arguments": [
@@ -874,9 +874,9 @@
       "pty.o",
       "pty.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/pty.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/chr_drv/pty.o"
+    "directory": "./kernel/chr_drv",
+    "file": "./kernel/chr_drv/pty.c",
+    "output": "./kernel/chr_drv/pty.o"
   },
   {
     "arguments": [
@@ -896,9 +896,9 @@
       "math_emulate.o",
       "math_emulate.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/math_emulate.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/math_emulate.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/math_emulate.c",
+    "output": "./kernel/math/math_emulate.o"
   },
   {
     "arguments": [
@@ -918,9 +918,9 @@
       "error.o",
       "error.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/error.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/error.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/error.c",
+    "output": "./kernel/math/error.o"
   },
   {
     "arguments": [
@@ -940,9 +940,9 @@
       "convert.o",
       "convert.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/convert.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/convert.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/convert.c",
+    "output": "./kernel/math/convert.o"
   },
   {
     "arguments": [
@@ -962,9 +962,9 @@
       "ea.o",
       "ea.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/ea.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/ea.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/ea.c",
+    "output": "./kernel/math/ea.o"
   },
   {
     "arguments": [
@@ -984,9 +984,9 @@
       "get_put.o",
       "get_put.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/get_put.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/get_put.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/get_put.c",
+    "output": "./kernel/math/get_put.o"
   },
   {
     "arguments": [
@@ -1006,9 +1006,9 @@
       "add.o",
       "add.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/add.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/add.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/add.c",
+    "output": "./kernel/math/add.o"
   },
   {
     "arguments": [
@@ -1028,9 +1028,9 @@
       "mul.o",
       "mul.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/mul.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/mul.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/mul.c",
+    "output": "./kernel/math/mul.o"
   },
   {
     "arguments": [
@@ -1050,9 +1050,9 @@
       "div.o",
       "div.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/div.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/div.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/div.c",
+    "output": "./kernel/math/div.o"
   },
   {
     "arguments": [
@@ -1072,9 +1072,9 @@
       "compare.o",
       "compare.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/kernel/math",
-    "file": "/Users/zhigang/Documents/devel/linux-read/kernel/math/compare.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/kernel/math/compare.o"
+    "directory": "./kernel/math",
+    "file": "./kernel/math/compare.c",
+    "output": "./kernel/math/compare.o"
   },
   {
     "arguments": [
@@ -1094,9 +1094,9 @@
       "ctype.o",
       "ctype.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/ctype.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/ctype.o"
+    "directory": "./lib",
+    "file": "./lib/ctype.c",
+    "output": "./lib/ctype.o"
   },
   {
     "arguments": [
@@ -1116,9 +1116,9 @@
       "_exit.o",
       "_exit.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/_exit.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/_exit.o"
+    "directory": "./lib",
+    "file": "./lib/_exit.c",
+    "output": "./lib/_exit.o"
   },
   {
     "arguments": [
@@ -1138,9 +1138,9 @@
       "open.o",
       "open.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/open.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/open.o"
+    "directory": "./lib",
+    "file": "./lib/open.c",
+    "output": "./lib/open.o"
   },
   {
     "arguments": [
@@ -1160,9 +1160,9 @@
       "close.o",
       "close.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/close.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/close.o"
+    "directory": "./lib",
+    "file": "./lib/close.c",
+    "output": "./lib/close.o"
   },
   {
     "arguments": [
@@ -1182,9 +1182,9 @@
       "errno.o",
       "errno.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/errno.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/errno.o"
+    "directory": "./lib",
+    "file": "./lib/errno.c",
+    "output": "./lib/errno.o"
   },
   {
     "arguments": [
@@ -1204,9 +1204,9 @@
       "write.o",
       "write.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/write.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/write.o"
+    "directory": "./lib",
+    "file": "./lib/write.c",
+    "output": "./lib/write.o"
   },
   {
     "arguments": [
@@ -1226,9 +1226,9 @@
       "dup.o",
       "dup.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/dup.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/dup.o"
+    "directory": "./lib",
+    "file": "./lib/dup.c",
+    "output": "./lib/dup.o"
   },
   {
     "arguments": [
@@ -1248,9 +1248,9 @@
       "setsid.o",
       "setsid.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/setsid.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/setsid.o"
+    "directory": "./lib",
+    "file": "./lib/setsid.c",
+    "output": "./lib/setsid.o"
   },
   {
     "arguments": [
@@ -1270,9 +1270,9 @@
       "execve.o",
       "execve.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/execve.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/execve.o"
+    "directory": "./lib",
+    "file": "./lib/execve.c",
+    "output": "./lib/execve.o"
   },
   {
     "arguments": [
@@ -1292,9 +1292,9 @@
       "wait.o",
       "wait.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/wait.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/wait.o"
+    "directory": "./lib",
+    "file": "./lib/wait.c",
+    "output": "./lib/wait.o"
   },
   {
     "arguments": [
@@ -1314,9 +1314,9 @@
       "string.o",
       "string.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/string.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/string.o"
+    "directory": "./lib",
+    "file": "./lib/string.c",
+    "output": "./lib/string.o"
   },
   {
     "arguments": [
@@ -1336,9 +1336,9 @@
       "malloc.o",
       "malloc.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read/lib",
-    "file": "/Users/zhigang/Documents/devel/linux-read/lib/malloc.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/lib/malloc.o"
+    "directory": "./lib",
+    "file": "./lib/malloc.c",
+    "output": "./lib/malloc.o"
   },
   {
     "arguments": [
@@ -1355,8 +1355,8 @@
       "tools/build",
       "tools/build.c"
     ],
-    "directory": "/Users/zhigang/Documents/devel/linux-read",
-    "file": "/Users/zhigang/Documents/devel/linux-read/tools/build.c",
-    "output": "/Users/zhigang/Documents/devel/linux-read/tools/build"
+    "directory": ".",
+    "file": "./tools/build.c",
+    "output": "./tools/build"
   }
 ]

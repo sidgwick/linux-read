@@ -469,7 +469,7 @@ struct m_inode *get_pipe_inode(void)
 
     inode->i_count = 2; /* sum of readers/writers */
 
-    /* 复位管道头尾指针, zone[0] 是读指针, zone[1] 是写指针 */
+    /* 复位管道头尾指针, zone[0] 是头指针, zone[1] 是尾指针 */
     PIPE_HEAD(*inode) = PIPE_TAIL(*inode) = 0;
     inode->i_pipe = 1; /* 置节点为管道使用的标志 */
 

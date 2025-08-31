@@ -212,6 +212,13 @@ struct task_struct {
     /* -1 if no tty, so it must be signed, 进程使用tty终端的子设备号. -1表示没有使用 */
     int tty;
 
+    /**
+     * umask 用于限制新创建文件的默认权限:
+     *  - umask 中的位为 1 表示要屏蔽的权限
+     *  - umask 中的位为 0 表示允许的权限
+     * 这行代码确保了新文件不会获得比 umask 允许的更多权限
+     */
+
     unsigned short umask;       // 文件创建属性屏蔽位
     struct m_inode *pwd;        // 当前工作目录 i 节点结构指针
     struct m_inode *root;       // 根目录 i 节点结构指针
