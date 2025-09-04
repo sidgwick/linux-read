@@ -11,5 +11,7 @@ boot/setup
 tools/build
 tools/system
 tools/system.elf
+boot/bootsect.elf
+boot/setup.elf
 explain.txt
 bochsout.txt

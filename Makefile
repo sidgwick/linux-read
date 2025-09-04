@@ -26,7 +26,7 @@ CPP	=cpp -nostdinc -Iinclude
 ROOT_DEV=FLOPPY
 SWAP_DEV=
 
-OBJS = init/main.o boot/head.o \
+OBJS = boot/head.o init/main.o \
        lib/_exit.o lib/malloc.o lib/setsid.o \
        lib/wait.o lib/open.o lib/close.o \
        lib/write.o lib/dup.o lib/ctype.o \
@@ -67,17 +67,19 @@ tools/build: tools/build.c
 boot/head.o: boot/head.s
 
 tools/system: $(OBJS)
-	$(LD) $(LDFLAGS) $(OBJS) -o tools/system.elf > System.map
+	$(LD) -M -x --Ttext=0 -e startup_32 -z noexecstack $(OBJS) -o tools/system.elf > System.map
 	objcopy -R .pdr -R .comment -R .note -S -O binary tools/system.elf tools/system
 
 # --------- OK ---------
 boot/setup: boot/setup.s
 	$(AS) -o boot/setup.o boot/setup.s
-	$(LD) -e start --oformat=binary --Ttext=0 -s -o boot/setup boot/setup.o
+	$(LD) -e start --Ttext=0 -s -o boot/setup.elf boot/setup.o
+	objcopy -R .pdr -R .comment -R .note -S -O binary boot/setup.elf boot/setup
 
 boot/bootsect:	boot/bootsect.s
 	$(AS) -o boot/bootsect.o boot/bootsect.s
-	$(LD) -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/bootsect boot/bootsect.o
+	$(LD) -e start -z noexecstack --Ttext=0 -o boot/bootsect.elf boot/bootsect.o
+	objcopy -R .pdr -R .comment -R .note -S -O binary boot/bootsect.elf boot/bootsect
 
 boot/setup.s:	boot/setup.S include/linux/config.h
 	$(CPP) -traditional boot/setup.S -o boot/setup.s
@@ -89,7 +91,7 @@ kernel/chr_drv/keyboard.s: kernel/chr_drv/keyboard.S
 	$(CPP) -traditional $^ -o kernel/chr_drv/keyboard.s
 
 clean:
-	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
+	rm -f Image System.map tmp_make core boot/bootsect boot/setup boot/bootsect.elf boot/setup.elf \
 		boot/bootsect.s boot/setup.s boot/bootsect0.s boot/bootsect1.s
 	rm -f tools/system tools/system.elf tools/build $(OBJS)
 	rm -f kernel/chr_drv/keyboard.s

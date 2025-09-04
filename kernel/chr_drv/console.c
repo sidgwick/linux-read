@@ -1463,7 +1463,30 @@ void con_init(void)
 
     /* 初始化非 0 号控制台参数, 与 0 号控制台的差异主要是内存位置不同 */
     for (currcons = 1; currcons < NR_CONSOLES; currcons++) {
-        vc_cons[currcons] = vc_cons[0]; /* 复制 0 号结构参数, TODO: 研究一下这里生成的汇编代码 */
+        /* 复制 0 号结构参数
+         * TODO-DONE: 研究一下这里生成的汇编代码
+         * 答: 从 debug 的反汇编拷贝了一份, 参考
+         *  mov    0x14(%esp),%edx
+         *  mov    %edx,%eax
+         *  shl    $0x3,%eax
+         *  add    %edx,%eax
+         *  shl    $0x4,%eax
+         *  add    $0x33e00,%eax
+         *  mov    %eax,%edx
+         *  mov    $0x33e00,%ebx
+         *  mov    $0x24,%eax
+         *  mov    %edx,%edi
+         *  mov    %ebx,%esi
+         *  mov    %eax,%ecx
+         *  rep movsl %ds:(%esi),%es:(%edi)
+         *
+         * // 这块不知道为啥, 使用下面的赋值语句, 会导致 `vc_cons[0]` 里面的数据被擦掉, 换成 memcpy 就好使了
+         * // vc_cons[currcons] = vc_cons[0];
+         *
+         */
+
+        memcpy((void *)(vc_cons + currcons), (void *)(vc_cons + 0), sizeof(vc_cons[0]));
+
         origin = video_mem_start = (base += video_memory); /* 注意看 base 一直在增长 */
         scr_end = origin + video_num_lines * video_size_row;
         video_mem_end = (term += video_memory);
