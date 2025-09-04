@@ -27,13 +27,7 @@ CPP	=gcc -E -nostdinc -I../include
 OBJS  = ctype.o _exit.o open.o close.o errno.o write.o dup.o setsid.o \
 	execve.o wait.o string.o malloc.o
 
-# lib.a: $(OBJS)
-# 	$(AR) rcs lib.a $(OBJS)
-# 	sync
-
-lib.o: $(OBJS)
-	$(LD) -r -o lib.o $(OBJS)
-	sync
+all: $(OBJS)
 
 clean:
 	rm -f core *.o *.a tmp_make

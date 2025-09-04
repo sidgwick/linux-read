@@ -26,21 +26,43 @@ CPP	=cpp -nostdinc -Iinclude
 ROOT_DEV=FLOPPY
 SWAP_DEV=
 
-ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
-DRIVERS =kernel/blk_drv/blk_drv.o kernel/chr_drv/chr_drv.o
-MATH	=kernel/math/math.o
-LIBS	=lib/lib.o
+SUBDIRS = kernel/math kernel/blk_drv kernel/chr_drv kernel mm fs lib
+
+
+OBJS = init/main.o boot/head.o \
+       lib/_exit.o lib/malloc.o lib/setsid.o \
+       lib/wait.o lib/open.o lib/close.o \
+       lib/write.o lib/dup.o lib/ctype.o \
+	   lib/execve.o lib/errno.o lib/string.o \
+       mm/page.o mm/swap.o mm/memory.o \
+       fs/ioctl.o fs/inode.o fs/truncate.o fs/read_write.o \
+       fs/block_dev.o fs/namei.o fs/fcntl.o fs/stat.o \
+       fs/open.o fs/char_dev.o fs/buffer.o fs/file_table.o \
+       fs/super.o fs/pipe.o fs/exec.o fs/bitmap.o \
+       fs/file_dev.o fs/select.o \
+       kernel/signal.o kernel/asm.o kernel/fork.o kernel/mktime.o \
+	   kernel/sched.o kernel/sys.o kernel/printk.o kernel/exit.o \
+	   kernel/panic.o kernel/sys_call.o kernel/traps.o kernel/vsprintf.o \
+       kernel/math/error.o kernel/math/ea.o kernel/math/add.o \
+       kernel/math/mul.o kernel/math/compare.o kernel/math/get_put.o \
+       kernel/math/math_emulate.o kernel/math/convert.o kernel/math/div.o \
+       kernel/chr_drv/keyboard.o kernel/chr_drv/rs_io.o kernel/chr_drv/console.o \
+	   kernel/chr_drv/pty.o kernel/chr_drv/tty_io.o kernel/chr_drv/serial.o \
+	   kernel/chr_drv/tty_ioctl.o \
+       kernel/blk_drv/ll_rw_blk.o kernel/blk_drv/floppy.o \
+       kernel/blk_drv/hd.o kernel/blk_drv/ramdisk.o
 
 .c.s:
-	$(CC) $(CFLAGS) \
-	-nostdinc -Iinclude -S -o $*.s $<
+	$(CC) $(CFLAGS) -nostdinc -Iinclude -S -o $*.s $<
 .s.o:
 	$(AS) -c -o $*.o $<
 .c.o:
-	$(CC) $(CFLAGS) \
-	-nostdinc -Iinclude -c -o $*.o $<
+	$(CC) $(CFLAGS) -nostdinc -Iinclude -c -o $*.o $<
 
-all:	Image
+all: $(SUBDIRS) Image
+
+kernel/chr_drv/keyboard.s: kernel/chr_drv/keyboard.S
+	$(CPP) -traditional $^ -o kernel/chr_drv/keyboard.s
 
 Image: boot/bootsect boot/setup tools/system tools/build
 	tools/build boot/bootsect boot/setup tools/system $(ROOT_DEV) \
@@ -55,46 +77,9 @@ tools/build: tools/build.c
 
 boot/head.o: boot/head.s
 
-tools/system:	boot/head.o init/main.o \
-				$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
-	# $(LD) $(LDFLAGS) boot/head.o init/main.o \
-	# 	$(ARCHIVES) \
-	# 	$(DRIVERS) \
-	# 	$(MATH) \
-	# 	$(LIBS) \
-	# 	--oformat=binary --Ttext=0 -o tools/system > System.map
-
-	$(LD) $(LDFLAGS) boot/head.o init/main.o \
-		$(ARCHIVES) \
-		$(DRIVERS) \
-		$(MATH) \
-		$(LIBS) \
-		-o tools/system.elf > System.map
-
+tools/system: $(OBJS)
+	$(LD) $(LDFLAGS) $(OBJS) -o tools/system.elf > System.map
 	objcopy -R .pdr -R .comment -R .note -S -O binary tools/system.elf tools/system
-	# objcopy -O binary tools/system kernel.bin
-	# mv kernel.bin tools/system
-
-kernel/math/math.o:
-	(cd kernel/math; make)
-
-kernel/blk_drv/blk_drv.o:
-	(cd kernel/blk_drv; make)
-
-kernel/chr_drv/chr_drv.o:
-	(cd kernel/chr_drv; make)
-
-kernel/kernel.o:
-	(cd kernel; make)
-
-mm/mm.o:
-	(cd mm; make)
-
-fs/fs.o:
-	(cd fs; make)
-
-lib/lib.o:
-	(cd lib; make)
 
 # --------- OK ---------
 boot/setup: boot/setup.s

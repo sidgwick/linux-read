@@ -17,10 +17,7 @@ CPP	=gcc -E -nostdinc -I../include
 
 OBJS	= memory.o swap.o page.o
 
-all: mm.o
-
-mm.o: $(OBJS)
-	$(LD) -r -o mm.o $(OBJS)
+all: $(OBJS)
 
 clean:
 	rm -f core *.o *.a tmp_make

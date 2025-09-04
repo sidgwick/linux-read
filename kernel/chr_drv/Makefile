@@ -15,28 +15,18 @@ CFLAGS	= -fno-builtin -Wall -fno-stack-protector -m32 -g -fno-pie -fstrength-red
 	-finline-functions  -nostdinc -I../../include
 CPP	=gcc -E -nostdinc -I../../include
 
-.c.s:
-	$(CC) $(CFLAGS) \
-	-S -o $*.s $<
+OBJS  = keyboard.o tty_io.o console.o serial.o rs_io.o tty_ioctl.o pty.o
+
 .s.o:
 	$(AS) -c -o $*.o $<
 .c.o:
-	$(CC) $(CFLAGS) \
-	-c -o $*.o $<
+	$(CC) $(CFLAGS) -c -o $*.o $<
 
-OBJS  = tty_io.o console.o keyboard.o serial.o rs_io.o \
-	tty_ioctl.o pty.o
+all: $(OBJS)
 
-# chr_drv.a: $(OBJS)
-# 	$(AR) rcs chr_drv.a $(OBJS)
-# 	sync
-
-chr_drv.o: $(OBJS)
-	$(LD) -r -o chr_drv.o $(OBJS)
-	sync
-
-keyboard.s: keyboard.S
+keyboard.o: keyboard.S
 	$(CPP) -traditional keyboard.S -o keyboard.s
+	$(AS) -c -o $*.o keyboard.s
 
 clean:
 	rm -f core *.o *.a tmp_make keyboard.s

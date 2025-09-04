@@ -26,13 +26,7 @@ CPP	=gcc -E -nostdinc -I../../include
 
 OBJS  = ll_rw_blk.o floppy.o hd.o ramdisk.o
 
-# blk_drv.a: $(OBJS)
-# 	$(AR) rcs blk_drv.a $(OBJS)
-# 	sync
-
-blk_drv.o: $(OBJS)
-	$(LD) -r -o blk_drv.o $(OBJS)
-	sync
+all: $(OBJS)
 
 clean:
 	rm -f core *.o *.a tmp_make
