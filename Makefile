@@ -26,9 +26,6 @@ CPP	=cpp -nostdinc -Iinclude
 ROOT_DEV=FLOPPY
 SWAP_DEV=
 
-SUBDIRS = kernel/math kernel/blk_drv kernel/chr_drv kernel mm fs lib
-
-
 OBJS = init/main.o boot/head.o \
        lib/_exit.o lib/malloc.o lib/setsid.o \
        lib/wait.o lib/open.o lib/close.o \
@@ -61,16 +58,8 @@ OBJS = init/main.o boot/head.o \
 
 all: $(SUBDIRS) Image
 
-kernel/chr_drv/keyboard.s: kernel/chr_drv/keyboard.S
-	$(CPP) -traditional $^ -o kernel/chr_drv/keyboard.s
-
 Image: boot/bootsect boot/setup tools/system tools/build
-	tools/build boot/bootsect boot/setup tools/system $(ROOT_DEV) \
-		$(SWAP_DEV) > Image
-	sync
-
-disk: Image
-	dd bs=8192 if=Image of=/dev/PS0
+	tools/build boot/bootsect boot/setup tools/system $(ROOT_DEV) $(SWAP_DEV) > Image
 
 tools/build: tools/build.c
 	$(CC) -Wall -o tools/build tools/build.c
@@ -86,43 +75,21 @@ boot/setup: boot/setup.s
 	$(AS) -o boot/setup.o boot/setup.s
 	$(LD) -e start --oformat=binary --Ttext=0 -s -o boot/setup boot/setup.o
 
+boot/bootsect:	boot/bootsect.s
+	$(AS) -o boot/bootsect.o boot/bootsect.s
+	$(LD) -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/bootsect boot/bootsect.o
+
 boot/setup.s:	boot/setup.S include/linux/config.h
 	$(CPP) -traditional boot/setup.S -o boot/setup.s
 
 boot/bootsect.s:	boot/bootsect.S include/linux/config.h
 	$(CPP) -traditional boot/bootsect.S -o boot/bootsect.s
 
-boot/bootsect:	boot/bootsect.s
-	$(AS) -o boot/bootsect.o boot/bootsect.s
-	$(LD) -e start -z noexecstack --oformat=binary --Ttext=0 -o boot/bootsect boot/bootsect.o
+kernel/chr_drv/keyboard.s: kernel/chr_drv/keyboard.S
+	$(CPP) -traditional $^ -o kernel/chr_drv/keyboard.s
 
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
 		boot/bootsect.s boot/setup.s boot/bootsect0.s boot/bootsect1.s
-	rm -f init/*.o tools/system tools/system.elf tools/build boot/*.o boot/*.bin
-	(cd mm;make clean)
-	(cd fs;make clean)
-	(cd kernel;make clean)
-	(cd lib;make clean)
-
-backup: clean
-	(cd .. ; tar cf - linux | compress - > backup.Z)
-	sync
-
-dep:
-	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
-	(for i in init/*.c;do echo -n "init/";$(CPP) -M $$i;done) >> tmp_make
-	cp tmp_make Makefile
-	(cd fs; make dep)
-	(cd kernel; make dep)
-	(cd mm; make dep)
-
-### Dependencies:
-init/main.o : init/main.c include/unistd.h include/sys/stat.h \
-  include/sys/types.h include/sys/time.h include/time.h include/sys/times.h \
-  include/sys/utsname.h include/sys/param.h include/sys/resource.h \
-  include/utime.h include/linux/tty.h include/termios.h include/linux/sched.h \
-  include/linux/head.h include/linux/fs.h include/linux/mm.h \
-  include/linux/kernel.h include/signal.h include/asm/system.h \
-  include/asm/io.h include/stddef.h include/stdarg.h include/fcntl.h \
-  include/string.h 
+	rm -f tools/system tools/system.elf tools/build $(OBJS)
+	rm -f kernel/chr_drv/keyboard.s
