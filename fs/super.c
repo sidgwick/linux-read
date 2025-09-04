@@ -25,15 +25,15 @@ void wait_for_keypress(void); /* 等待击键 */
  *
  * set_bit uses setb, as gas doesn't recognize setc
  */
-#define set_bit(bitnr, addr)                                                                       \
-    ({                                                                                             \
-        register int __res __asm__("ax");                                                          \
-        __asm__(                                                                                   \
-            "bt %2, %3"                                                                            \
-            "setb %%al" /* Set if Below 在进位标志 CF 置位时将目标操作数设置为 1，否则设置为 0 */  \
-            : "=a"(__res)                                                                          \
-            : "a"(0), "r"(bitnr), "m"(*(addr)));                                                   \
-        __res;                                                                                     \
+#define set_bit(bitnr, addr)                                                                          \
+    ({                                                                                                \
+        register int __res __asm__("ax");                                                             \
+        __asm__(                                                                                      \
+            "bt %2, %3\n\t"                                                                           \
+            "setb %%al\n\t" /* Set if Below 在进位标志 CF 置位时将目标操作数设置为 1，否则设置为 0 */ \
+            : "=a"(__res)                                                                             \
+            : "a"(0), "r"(bitnr), "m"(*(addr)));                                                      \
+        __res;                                                                                        \
     })
 
 /* 超级块结构表数组 */
@@ -201,7 +201,7 @@ static struct super_block *read_super(int dev)
 
     /* dev 上的文件系统超级块已经在超级块表中, 直接使用即可 */
     check_disk_change(dev);
-    if (s = get_super(dev)) {
+    if ((s = get_super(dev))) {
         return s;
     }
 
@@ -258,7 +258,7 @@ static struct super_block *read_super(int dev)
     /* 读取 inode 位图区块 */
     block = 2;
     for (i = 0; i < s->s_imap_blocks; i++) {
-        if (s->s_imap[i] = bread(dev, block)) {
+        if ((s->s_imap[i] = bread(dev, block))) {
             block++;
         } else {
             break;
@@ -267,7 +267,7 @@ static struct super_block *read_super(int dev)
 
     /* 读取 zone 位图区块 */
     for (i = 0; i < s->s_zmap_blocks; i++) {
-        if (s->s_zmap[i] = bread(dev, block)) {
+        if ((s->s_zmap[i] = bread(dev, block))) {
             block++;
         } else {
             break;

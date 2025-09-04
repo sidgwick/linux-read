@@ -18,7 +18,7 @@ extern int tty_write(unsigned minor, char *buf, int count);
 
 /* 定义字符设备读写函数指针类型
  * Character device Read Write PoinTeR */
-typedef (*crw_ptr)(int rw, unsigned minor, char *buf, int count, off_t *pos);
+typedef int (*crw_ptr)(int rw, unsigned minor, char *buf, int count, off_t *pos);
 
 /**
  * @brief 串口终端读写操作函数

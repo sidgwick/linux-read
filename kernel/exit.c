@@ -323,7 +323,7 @@ int sys_kill(int pid, int sig)
 
     if (pid == -1) { /* pid = -1, 给所有进程发送信号 */
         while (--p > &FIRST_TASK) {
-            if (err = send_sig(sig, *p, 0)) {
+            if ((err = send_sig(sig, *p, 0))) {
                 retval = err;
             }
         }
@@ -474,7 +474,7 @@ volatile void do_exit(long code)
      *    jons, send them a SIGUP and then a SIGCONT.  (POSIX 3.2.2.2)
      *
      * 处理可能受影响的子进程 */
-    if (p = current->p_cptr) {
+    if ((p = current->p_cptr)) {
         while (1) {
             p->p_pptr = task[1]; /* init 进程收养子进程 */
 
@@ -563,6 +563,7 @@ volatile void do_exit(long code)
 int sys_exit(int error_code)
 {
     do_exit((error_code & 0xff) << 8);
+    return 0;
 }
 
 /* 系统调用 waitpid

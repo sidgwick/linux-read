@@ -253,11 +253,10 @@ repeat:
 
 /* 从 from 拷贝 1024 字节, 到 to */
 #define copy_buffer(from, to)                                                                      \
-    __asm__("cld"                                                                                  \
+    __asm__("cld\n\t"                                                                              \
             "rep movsl"                                                                            \
             :                                                                                      \
-            : "c"(BLOCK_SIZE / 4), "S"((long)(from)), "D"((long)(to))                              \
-            : "cx", "di", "si")
+            : "c"(BLOCK_SIZE / 4), "S"((long)(from)), "D"((long)(to)))
 
 /* 初始化软盘 DMA 通道
  * 软盘中数据读写操作是使用 DMA 进行的, 因此在每次进行数据传输之前需要设置 DMA 芯片
@@ -456,7 +455,7 @@ static void rw_interrupt(void)
 }
 
 /* 初始化软盘读写设置 */
-inline void setup_rw_floppy(void)
+static inline void setup_rw_floppy(void)
 {
     /* 设置 DMA 通道 2 */
     setup_DMA();
@@ -687,7 +686,7 @@ static void floppy_on_interrupt(void)
  *  2. 利用请求项中的设备号计算取得请求项指定软驱的参数块
  *  3. 利用内核定时器启动软盘读/写操作
  */
-void do_fd_request(void)
+static void do_fd_request(void)
 {
     unsigned int block;
 

@@ -276,14 +276,14 @@ static void scrup(int currcons)
             if (scr_end > video_mem_end) {
                 __asm__("cld\n\t"
                         "rep movsl\n\t"
-                        "movl _video_num_columns,%1\n\t"
+                        "movl video_num_columns,%1\n\t"
                         "rep stosw"
                         :
                         : "a"(video_erase_char),                               /* 擦除字符 */
                           "c"((video_num_lines - 1) * video_num_columns >> 1), /* 一屏少一行 */
                           "D"(video_mem_start), /* 拷贝到显存开始位置 */
-                          "S"(origin)           /* 从原来的可视区域开始位置拷贝 */
-                        : "cx", "di", "si");
+                          "S"(origin));         /* 从原来的可视区域开始位置拷贝 */
+
                 /* origin - video_mem_start 实际上是这次移动的跨度, 在纸上画画就容易理解 */
                 scr_end -= origin - video_mem_start;
                 pos -= origin - video_mem_start;
@@ -294,37 +294,34 @@ static void scrup(int currcons)
                 __asm__("cld\n\t"
                         "rep stosw" /* al -> ES:EDI */
                         :
-                        : "a"(video_erase_char),        /* 擦除字符 */
-                          "c"(video_num_columns),       /* 擦除长度 */
-                          "D"(scr_end - video_size_row) /* 擦除目标 */
-                        : "cx", "di");
+                        : "a"(video_erase_char),          /* 擦除字符 */
+                          "c"(video_num_columns),         /* 擦除长度 */
+                          "D"(scr_end - video_size_row)); /* 擦除目标 */
             }
             set_origin(currcons); /* 更新屏幕 */
         } else {
             __asm__("cld\n\t"
                     "rep movsl\n\t"
-                    "movl _video_num_columns, %%ecx\n\t"
+                    "movl video_num_columns, %%ecx\n\t"
                     "rep stosw"
                     :
                     : "a"(video_erase_char),                            /**/
                       "c"((bottom - top - 1) * video_num_columns >> 1), /**/
                       "D"(origin + video_size_row * top),               /**/
-                      "S"(origin + video_size_row * (top + 1))
-                    : "cx", "di", "si");
+                      "S"(origin + video_size_row * (top + 1)));
         }
     } else {
         /* Not EGA/VGA */
         __asm__(
-            "cld\n\t"                            /* 正向拷贝 */
-            "rep movsl\n\t"                      /* DS:ESI -> ES:EDI */
-            "movl _video_num_columns, %%ecx\n\t" /* 全局变量的符号可直接嵌入指令, 无需通过输入/输出操作数传递 */
-            "rep stosw"                          /* al -> ES:EDI */
+            "cld\n\t"                           /* 正向拷贝 */
+            "rep movsl\n\t"                     /* DS:ESI -> ES:EDI */
+            "movl video_num_columns, %%ecx\n\t" /* 全局变量的符号可直接嵌入指令, 无需通过输入/输出操作数传递 */
+            "rep stosw"                         /* al -> ES:EDI */
             :
             : "a"(video_erase_char),                            /* al=擦除字符 */
               "c"((bottom - top - 1) * video_num_columns >> 1), /* 要拷贝的内存大小(除2) */
               "D"(origin + video_size_row * top),               /* 拷贝到这个位置(第 0 行) */
-              "S"(origin + video_size_row * (top + 1))          /* 从这里开始拷贝(第 1 行) */
-            : "cx", "di", "si");
+              "S"(origin + video_size_row * (top + 1)));        /* 从这里开始拷贝(第 1 行) */
     }
 }
 
@@ -352,27 +349,25 @@ static void scrdown(int currcons)
             "std\n\t" /* 倒着拷贝, 以防出现数据覆盖的情况 */
             "rep movsl\n\t"
             "addl $2, %%edi\n\t" /* %edi has been decremented by 4 */
-            "movl _video_num_columns, %%ecx\n\t"
+            "movl video_num_columns, %%ecx\n\t"
             "rep stosw"
             :
             : "a"(video_erase_char),                            /*擦除*/
               "c"((bottom - top - 1) * video_num_columns >> 1), /* 一屏少一行 */
               "D"(origin + video_size_row * bottom - 4),        /* 到: 窗口右下角最后一个长字 */
-              "S"(origin + video_size_row * (bottom - 1) - 4)   /* 从: 窗口倒数第2行最后一个长字 */
-            : "ax", "cx", "di", "si");
+              "S"(origin + video_size_row * (bottom - 1) - 4)); /* 从: 窗口倒数第2行最后一个长字 */
     } else {
         /* Not EGA/VGA */
         __asm__("std\n\t"
                 "rep movsl\n\t"
                 "addl $2, %%edi\n\t" /* %edi has been decremented by 4 */
-                "movl _video_num_columns,%%ecx\n\t"
+                "movl video_num_columns,%%ecx\n\t"
                 "rep stosw"
                 :
                 : "a"(video_erase_char), /**/
                   "c"((bottom - top - 1) * video_num_columns >> 1),
                   "D"(origin + video_size_row * bottom - 4),
-                  "S"(origin + video_size_row * (bottom - 1) - 4)
-                : "ax", "cx", "di", "si");
+                  "S"(origin + video_size_row * (bottom - 1) - 4));
     }
 }
 
@@ -468,8 +463,8 @@ static void del(int currcons)
  */
 static void csi_J(int currcons, int vpar)
 {
-    long count __asm__("cx"); /* 指定为寄存器变量 */
-    long start __asm__("di");
+    long count; /* 指定为寄存器变量 */
+    long start;
 
     switch (vpar) {
     case 0: /* erase from cursor to end of display */
@@ -491,8 +486,7 @@ static void csi_J(int currcons, int vpar)
     __asm__("cld\n\t"
             "rep stosw\n\t"
             :
-            : "c"(count), "D"(start), "a"(video_erase_char)
-            : "cx", "di");
+            : "c"(count), "D"(start), "a"(video_erase_char));
 }
 
 /**
@@ -511,8 +505,8 @@ static void csi_J(int currcons, int vpar)
  */
 static void csi_K(int currcons, int vpar)
 {
-    long count __asm__("cx");
-    long start __asm__("di");
+    long count;
+    long start;
 
     switch (vpar) {
     case 0: /* erase from cursor to end of line */
@@ -538,8 +532,7 @@ static void csi_K(int currcons, int vpar)
     __asm__("cld\n\t"
             "rep stosw\n\t"
             :
-            : "c"(count), "D"(start), "a"(video_erase_char)
-            : "cx", "di");
+            : "c"(count), "D"(start), "a"(video_erase_char));
 }
 
 /**
@@ -1032,8 +1025,7 @@ void con_write(struct tty_struct *tty)
                         :
                         : "a"(translate[c - 32]), /* 转成对应的 ASCII 字符 */
                           "m"(*(short *)pos),     /* 输出的位置 */
-                          "m"(attr)               /* 字符属性 */
-                        : "ax");
+                          "m"(attr));             /* 字符属性 */
                 pos += 2;
                 x++;
             } else if (c == 27) {
@@ -1144,7 +1136,7 @@ void con_write(struct tty_struct *tty)
 
             /* 接收到的字符是 '?', 说明这个序列是终端设备私有序列, 后面会有一个功能字符
              * 于是去读下一字符, 再到状态 ESgetpars 去处理代码处. */
-            if (ques = (c == '?')) {
+            if ((ques = (c == '?'))) {
                 break;
             }
         case ESgetpars:
@@ -1623,7 +1615,7 @@ void console_print(const char *b)
     int currcons = fg_console;
     char c;
 
-    while (c = *(b++)) {
+    while ((c = *(b++))) {
         /* 遇到 LF 的处理, 直接做一次 `回车+换行` 操作 */
         if (c == 10) {
             cr(currcons);
@@ -1647,8 +1639,7 @@ void console_print(const char *b)
         __asm__("movb %2, %%ah\n\t"
                 "movw %%ax, %1\n\t"
                 :
-                : "a"(c), "m"(*(short *)pos), "m"(attr)
-                : "ax");
+                : "a"(c), "m"(*(short *)pos), "m"(attr));
 
         /* 移动光标位置和内存游标 */
         pos += 2;

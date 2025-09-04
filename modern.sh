@@ -20,12 +20,11 @@ find -name "Makefile" -exec sed -i "s/gas/as/g;
                                     s/gar/ar/g;
                                     s/as$/as --32/g;
                                     s/\bld$/ld -m elf_i386/g;
-                                    s/-O/-g -m32/g;
+                                    s/-O/-m32/g;
                                     s/-Wall/-Wall -fno-stack-protector/g;
                                     s/-fcombine-regs//g;
                                     s/^CFLAGS\s\+=/& -fno-builtin /g;
                                     s/-mstring-insns//g;" {} \;
-
 
 sed -i 's/^LDFLAGS\s\+=.*$/LDFLAGS = -M -x -Ttext 0 -e startup_32 -z noexecstack/g' Makefile
 sed -i 's#ROOT_DEV=/dev/hd6#ROOT_DEV=FLOPPY#g' Makefile

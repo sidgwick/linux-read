@@ -118,8 +118,7 @@ static int match(int len, const char *name, struct dir_entry *de)
             "fs ; repe ; cmpsb\n\t" /* fs 指定 cmpsb 使用 fs 段 */
             "setz %%al"             /* equal -> ZF=1 -> al=1 */
             : "=a"(same)
-            : "0"(0), "S"((long)name), "D"((long)de->name), "c"(len)
-            : "cx", "di", "si");
+            : "0"(0), "S"((long)name), "D"((long)de->name), "c"(len));
 
     /* 匹配返回 1, 不匹配返回 0 */
     return same;
@@ -481,7 +480,7 @@ static struct m_inode *dir_namei(const char *pathname, int *namelen, const char 
     }
 
     basename = pathname;
-    while (c = get_fs_byte(pathname++)) {
+    while ((c = get_fs_byte(pathname++))) {
         if (c == '/') {
             basename = pathname;
         }

@@ -341,7 +341,7 @@ noevrx:    lea    si,idgenoa        ! Check Genoa 'clues'
     mov    cx,#0x04
     dec    si
     dec    di
-l1:    inc    si
+l1:  inc    si
     inc    di
     mov    al,(si)
     seg es
@@ -539,7 +539,7 @@ skip10:    mov    al,ah
 
 ! Part of above routine, this one just prints ascii al
 
-prnt1:    push    ax
+prnt1:  push    ax
     push    cx
     mov    bh,#0x00
     mov    cx,#0x01
@@ -585,7 +585,7 @@ gdt_48:
     .word    0x800        ! gdt limit=2048, 256 GDT entries
     .word    512+gdt,0x9    ! gdt base = 0X9xxxx
 
-msg1:        .ascii    "Press <RETURN> to see SVGA-modes available or any other key to continue."
+msg1:      .ascii    "Press <RETURN> to see SVGA-modes available or any other key to continue."
         db    0x0d, 0x0a, 0x0a, 0x00
 msg2:        .ascii    "Mode:  COLSxROWS:"
         db    0x0d, 0x0a, 0x0a, 0x00

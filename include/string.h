@@ -38,7 +38,7 @@ extern char *strerror(int errno);
 
 /**
  * 从 src 拷贝数据到 dest */
-extern inline char *strcpy(char *dest, const char *src)
+__attribute__((unused)) static inline char *strcpy(char *dest, const char *src)
 {
     /**
      * ------------------------
@@ -55,20 +55,21 @@ extern inline char *strcpy(char *dest, const char *src)
      * 被破坏的寄存器列表有 si, di, ax */
 
     __asm__("cld\n"
-            "1:\tlodsb\n\t"
+            "1:"
+            "lodsb\n\t"
             "stosb\n\t"
-            "testb %%al,%%al\n\t"
+            "testb %%al, %%al\n\t"
             "jne 1b"
             :
             : "S"(src), "D"(dest)
-            : "si", "di", "ax");
+            : "ax");
     return dest;
 }
 
 /**
  * 从 src 拷贝 count 字节到 dest
  * src 长度不够的, 使用 NULL 填充 */
-extern inline char *strncpy(char *dest, const char *src, int count)
+__attribute__((unused)) static inline char *strncpy(char *dest, const char *src, int count)
 {
     /**
      * ------------------------
@@ -85,24 +86,24 @@ extern inline char *strncpy(char *dest, const char *src, int count)
      * ------------------------ */
 
     __asm__("cld\n"
-            "1:\tdecl %2\n\t"
+            "1:"
+            "decl %2\n\t"
             "js 2f\n\t"
             "lodsb\n\t"
             "stosb\n\t"
-            "testb %%al,%%al\n\t"
+            "testb %%al, %%al\n\t"
             "jne 1b\n\t"
-            "rep\n\t"
-            "stosb\n"
+            "rep stosb\n"
             "2:"
             :
             : "S"(src), "D"(dest), "c"(count)
-            : "si", "di", "ax", "cx");
+            : "ax");
     return dest;
 }
 
 /**
  * 将 src 拼接在 dest 后面 */
-extern inline char *strcat(char *dest, const char *src)
+__attribute__((unused)) static inline char *strcat(char *dest, const char *src)
 {
     /**
      * scasb 比较 %al 和 (%edi), 比较完后 %edi+1, %ecx-1
@@ -127,13 +128,13 @@ extern inline char *strcat(char *dest, const char *src)
             "jne 1b"
             :
             : "S"(src), "D"(dest), "a"(0), "c"(0xffffffff)
-            : "si", "di", "ax", "cx");
+            :);
     return dest;
 }
 
 /**
  * 将最多 count 字节 src 拼接在 dest 后面 */
-extern inline char *strncat(char *dest, const char *src, int count)
+__attribute__((unused)) static inline char *strncat(char *dest, const char *src, int count)
 {
     /**
      * scasb 比较 %al 和 (%edi), 比较完后 %edi+1, %ecx-1
@@ -169,13 +170,13 @@ extern inline char *strncat(char *dest, const char *src, int count)
             "stosb"
             :
             : "S"(src), "D"(dest), "a"(0), "c"(0xffffffff), "g"(count)
-            : "si", "di", "ax", "cx");
+            :);
     return dest;
 }
 
 /**
  * 比较 cs, ct, 返回 `sign(cs-ct) * 1` */
-extern inline int strcmp(const char *cs, const char *ct)
+__attribute__((unused)) static inline int strcmp(const char *cs, const char *ct)
 {
     /**
      * scasb 比较 %al 和 (%edi), 比较完后 %edi+1, %ecx-1
@@ -211,13 +212,13 @@ extern inline int strcmp(const char *cs, const char *ct)
             "3:"
             : "=a"(__res)
             : "D"(cs), "S"(ct)
-            : "si", "di");
+            :);
     return __res;
 }
 
 /**
  * 比较 cs, ct 的 count 个字节, 返回 `sign(cs-ct) * 1` */
-extern inline int strncmp(const char *cs, const char *ct, int count)
+__attribute__((unused)) static inline int strncmp(const char *cs, const char *ct, int count)
 {
     /**
      * ------------------------
@@ -257,14 +258,14 @@ extern inline int strncmp(const char *cs, const char *ct, int count)
             "4:"
             : "=a"(__res)
             : "D"(cs), "S"(ct), "c"(count)
-            : "si", "di", "cx");
+            :);
     return __res;
 }
 
 /**
  * 在字符串 s 里面寻找 c
  * 返回 c 第一次出现的位置的指针, 如果没找到, 则返回 NULL */
-extern inline char *strchr(const char *s, char c)
+__attribute__((unused)) static inline char *strchr(const char *s, char c)
 {
     /**
      * 约束 "0"(c) 表示参数 c 使用与第 0 个操作数相同的寄存器
@@ -295,14 +296,14 @@ extern inline char *strchr(const char *s, char c)
             "decl %0"
             : "=a"(__res)
             : "S"(s), "0"(c)
-            : "si");
+            :);
     return __res;
 }
 
 /**
  * 在字符串 s 里面从右往左寻找 c, 返回 c 第一次
  * 本函数实际上是从左往右扫描, 记录 c 最近一次出现的位置, 扫描结束后返回 */
-extern inline char *strrchr(const char *s, char c)
+__attribute__((unused)) static inline char *strrchr(const char *s, char c)
 {
     /**
      * 约束 "0"(0) 表示将 %0 占位指代的 %edx 置 0
@@ -331,7 +332,7 @@ extern inline char *strrchr(const char *s, char c)
             "jne 1b"
             : "=d"(__res)
             : "0"(0), "S"(s), "a"(c)
-            : "ax", "si");
+            :);
     return __res;
 }
 
@@ -339,7 +340,7 @@ extern inline char *strrchr(const char *s, char c)
  * 返回 cs 中第一个不在字符串 ct 中出现的字符下标
  * strspn 是 string span 的缩写, span 强调对连续字符序列长度的计算,
  * 而非定位单个字符 */
-extern inline int strspn(const char *cs, const char *ct)
+__attribute__((unused)) static inline int strspn(const char *cs, const char *ct)
 {
     /**
      * ------------------------
@@ -367,31 +368,31 @@ extern inline int strspn(const char *cs, const char *ct)
      * ------------------------ */
     register char *__res __asm__("si");
     __asm__("cld\n\t"
-            "movl %4,%%edi\n\t"
-            "repne\n\t"
-            "scasb\n\t"
+            "movl %4, %%edi\n\t"
+            "repne scasb\n\t"
             "notl %%ecx\n\t"
             "decl %%ecx\n\t"
-            "movl %%ecx,%%edx\n"
-            "1:\tlodsb\n\t"
-            "testb %%al,%%al\n\t"
+            "movl %%ecx, %%edx\n"
+            "1:"
+            "lodsb\n\t"
+            "testb %%al, %%al\n\t"
             "je 2f\n\t"
-            "movl %4,%%edi\n\t"
-            "movl %%edx,%%ecx\n\t"
-            "repne\n\t"
-            "scasb\n\t"
+            "movl %4, %%edi\n\t"
+            "movl %%edx, %%ecx\n\t"
+            "repne scasb\n\t"
             "je 1b\n"
-            "2:\tdecl %0"
+            "2:"
+            "decl %0"
             : "=S"(__res)
             : "a"(0), "c"(0xffffffff), "0"(cs), "g"(ct)
-            : "ax", "cx", "dx", "di");
+            : "dx", "di");
     return __res - cs;
 }
 
 /**
  * 返回 cs 中第一个在字符串 ct 中出现的字符下标
  * strcspn 是 string complement span 的缩写 */
-extern inline int strcspn(const char *cs, const char *ct)
+__attribute__((unused)) static inline int strcspn(const char *cs, const char *ct)
 {
     /**
      * ------------------------
@@ -432,7 +433,7 @@ extern inline int strcspn(const char *cs, const char *ct)
             "2:\tdecl %0"
             : "=S"(__res)
             : "a"(0), "c"(0xffffffff), "0"(cs), "g"(ct)
-            : "ax", "cx", "dx", "di");
+            : "dx", "di");
     return __res - cs;
 }
 
@@ -440,7 +441,7 @@ extern inline int strcspn(const char *cs, const char *ct)
  * 在 cs 中搜索​​首个出现​​在 ct 中的字符, 并返回该字符在
  * cs 中的指针 strpbrk = String Pointer Break 顺便说如果 ct 中有 cs 中的字符,
  * 这个函数实际上就是 res = cs + strspn(cs, ct) */
-extern inline char *strpbrk(const char *cs, const char *ct)
+__attribute__((unused)) static inline char *strpbrk(const char *cs, const char *ct)
 {
     /**
      * ------------------------
@@ -489,13 +490,13 @@ extern inline char *strpbrk(const char *cs, const char *ct)
             "3:"
             : "=S"(__res)
             : "a"(0), "c"(0xffffffff), "0"(cs), "g"(ct)
-            : "ax", "cx", "dx", "di");
+            : "dx", "di");
     return __res;
 }
 
 /**
  * 在 cs 中寻找 ct 子串, 返回 cs 中的位置, 如果找不到返回 NULL */
-extern inline char *strstr(const char *cs, const char *ct)
+__attribute__((unused)) static inline char *strstr(const char *cs, const char *ct)
 {
     /**
      * ------------------------
@@ -541,13 +542,13 @@ extern inline char *strstr(const char *cs, const char *ct)
             "2:"
             : "=a"(__res)
             : "0"(0), "c"(0xffffffff), "S"(cs), "g"(ct)
-            : "cx", "dx", "di", "si");
+            : "dx", "di");
     return __res;
 }
 
 /**
  * 获取 NULL 结尾的字符串长度 */
-extern inline int strlen(const char *s)
+__attribute__((unused)) static inline int strlen(const char *s)
 {
     register int __res __asm__("cx");
     __asm__("cld\n\t"
@@ -556,8 +557,7 @@ extern inline int strlen(const char *s)
             "notl %0\n\t"
             "decl %0"
             : "=c"(__res)
-            : "D"(s), "a"(0), "0"(0xffffffff)
-            : "di");
+            : "D"(s), "a"(0), "0"(0xffffffff));
     return __res;
 }
 
@@ -576,7 +576,7 @@ extern char *___strtok;
  *
  * 返回字符串 s 中第 1 个 token, 如果没有找到 token, 则返回一个 null 指针
  * 后续使用字符串 s 指针为 null 的调用, 将在原字符串 s 中搜索下一个token */
-extern inline char *strtok(char *s, const char *ct)
+__attribute__((unused)) static inline char *strtok(char *s, const char *ct)
 {
     /**
      * ------------------------
@@ -714,14 +714,13 @@ extern inline char *strtok(char *s, const char *ct)
 /**
  * 从 src 拷贝 n 字节到 dest
  * 此函数不考虑内存重叠导致的错误情况 */
-extern inline void *memcpy(void *dest, const void *src, int n)
+__attribute__((unused)) static inline void *memcpy(void *dest, const void *src, int n)
 {
     __asm__("cld\n\t"
             "rep\n\t"
             "movsb"
             :
-            : "c"(n), "S"(src), "D"(dest)
-            : "cx", "si", "di");
+            : "c"(n), "S"(src), "D"(dest));
     return dest;
 }
 
@@ -743,26 +742,26 @@ extern inline void *memcpy(void *dest, const void *src, int n)
  *      s[4] = s[2]
  *      s[3] = s[1]
  *      s[2] = s[0] */
-extern inline void *memmove(void *dest, const void *src, int n)
+__attribute__((unused)) static inline void *memmove(void *dest, const void *src, int n)
 {
     if (dest < src)
         __asm__("cld\n\t"
                 "rep\n\t"
-                "movsb" ::"c"(n),
-                "S"(src), "D"(dest)
-                : "cx", "si", "di");
+                "movsb"
+                :
+                : "c"(n), "S"(src), "D"(dest));
     else
         __asm__("std\n\t"
                 "rep\n\t"
-                "movsb" ::"c"(n),
-                "S"(src + n - 1), "D"(dest + n - 1)
-                : "cx", "si", "di");
+                "movsb"
+                :
+                : "c"(n), "S"(src + n - 1), "D"(dest + n - 1));
     return dest;
 }
 
 /**
  * 比较 cs, ct 的 count 个字节, 如果相同返回 0, 否则返回 `1*sign(cs - ct)` */
-extern inline int memcmp(const void *cs, const void *ct, int count)
+__attribute__((unused)) static inline int memcmp(const void *cs, const void *ct, int count)
 {
     /**
      * ------------------------
@@ -784,12 +783,11 @@ extern inline int memcmp(const void *cs, const void *ct, int count)
             "negl %%eax\n"
             "1:"
             : "=a"(__res)
-            : "0"(0), "D"(cs), "S"(ct), "c"(count)
-            : "si", "di", "cx");
+            : "0"(0), "D"(cs), "S"(ct), "c"(count));
     return __res;
 }
 
-extern inline void *memchr(const void *cs, char c, int count)
+__attribute__((unused)) static inline void *memchr(const void *cs, char c, int count)
 {
     /**
      * ------------------------
@@ -809,12 +807,11 @@ extern inline void *memchr(const void *cs, char c, int count)
             "movl $1,%0\n"
             "1:\tdecl %0"
             : "=D"(__res)
-            : "a"(c), "D"(cs), "c"(count)
-            : "cx");
+            : "a"(c), "D"(cs), "c"(count));
     return __res;
 }
 
-extern inline void *memset(void *s, char c, int count)
+__attribute__((unused)) static inline void *memset(void *s, char c, int count)
 {
     /**
      * ------------------------
@@ -824,8 +821,7 @@ extern inline void *memset(void *s, char c, int count)
     __asm__("cld\n\t"
             "rep\n\t"
             "stosb" ::"a"(c),
-            "D"(s), "c"(count)
-            : "cx", "di");
+            "D"(s), "c"(count));
     return s;
 }
 

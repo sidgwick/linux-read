@@ -17,8 +17,7 @@
     __asm__("cld\n\t"                                                                              \
             "rep stosl"                                                                            \
             :                                                                                      \
-            : "a"(0), "c"(BLOCK_SIZE / 4), "D"((long)(addr))                                       \
-            : "cx", "di")
+            : "a"(0), "c"(BLOCK_SIZE / 4), "D"((long)(addr)))
 
 /**
  * @brief 置 addr 的 nr 比特位为 1, 并返回原始比特位值
@@ -73,7 +72,7 @@
             "3:"                                                                                   \
             : "=c"(__res)                                                                          \
             : "c"(0), "S"(addr)                                                                    \
-            : "ax", "dx", "si");                                                                   \
+            : "ax", "dx");                                                                         \
         __res;                                                                                     \
     })
 
@@ -160,7 +159,7 @@ int new_block(int dev)
 
     /* 扫描 zmap, 找一个空闲的 zone */
     for (i = 0; i < 8; i++) {
-        if (bh = sb->s_zmap[i]) {
+        if ((bh = sb->s_zmap[i])) {
             if ((j = find_first_zero(bh->b_data)) < 8192) {
                 break;
             }
@@ -293,7 +292,7 @@ struct m_inode *new_inode(int dev)
     /* 在磁盘上找一个空的 inode, 和这个内存 inode 对应起来 */
     j = 8192;
     for (i = 0; i < 8; i++) {
-        if (bh = sb->s_imap[i]) {
+        if ((bh = sb->s_imap[i])) {
             if ((j = find_first_zero(bh->b_data)) < 8192) {
                 break;
             }

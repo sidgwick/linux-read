@@ -14,8 +14,10 @@
  * the page directory.
  */
 .text
-.globl _idt,_gdt,_pg_dir,_tmp_floppy_area
-_pg_dir:
+.globl startup_32,idt,gdt,pg_dir,tmp_floppy_area
+
+pg_dir:
+
 startup_32:
         movl $0x10, %eax # 数据段选择子, 使用 00010~0_00 = #2
         mov %ax, %ds
@@ -24,7 +26,7 @@ startup_32:
         mov %ax, %gs
         # LSS 从内存中读取 ​​48 位数据​​(32 位偏移地址 + 16 位段选择符)
         # 分别加载到 通用寄存器和 SS 寄存器
-        lss _stack_start, %esp
+        lss stack_start, %esp
         call setup_idt
         call setup_gdt
         movl $0x10, %eax        # reload all the segment registers
@@ -32,7 +34,7 @@ startup_32:
         mov %ax, %es        # reloaded in 'setup_gdt'
         mov %ax, %fs
         mov %ax, %gs
-        lss _stack_start, %esp
+        lss stack_start, %esp
 
         # 测试A20地址线是否已经开启
         # 采用的方法是是向内存地址 0x00000 处写入任意一个数值, 然后看内存地址 0x100000(1M) 处是否也是这个数值.
@@ -135,7 +137,7 @@ setup_idt:
         # 中断门的低 32 位在 EAX
         # 中断门的高 32 位在 EDX
 
-        lea _idt, %edi
+        lea idt, %edi
         mov $256, %ecx
     rp_sidt:
         movl %eax, (%edi)
@@ -190,7 +192,7 @@ pg3: // PG3 从 0x4000 ~ 0x4FFF
  * reach to a buffer-block. It needs to be aligned, so that it isn't
  * on a 64kB border.
  */
-_tmp_floppy_area:
+tmp_floppy_area:
     .fill 1024, 1, 0
 
 after_page_tables:
@@ -199,7 +201,7 @@ after_page_tables:
         pushl $0
         pushl $0
         pushl $L6        # return address for main, if it decides to.
-        pushl $_main
+        pushl $main
         jmp setup_paging
     L6:
         jmp L6  # main should never return here, but
@@ -223,7 +225,7 @@ ignore_int:
         mov %ax, %es
         mov %ax, %fs
         pushl $int_msg
-        call _printk
+        call printk
         popl %eax
         pop %fs
         pop %es
@@ -269,10 +271,10 @@ setup_paging:
         rep stosl
 
         # +7 实际上实在设置低 12 位包含的属性 bits, 这里的设置是 P=1, RW=1, US=1
-        movl $pg0+7, _pg_dir        /* set present bit/user r/w */
-        movl $pg1+7, _pg_dir+4        /*  --------- " " --------- */
-        movl $pg2+7, _pg_dir+8        /*  --------- " " --------- */
-        movl $pg3+7, _pg_dir+12        /*  --------- " " --------- */
+        movl $pg0+7, pg_dir        /* set present bit/user r/w */
+        movl $pg1+7, pg_dir+4        /*  --------- " " --------- */
+        movl $pg2+7, pg_dir+8        /*  --------- " " --------- */
+        movl $pg3+7, pg_dir+12        /*  --------- " " --------- */
 
         # 下面这段, 从 PG3 的 4092 项开始, 倒序逐个填充 4Byte 的页表项
         # 0xFFF007 = 11_11_1111_1111~0000_0000_0111
@@ -302,19 +304,19 @@ setup_paging:
 .word 0
 idt_descr:
     .word (256*8-1) # idt contains 256 entries
-    .long _idt
+    .long idt
 
 .align 4
 .word 0
 gdt_descr:
     .word 256*8-1 # so does gdt (not that that's any
-    .long _gdt # magic number, but it works for me :^)
+    .long gdt # magic number, but it works for me :^)
 
 .align 8
-_idt:
+idt:
     .fill 256, 8, 0        # idt is uninitialized
 
-_gdt:
+gdt:
     .quad 0x0000000000000000    /* NULL descriptor */
     .quad 0x00c09a0000000fff    /* 16Mb, 全局代码段 */
     .quad 0x00c0920000000fff    /* 16Mb, 全局数据段 */

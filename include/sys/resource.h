@@ -6,6 +6,8 @@
 #ifndef _SYS_RESOURCE_H
 #define _SYS_RESOURCE_H
 
+#include <sys/time.h>
+
 // rusage == Resource USAGE
 // 以下符号常数和结构用于 getrusage()
 // 参见 kernel/sys.c 文件第 412 行开始

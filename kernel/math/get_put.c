@@ -54,7 +54,7 @@ void get_short_int(temp_real *tmp, struct info *info, unsigned short code)
     addr = ea(info, code);
     ti.a = (signed short)get_fs_word((unsigned short *)addr);
     ti.b = 0;
-    if (ti.sign = (ti.a < 0))
+    if ((ti.sign = (ti.a < 0)))
         ti.a = -ti.a;
     int_to_real(&ti, tmp);
 }
@@ -67,7 +67,7 @@ void get_long_int(temp_real *tmp, struct info *info, unsigned short code)
     addr = ea(info, code);
     ti.a = get_fs_long((unsigned long *)addr);
     ti.b = 0;
-    if (ti.sign = (ti.a < 0))
+    if ((ti.sign = (ti.a < 0)))
         ti.a = -ti.a;
     int_to_real(&ti, tmp);
 }
@@ -80,7 +80,7 @@ void get_longlong_int(temp_real *tmp, struct info *info, unsigned short code)
     addr = ea(info, code);
     ti.a = get_fs_long((unsigned long *)addr);
     ti.b = get_fs_long(1 + (unsigned long *)addr);
-    if (ti.sign = (ti.b < 0))
+    if ((ti.sign = (ti.b < 0)))
         __asm__("notl %0 ; notl %1\n\t"
                 "addl $1,%0 ; adcl $0,%1"
                 : "=r"(ti.a), "=r"(ti.b)

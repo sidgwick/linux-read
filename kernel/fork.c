@@ -185,9 +185,9 @@ int copy_process(int nr, long ebp, long edi, long esi,
      * fnsave 用于把协处理器的所有状态保存到目的操作数指定的内存区域中(tss.i387)
      */
     if (last_task_used_math == current)
-        __asm__("clts"
-                "fnsave %0"
-                "frstor %0"
+        __asm__("clts\n\t"
+                "fnsave %0\n\t"
+                "frstor %0\n\t"
                 :
                 : "m"(p->tss.i387));
 
@@ -203,7 +203,7 @@ int copy_process(int nr, long ebp, long edi, long esi,
      * 因为这里创建的子进程会与父进程共享这些打开的文件
      * TODO: 学完文件系统, 再回来看看这里的计数操作 */
     for (i = 0; i < NR_OPEN; i++) {
-        if (f = p->filp[i]) {
+        if ((f = p->filp[i])) {
             f->f_count++;
         }
     }

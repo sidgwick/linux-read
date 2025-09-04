@@ -20,8 +20,10 @@ static int skip_atoi(const char **s)
 {
     int i = 0;
 
-    while (is_digit(**s))
+    while (is_digit(**s)) {
         i = i * 10 + *((*s)++) - '0';
+    }
+
     return i;
 }
 
@@ -51,16 +53,19 @@ static char *number(char *str, int num, int base, int size, int precision, int t
     int i;
 
     /* 小写显示 */
-    if (type & SMALL)
+    if (type & SMALL) {
         digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+    }
 
     /* 如果要求左对齐, 把 type 里面 zeropad 位清理掉 */
-    if (type & LEFT)
+    if (type & LEFT) {
         type &= ~ZEROPAD;
+    }
 
     /* 最多支持到 2~36 进制 */
-    if (base < 2 || base > 36)
+    if (base < 2 || base > 36) {
         return 0;
+    }
 
     /* c 将来用于在前面部分 padding */
     c = (type & ZEROPAD) ? '0' : ' ';
@@ -74,63 +79,80 @@ static char *number(char *str, int num, int base, int size, int precision, int t
     }
 
     /* 如果有符号, 则符号肯定已经占据了一个显示位置 */
-    if (sign)
+    if (sign) {
         size--;
+    }
 
     /* 16 进制或者 8 进制, 减去前缀 */
-    if (type & SPECIAL)
-        if (base == 16)
+    if (type & SPECIAL) {
+        if (base == 16) {
             size -= 2;
-        else if (base == 8)
+        } else if (base == 8) {
             size--;
+        }
+    }
 
     /* 按照 base 进制, 拆出来每一位上面的数值 */
     i = 0;
-    if (num == 0)
+    if (num == 0) {
         tmp[i++] = '0';
-    else
-        while (num != 0)
+    } else {
+        while (num != 0) {
             tmp[i++] = digits[do_div(num, base)];
+        }
+    }
 
     /* 如果想要的精度太小, 显示不下, 那就要把精度调整大一些, 以完全显示 */
-    if (i > precision)
+    if (i > precision) {
         precision = i;
+    }
+
     size -= precision; /* 去掉数字显示本身, 还剩下的 size */
 
     /* 如果不是 0 填充前部, 也不是左对齐, 就 padding 进 size 个空格 */
-    if (!(type & (ZEROPAD + LEFT)))
-        while (size-- > 0)
+    if (!(type & (ZEROPAD + LEFT))) {
+        while (size-- > 0) {
             *str++ = ' ';
+        }
+    }
 
     /* 有符号? 追加符号到结果 */
-    if (sign)
+    if (sign) {
         *str++ = sign;
+    }
 
     /* 特殊前缀? 追加特殊前缀内容 */
-    if (type & SPECIAL)
-        if (base == 8)
+    if (type & SPECIAL) {
+        if (base == 8) {
             *str++ = '0';
-        else if (base == 16) {
+        } else if (base == 16) {
             *str++ = '0';
             *str++ = digits[33];
         }
+    }
 
     /* 不是左对齐, 填充空格进来: 类似 0x003A 中的 00 */
-    if (!(type & LEFT))
-        while (size-- > 0)
+    if (!(type & LEFT)) {
+        while (size-- > 0) {
             *str++ = c;
+        }
+    }
 
     /* i 存有数值 num 的数字个数, 若数字个数小于精度值, 则str中放入(精度值-i)个
      * 0 */
-    while (i < precision--)
+    while (i < precision--) {
         *str++ = '0';
+    }
+
     /* 数字本身 */
-    while (i-- > 0)
+    while (i-- > 0) {
         *str++ = tmp[i];
+    }
 
     /* 如果还有 size, 一律使用空格填充 */
-    while (size-- > 0)
+    while (size-- > 0) {
         *str++ = ' ';
+    }
 
     return str;
 }
@@ -146,9 +168,8 @@ int vsprintf(char *buf, const char *fmt, va_list args)
     int flags; /* flags to number() */
 
     int field_width; /* width of output field */
-    int precision;   /* min. # of digits for integers; max number of chars for
-                        from string */
-    int qualifier;   /* 'h', 'l', or 'L' for integer fields */
+    int precision;   /* min. # of digits for integers; max number of chars for from string */
+    int qualifier __attribute__((unused)); /* 'h', 'l', or 'L' for integer fields */
 
     for (str = buf; *fmt; ++fmt) {
         // 如果没有遇到格式化字符, 就持续直接打印
@@ -190,9 +211,9 @@ int vsprintf(char *buf, const char *fmt, va_list args)
 
         /* get field width, fmt中指定的打印的宽度 */
         field_width = -1;
-        if (is_digit(*fmt))
+        if (is_digit(*fmt)) {
             field_width = skip_atoi(&fmt);
-        else if (*fmt == '*') {
+        } else if (*fmt == '*') {
             /* it's the next argument */
             fmt++; // BUG fix
             field_width = va_arg(args, int);
@@ -206,15 +227,17 @@ int vsprintf(char *buf, const char *fmt, va_list args)
         precision = -1;
         if (*fmt == '.') {
             ++fmt;
-            if (is_digit(*fmt))
+            if (is_digit(*fmt)) {
                 precision = skip_atoi(&fmt);
-            else if (*fmt == '*') {
+            } else if (*fmt == '*') {
                 /* it's the next argument */
                 fmt++;
                 precision = va_arg(args, int);
             }
-            if (precision < 0)
+
+            if (precision < 0) {
                 precision = 0;
+            }
         }
 
         /* get the conversion qualifier */
@@ -231,31 +254,39 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             // 此时如果标志域表明不是左靠齐, 则该字段前面放入 '宽度域值-1'
             // 个空格字符, 然后再放入参数字符 如果宽度域还大于0, 则表示为左靠齐,
             // 则在参数字符后面添加 '宽度值-1' 个空格字符
-            if (!(flags & LEFT))
-                while (--field_width > 0)
+            if (!(flags & LEFT)) {
+                while (--field_width > 0) {
                     *str++ = ' ';
+                }
+            }
             *str++ = (unsigned char)va_arg(args, int);
-            while (--field_width > 0)
+            while (--field_width > 0) {
                 *str++ = ' ';
+            }
             break;
 
         case 's':
             s = va_arg(args, char *);
             len = strlen(s);
-            if (precision < 0)
+            if (precision < 0) {
                 precision = len;
-            else if (len > precision)
+            } else if (len > precision) {
                 len = precision; /* 截断 */
+            }
 
-            if (!(flags & LEFT))
-                while (len < field_width--)
+            if (!(flags & LEFT)) {
+                while (len < field_width--) {
                     *str++ = ' ';
+                }
+            }
 
-            for (i = 0; i < len; ++i)
+            for (i = 0; i < len; ++i) {
                 *str++ = *s++;
+            }
 
-            while (len < field_width--)
+            while (len < field_width--) {
                 *str++ = ' ';
+            }
 
             break;
 
@@ -297,15 +328,20 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             break;
 
         default:
-            if (*fmt != '%')
+            if (*fmt != '%') {
                 *str++ = '%';
-            if (*fmt)
+            }
+
+            if (*fmt) {
                 *str++ = *fmt;
-            else
+            } else {
                 --fmt;
+            }
+
             break;
         }
     }
+
     *str = '\0';
     return str - buf;
 }

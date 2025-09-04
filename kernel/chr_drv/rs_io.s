@@ -13,7 +13,7 @@
  */
 
 .text
-.globl _rs1_interrupt, _rs2_interrupt
+.globl rs1_interrupt, rs2_interrupt
 
 size = 1024 /* must be power of two !
                and must match the value in tty_io.c!!!
@@ -36,13 +36,13 @@ startup    = 256   /* chars left in write queue when we restart it */
  * 初始化时 rs1_interrupt 地址被放入中断描述符 0x24 中, 对应 8259A 的中断请求 IRQ4 引脚
  * 初始化时 rs2_interrupt 地址被放入中断描述符 0x23 中, 对应 8259A 的中断请求 IRQ3 引脚 */
 .align 2
-_rs1_interrupt:
-    pushl $_table_list+8 # RS1 输入队列
+rs1_interrupt:
+    pushl $table_list+8 # RS1 输入队列
     jmp rs_int
 
 .align 2
-_rs2_interrupt:
-    pushl $_table_list+16 # RS2 输入队列
+rs2_interrupt:
+    pushl $table_list+16 # RS2 输入队列
 
 // 这段代码首先让段寄存器ds、es指向内核数据段, 然后从对应读写缓冲队列data字段取出
 // 串行端口基地址. 该地址.
@@ -104,7 +104,7 @@ end:
     popl %ecx
     popl %edx
 
-    addl $4, %esp # jump over _table_list entry
+    addl $4, %esp # jump over table_list entry
     iret
 
 jmp_table:
@@ -136,7 +136,7 @@ line_status:
 read_char:
     inb %dx, %al                # EDX=0x3F8, 读取 `读接受缓冲寄存器(RBR)` 寄存器
     movl %ecx, %edx             # 输入队列的二级指针
-    subl $_table_list, %edx     # 输入队列的二级指针相对于 table_list 的偏移量
+    subl $table_list, %edx     # 输入队列的二级指针相对于 table_list 的偏移量
     shrl $3, %edx               # 除以 8, 得到的是 RS 端口的索引值(1/2号端口)
     movl (%ecx), %ecx            # read-queue, 输入队列的1级指针
     movl head(%ecx), %ebx       # 缓冲区的 head 游标
@@ -149,7 +149,7 @@ read_char:
 1:
     addl $63, %edx              # 串口号转换成 tty 号(63或64)并作为参数入栈, 和 tty_table 分配有关系
     pushl %edx
-    call _do_tty_interrupt      # 使用这个 C 函数, 把字符拷贝到辅助序列
+    call do_tty_interrupt      # 使用这个 C 函数, 把字符拷贝到辅助序列
     addl $4, %esp
     ret
 

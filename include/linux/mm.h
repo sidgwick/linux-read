@@ -29,7 +29,7 @@ void swap_free(int page_nr);
 void swap_in(unsigned long *table_ptr);
 
 // 显示内存已用完出错信息, 并退出
-extern inline volatile void oom(void)
+static inline volatile void oom(void)
 {
     // do_exit 应该使用退出代码
     // 这里用了信号值 SIGSEGV(11) 相同值的出错码含义是“资源暂时不可用”, 正好同义

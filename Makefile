@@ -11,12 +11,11 @@ LD86	=ld86 -0
 # AS = as --32
 # LD = ld -m elf_i386
 
-AS	= as
-LD	= ld
-LDFLAGS	=-s -x -M
+AS	= as --32
+LD	= ld -m elf_i386
+LDFLAGS = -M -x -Ttext 0 -e startup_32 -z noexecstack
 CC	=gcc $(RAMDISK)
-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer \
--fcombine-regs -mstring-insns
+CFLAGS	= -fno-builtin -Wall -fno-stack-protector -m32 -g -fno-pie -fstrength-reduce -fomit-frame-pointer
 CPP	=cpp -nostdinc -Iinclude
 
 #
@@ -24,8 +23,8 @@ CPP	=cpp -nostdinc -Iinclude
 # This can be either FLOPPY, /dev/xxxx or empty, in which case the
 # default of /dev/hd6 is used by 'build'.
 #
-ROOT_DEV=/dev/hd6
-SWAP_DEV=/dev/hd2
+ROOT_DEV=FLOPPY
+SWAP_DEV=
 
 ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
 DRIVERS =kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
@@ -52,8 +51,7 @@ disk: Image
 	dd bs=8192 if=Image of=/dev/PS0
 
 tools/build: tools/build.c
-	$(CC) $(CFLAGS) \
-	-o tools/build tools/build.c
+	$(CC) -Wall -o tools/build tools/build.c
 
 boot/head.o: boot/head.s
 
@@ -64,7 +62,9 @@ tools/system:	boot/head.o init/main.o \
 		$(DRIVERS) \
 		$(MATH) \
 		$(LIBS) \
-		-o tools/system > System.map
+		--oformat=binary --Ttext=0 -o tools/system > System.map
+	# objcopy -O binary tools/system kernel.bin
+	# mv kernel.bin tools/system
 
 kernel/math/math.a:
 	(cd kernel/math; make)

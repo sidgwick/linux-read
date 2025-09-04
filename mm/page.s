@@ -9,7 +9,7 @@
  * the real work is done in mm.c
  */
 
-.globl _page_fault
+.globl page_fault
 
 /*
  * 中断发生的时候, 根据有没有发生特权级处理器会压栈:
@@ -19,7 +19,7 @@
 
 /**
  * page_fault 函数用于处理页面异常中断 */
-_page_fault:
+page_fault:
     xchgl %eax,(%esp) # 栈顶位置有出错码, 顺手还把 %eax 换到栈里面了
     pushl %ecx
     pushl %edx
@@ -35,9 +35,9 @@ _page_fault:
     pushl %eax # 出错码入栈, 里面有具体错误信息, 特别注意最低位是 P 位
     testl $1,%eax
     jne 1f # JNE ~ ZF!=0 ~ (<P=1 & 1> = 1)
-    call _do_no_page # 处理缺页异常
+    call do_no_page # 处理缺页异常
     jmp 2f
-1:    call _do_wp_page # 处理非缺页异常
+1:  call do_wp_page # 处理非缺页异常
 2:    addl $8,%esp # 清理栈上面参数
     pop %fs
     pop %es

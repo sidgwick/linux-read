@@ -48,6 +48,9 @@
 
 #define STRINGIFY(x) #x
 
+#define MAJOR(a) (((unsigned)(a)) >> 8) // 取高字节 (主设备号)
+#define MINOR(a) ((a) & 0xff)           // 取低字节 (次设备号)
+
 void die(char *str)
 {
     fprintf(stderr, "%s\n", str);
@@ -115,20 +118,20 @@ int main(int argc, char **argv)
         buf[i] = 0;
     if ((id = open(argv[1], O_RDONLY, 0)) < 0)
         die("Unable to open 'boot'");
-    if (read(id, buf, MINIX_HEADER) != MINIX_HEADER)
-        die("Unable to read header of 'boot'");
-    if (((long *)buf)[0] != 0x04100301)
-        die("Non-Minix header of 'boot'");
-    if (((long *)buf)[1] != MINIX_HEADER)
-        die("Non-Minix header of 'boot'");
-    if (((long *)buf)[3] != 0)
-        die("Illegal data segment in 'boot'");
-    if (((long *)buf)[4] != 0)
-        die("Illegal bss in 'boot'");
-    if (((long *)buf)[5] != 0)
-        die("Non-Minix header of 'boot'");
-    if (((long *)buf)[7] != 0)
-        die("Illegal symbol table in 'boot'");
+    //    if (read(id, buf, MINIX_HEADER) != MINIX_HEADER)
+    //        die("Unable to read header of 'boot'");
+    //    if (((long *)buf)[0] != 0x04100301)
+    //        die("Non-Minix header of 'boot'");
+    //    if (((long *)buf)[1] != MINIX_HEADER)
+    //        die("Non-Minix header of 'boot'");
+    //    if (((long *)buf)[3] != 0)
+    //        die("Illegal data segment in 'boot'");
+    //    if (((long *)buf)[4] != 0)
+    //        die("Illegal bss in 'boot'");
+    //    if (((long *)buf)[5] != 0)
+    //        die("Non-Minix header of 'boot'");
+    //    if (((long *)buf)[7] != 0)
+    //        die("Illegal symbol table in 'boot'");
     i = read(id, buf, sizeof buf);
     fprintf(stderr, "Boot sector %d bytes.\n", i);
     if (i != 512)
@@ -146,20 +149,20 @@ int main(int argc, char **argv)
 
     if ((id = open(argv[2], O_RDONLY, 0)) < 0)
         die("Unable to open 'setup'");
-    if (read(id, buf, MINIX_HEADER) != MINIX_HEADER)
-        die("Unable to read header of 'setup'");
-    if (((long *)buf)[0] != 0x04100301)
-        die("Non-Minix header of 'setup'");
-    if (((long *)buf)[1] != MINIX_HEADER)
-        die("Non-Minix header of 'setup'");
-    if (((long *)buf)[3] != 0)
-        die("Illegal data segment in 'setup'");
-    if (((long *)buf)[4] != 0)
-        die("Illegal bss in 'setup'");
-    if (((long *)buf)[5] != 0)
-        die("Non-Minix header of 'setup'");
-    if (((long *)buf)[7] != 0)
-        die("Illegal symbol table in 'setup'");
+    //    if (read(id, buf, MINIX_HEADER) != MINIX_HEADER)
+    //        die("Unable to read header of 'setup'");
+    //    if (((long *)buf)[0] != 0x04100301)
+    //        die("Non-Minix header of 'setup'");
+    //    if (((long *)buf)[1] != MINIX_HEADER)
+    //        die("Non-Minix header of 'setup'");
+    //    if (((long *)buf)[3] != 0)
+    //        die("Illegal data segment in 'setup'");
+    //    if (((long *)buf)[4] != 0)
+    //        die("Illegal bss in 'setup'");
+    //    if (((long *)buf)[5] != 0)
+    //        die("Non-Minix header of 'setup'");
+    //    if (((long *)buf)[7] != 0)
+    //        die("Illegal symbol table in 'setup'");
     for (i = 0; (c = read(id, buf, sizeof buf)) > 0; i += c)
         if (write(1, buf, c) != c)
             die("Write call failed");
@@ -180,10 +183,10 @@ int main(int argc, char **argv)
 
     if ((id = open(argv[3], O_RDONLY, 0)) < 0)
         die("Unable to open 'system'");
-    if (read(id, buf, GCC_HEADER) != GCC_HEADER)
-        die("Unable to read header of 'system'");
-    if (((long *)buf)[5] != 0)
-        die("Non-GCC header of 'system'");
+    // if (read(id, buf, GCC_HEADER) != GCC_HEADER)
+    //     die("Unable to read header of 'system'");
+    // if (((long *)buf)[5] != 0)
+    //     die("Non-GCC header of 'system'");
     for (i = 0; (c = read(id, buf, sizeof buf)) > 0; i += c)
         if (write(1, buf, c) != c)
             die("Write call failed");

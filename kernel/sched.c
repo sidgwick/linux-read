@@ -116,7 +116,7 @@ struct task_struct *task[NR_TASKS] = {
     &(init_task.task),
 };
 
-/* 栈大小定义为 1024 项, 每项 4B, 共计 1024KB */
+/* 栈大小定义为 1024 项, 每项 4B, 共计 4096KB */
 long user_stack[PAGE_SIZE >> 2];
 
 /* 栈段 */
@@ -340,7 +340,7 @@ repeat:
         printk("Warning: *P = NULL\n\r");
     }
 
-    if (*p = tmp) {
+    if ((*p = tmp)) {
         tmp->state = 0;
     }
 }
@@ -771,8 +771,8 @@ void sched_init(void)
 
     /* Clear NT, so that we won't have troubles with that later on
      * 清理 NT 位 */
-    __asm__("pushfl"
-            "andl $0xffffbfff, (%esp)"
+    __asm__("pushfl\n\t"
+            "andl $0xffffbfff, (%esp)\n\t"
             "popfl");
 
     ltr(0);  /* 装载第 0 个任务的 TSS */

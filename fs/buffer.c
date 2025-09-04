@@ -29,6 +29,9 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
+extern void put_super(int dev);
+extern void invalidate_inodes(int dev);
+
 extern int end; /* 内核在内存中的末端位置 */
 struct buffer_head *start_buffer = (struct buffer_head *)&end;
 
@@ -160,7 +163,7 @@ int sync_dev(int dev)
  *
  * @param dev
  */
-void inline invalidate_buffers(int dev)
+void invalidate_buffers(int dev)
 {
     int i;
     struct buffer_head *bh;
@@ -397,7 +400,7 @@ struct buffer_head *getblk(int dev, int block)
     struct buffer_head *tmp, *bh;
 
 repeat:
-    if (bh = get_hash_table(dev, block)) {
+    if ((bh = get_hash_table(dev, block))) {
         return bh;
     }
 
@@ -559,8 +562,7 @@ struct buffer_head *bread(int dev, int block)
     __asm__("cld\n\t"                                                                              \
             "rep movsl\n\t"                                                                        \
             :                                                                                      \
-            : "c"(BLOCK_SIZE / 4), "S"(from), "D"(to)                                              \
-            : "cx", "di", "si")
+            : "c"(BLOCK_SIZE / 4), "S"(from), "D"(to))
 
 /**
  * @brief 读设备上一个页面(4个缓冲块)的内容到指定内存地址处
@@ -587,7 +589,7 @@ void bread_page(unsigned long address, int dev, int b[4])
     /* 发起读磁盘请求 */
     for (i = 0; i < 4; i++) {
         if (b[i]) {
-            if (bh[i] = getblk(dev, b[i])) {
+            if ((bh[i] = getblk(dev, b[i]))) {
                 if (!bh[i]->b_uptodate) {
                     ll_rw_block(READ, bh[i]);
                 }

@@ -159,7 +159,7 @@ int DEVICE_TIMEOUT = 0;
 static void(DEVICE_REQUEST)(void);
 
 /* 解锁缓冲区, 并唤醒等待该缓冲区的进程 */
-extern inline void unlock_buffer(struct buffer_head *bh)
+static inline void unlock_buffer(struct buffer_head *bh)
 {
     if (!bh->b_lock) {
         printk(DEVICE_NAME ": free buffer being unlocked\n");
@@ -170,7 +170,7 @@ extern inline void unlock_buffer(struct buffer_head *bh)
 }
 
 /* 结束请求处理 */
-extern inline void end_request(int uptodate)
+static inline void end_request(int uptodate)
 {
     DEVICE_OFF(CURRENT->dev); /* 首先关闭指定块设备 */
 

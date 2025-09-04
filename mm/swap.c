@@ -29,8 +29,8 @@
     static inline int name(char *addr, unsigned int nr)                                            \
     {                                                                                              \
         int __res;                                                                                 \
-        __asm__ __volatile__("bt" op " %1,%2"                                                      \
-                             "adcl $0,%0" /* adc 用于将 CR 标记体现到最终结果里面 */               \
+        __asm__ __volatile__("bt" op " %1,%2\n\t"                                                  \
+                             "adcl $0,%0\n\t" /* adc 用于将 CR 标记体现到最终结果里面 */           \
                              : "=g"(__res)                                                         \
                              : "r"(nr), "m"(*(addr)), "0"(0));                                     \
         return __res;                                                                              \
@@ -225,17 +225,20 @@ int swap_out(void)
                 dir_entry = FIRST_VM_PAGE >> 10;
 
             pg_table = pg_dir[dir_entry];
-            if (!(pg_table & 1)) /* page 在内存里 */
-                if ((counter -= 1024) > 0)
+            if (!(pg_table & 1)) { /* page 在内存里 */
+                if ((counter -= 1024) > 0) {
                     goto repeat;
-                else
+                } else {
                     break;
+                }
+            }
 
             pg_table &= 0xfffff000;
         }
 
-        if (try_to_swap_out(page_entry + (unsigned long *)pg_table))
+        if (try_to_swap_out(page_entry + (unsigned long *)pg_table)) {
             return 1;
+        }
     }
 
     printk("Out of swap-memory\n\r");
@@ -258,7 +261,7 @@ unsigned long get_free_page(void)
 
 repeat:
     __asm__(
-        "std"
+        "std\n\t"
         "repne scasb\n\t" /* 倒着找, mem_map 里面不为 0 的字节 */
         "jne 1f\n\t" /* jne 说明没有找到, 否则说明找到了, 相关的值为 0 的字节指针在 %edi+1 位置 */
         "movb $1, 1(%%edi)\n\t" /* 将那个 0 字节置 1, 表示这个页面现在被用了 */
@@ -272,7 +275,7 @@ repeat:
         "1:"
         : "=a"(__res)
         : "0"(0), "i"(LOW_MEM), "c"(PAGING_PAGES), "D"(mem_map + PAGING_PAGES - 1)
-        : "di", "cx", "dx");
+        : "dx");
 
     /* 找的结果不对, 重找 */
     if (__res >= HIGH_MEMORY)

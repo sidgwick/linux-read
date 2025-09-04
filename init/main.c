@@ -23,10 +23,10 @@
 
 /* fork 函数复制了一份当前运行任务的副本
  * 然后更新属于新进程栈等等参数, 追加到任务队列里面, 等待调度 */
-static inline _syscall0(int, fork);
-static inline _syscall0(int, pause);
+inline _syscall0(int, fork);
+inline _syscall0(int, pause);
 static inline _syscall1(int, setup, void *, BIOS);
-static inline _syscall0(int, sync);
+inline _syscall0(int, sync);
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -156,6 +156,8 @@ struct drive_info {
  *         V    */
 void main(void)
 {
+    asm("xchg %bx, %bx");
+
     /*
      * Interrupts are still disabled. Do necessary setups, then
      * enable them
@@ -232,10 +234,10 @@ void main(void)
      * task can run, and if not we return here.
      */
     for (;;)
-        __asm__("int $0x80" ::"a"(__NR_pause) : "ax");
+        __asm__("int $0x80" : : "a"(__NR_pause));
 }
 
-static int printf(const char *fmt, ...)
+int printf(const char *fmt, ...)
 {
     va_list args;
     int i;

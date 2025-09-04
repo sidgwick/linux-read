@@ -85,9 +85,9 @@ ENOSYS = 38 # 系统调用号出错码
  * Ok, I get parallel printer interrupts while using the floppy for some
  * strange reason. Urgel. Now I just ignore them.
  */
-.globl _system_call,_sys_fork,_timer_interrupt,_sys_execve
-.globl _hd_interrupt,_floppy_interrupt,_parallel_interrupt
-.globl _device_not_available, _coprocessor_error
+.globl system_call,sys_fork,timer_interrupt,sys_execve
+.globl hd_interrupt,floppy_interrupt,parallel_interrupt
+.globl device_not_available, coprocessor_error
 
 # 系统调用号错误时将返回出错码 -ENOSYS
 .align 2
@@ -100,11 +100,11 @@ bad_sys_call:
 .align 2
 reschedule:
     pushl $ret_from_sys_call
-    jmp _schedule
+    jmp schedule
 
 # 系统调用入口
 .align 2
-_system_call:
+system_call:
     push %ds
     push %es
     push %fs
@@ -121,12 +121,12 @@ _system_call:
     movl $0x17,%edx        # fs points to local data space
     mov %dx,%fs
 
-    cmpl _NR_syscalls,%eax # %eax - _NR_syscalls, cmp 指令影响 CF
+    cmpl NR_syscalls,%eax # %eax - NR_syscalls, cmp 指令影响 CF
     jae bad_sys_call # jmp above or equal 要求 `CF > 0`, 这说明 %eax 里面的功能号太大了, 处理不了
-    call _sys_call_table(,%eax,4) # 执行系统调用
+    call sys_call_table(,%eax,4) # 执行系统调用
     pushl %eax # 系统调用结果
 2:
-    movl _current, %eax  # 当前任务
+    movl current, %eax  # 当前任务
     cmpl $0, state(%eax) # 当前任务的 state == 0
     jne reschedule # 状态 != 0, 就去调度别的任务
     cmpl $0, counter(%eax) # 时间片用完了, 也去调度其他任务
@@ -138,8 +138,8 @@ _system_call:
 # 其他中断服务程序退出时也将跳转到这里进行处理后才退出中断过程
 ret_from_sys_call:
     # task0 不处理信号
-    movl _current, %eax
-    cmpl _task, %eax    # task[0] cannot have signals
+    movl current, %eax
+    cmpl task, %eax    # task[0] cannot have signals
                         # task 数组在 sched.c 文件定义
     je 3f
 
@@ -168,7 +168,7 @@ ret_from_sys_call:
     movl %ebx, signal(%eax) # 更新信号集
     incl %ecx   # ECX + 1 = SIGNAL_NUMBER
     pushl %ecx
-    call _do_signal
+    call do_signal
     popl %ecx
 
     # 循环, eax & eax != 0 的时候跳转
@@ -192,7 +192,7 @@ ret_from_sys_call:
 # 下面代码用于处理协处理器发出的出错信号, 并跳转去执行 C 函数 math_error (在 kernel/math/error.c)
 # 返回后将跳转到标号 ret_from_sys_call 处继续执行
 .align 2
-_coprocessor_error:
+coprocessor_error:
     push %ds
     push %es
     push %fs
@@ -206,8 +206,8 @@ _coprocessor_error:
     mov %ax,%es
     movl $0x17,%eax # 10-1-11 局部数据段
     mov %ax,%fs
-    pushl $ret_from_sys_call # 手动给 _math_error 设置好返回地址
-    jmp _math_error
+    pushl $ret_from_sys_call # 手动给 math_error 设置好返回地址
+    jmp math_error
 
 # 如果控制寄存器 CR0 中 EM 标志置位, 则当 CPU 执行一个协处理器指令时就会引发该
 # 中断, 这样 CPU 就可以有机会让这个中断处理程序模拟协处理器指令
@@ -223,7 +223,7 @@ _coprocessor_error:
 #   1 - EM 置位, CPU 执行协处理器指令
 #   2 - TS 置位, CPU 执行协处理器指令
 .align 2
-_device_not_available:
+device_not_available:
     push %ds
     push %es
     push %fs
@@ -243,14 +243,14 @@ _device_not_available:
     clts                    # clear TS so that we can use math
     movl %cr0, %eax
     testl $0x4, %eax        # .... 0100 ~ EM (math emulation bit)
-    je _math_state_restore  # 转去保存协处理器状态
+    je math_state_restore  # 转去保存协处理器状态
     pushl %ebp
     pushl %esi
     pushl %edi
     pushl $0                # temporary storage for ORIG_EIP
 
     # TODO: 所以这里是如何跳过了后续的协处理器指令?
-    call _math_emulate      # 软件模拟协处理器指令执行
+    call math_emulate      # 软件模拟协处理器指令执行
 
     addl $4, %esp
     popl %edi
@@ -263,9 +263,9 @@ _device_not_available:
 # 因此这里 jiffies 每 10 毫秒加 1, 这段代码将 jiffies 增 1, 发送结束中断指令给 8259 控制器
 # 然后用当前特权级作为参数调用 C 函数 do_timer(long CPL), 当调用返回时转去检测并处理信号
 .align 2
-_timer_interrupt:
+timer_interrupt:
     push %ds        # save ds,es and put kernel data space
-    push %es        # into them. %fs is used by _system_call
+    push %es        # into them. %fs is used by system_call
     push %fs
     pushl $-1        # fill in -1 for orig_eax
     pushl %edx        # we save %eax,%ecx,%edx as gcc doesn't
@@ -278,7 +278,7 @@ _timer_interrupt:
     mov %ax,%es
     movl $0x17,%eax # fs 保存的是任务的数据段
     mov %ax,%fs
-    incl _jiffies   # 增加系统滴答数
+    incl jiffies   # 增加系统滴答数
 
     # 通知 8259A 中断处理完成, 以继续中断
     # 由于初始化中断控制芯片时没有采用自动 EOI, 所以这里需要发指令结束该硬件中断
@@ -290,7 +290,7 @@ _timer_interrupt:
     movl CS(%esp), %eax
     andl $3, %eax        # (0011 & %eax) is CPL (0 or 3, 0=supervisor)
     pushl %eax
-    call _do_timer        # 'do_timer(long CPL)' does everything from
+    call do_timer        # 'do_timer(long CPL)' does everything from
     addl $4,%esp        # task switching to accounting ...
     jmp ret_from_sys_call
 
@@ -302,10 +302,10 @@ _timer_interrupt:
 #          sys_execve
 # TODO: EIP(%esp) 到底是如何运作的???
 .align 2
-_sys_execve:
+sys_execve:
     lea EIP(%esp), %eax # eax 指向的是堆栈中保存用户程序 eip 指针处
     pushl %eax
-    call _do_execve
+    call do_execve
     addl $4, %esp
     ret
 
@@ -313,8 +313,8 @@ _sys_execve:
  * 首先用 find_empty_process 找到最新可用的 pid
  * 然后调用 copy_process 创建出新进程 */
 .align 2
-_sys_fork:
-    call _find_empty_process    # 准备 pid
+sys_fork:
+    call find_empty_process    # 准备 pid
     testl %eax,%eax
     js 1f
     push %gs
@@ -322,11 +322,11 @@ _sys_fork:
     pushl %edi
     pushl %ebp
     pushl %eax
-    call _copy_process
+    call copy_process
     addl $20,%esp
 1:    ret
 
-_hd_interrupt:
+hd_interrupt:
     pushl %eax
     pushl %ecx
     pushl %edx
@@ -351,11 +351,11 @@ _hd_interrupt:
 # 若该指针为空, 则赋予该指针指向 C 函数 unexpected_hd_interrupt, 以处理未知硬盘中断
 # 每次 hd_interrupt 之前都应该重新设置 do_hd
 1:    xorl %edx, %edx
-    movl %edx, _hd_timeout # hd_timeout 置为 0, 表示控制器已在规定时间内产生了中断
-    xchgl _do_hd, %edx
+    movl %edx, hd_timeout # hd_timeout 置为 0, 表示控制器已在规定时间内产生了中断
+    xchgl do_hd, %edx
     testl %edx, %edx
     jne 1f
-    movl $_unexpected_hd_interrupt, %edx # 默认的中断处理函数
+    movl $unexpected_hd_interrupt, %edx # 默认的中断处理函数
 1:    outb %al, $0x20 # EOI
     call *%edx        # "interesting" way of handling intr.
     pop %fs
@@ -376,7 +376,7 @@ _hd_interrupt:
 #  - recal_interrupt
 #  - reset_interrupt
 #  - unexpected_floppy_interrupt
-_floppy_interrupt:
+floppy_interrupt:
     pushl %eax
     pushl %ecx
     pushl %edx
@@ -396,10 +396,10 @@ _floppy_interrupt:
     # do_floppy = NULL
     # 每次 floppy_interrupt 之前都应该重新设置 do_floppy
     xorl %eax, %eax
-    xchgl _do_floppy, %eax
+    xchgl do_floppy, %eax
     testl %eax, %eax
     jne 1f
-    movl $_unexpected_floppy_interrupt, %eax
+    movl $unexpected_floppy_interrupt, %eax
 1:    call *%eax        # "interesting" way of handling intr.
     pop %fs
     pop %es
@@ -411,7 +411,7 @@ _floppy_interrupt:
 
 # 并行口中断处理程序, 对应硬件中断请求信号 IRQ7
 # 本版本内核还未实现. 这里只是发送 EOI 指令
-_parallel_interrupt:
+parallel_interrupt:
     pushl %eax
 
     movb $0x20,%al

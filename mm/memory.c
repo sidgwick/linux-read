@@ -45,8 +45,7 @@
 unsigned long HIGH_MEMORY = 0; // 内存高端地址
 
 /* 拷贝一页内容 */
-#define copy_page(from, to)                                                                        \
-    __asm__("cld ; rep ; movsl" ::"S"(from), "D"(to), "c"(1024) : "cx", "di", "si")
+#define copy_page(from, to) __asm__("cld ; rep ; movsl" ::"S"(from), "D"(to), "c"(1024))
 
 // 物理内存映射字节图(1字节代表1页内存)
 // 每个页面对应的字节用于标志页面当前被引用(占用)次数, 使用 PAGING_PAGES
@@ -473,17 +472,20 @@ static int try_to_share(unsigned long address, struct task_struct *p)
 
     /* 目的页目录项内容, 如果标记不存在, 需要分配一个当做页表的页 */
     to = *(unsigned long *)to_page;
-    if (!(to & 1))
-        if (to = get_free_page())
+    if (!(to & 1)) {
+        if ((to = get_free_page())) {
             *(unsigned long *)to_page = to | 7; /* 页表是存在,可读写,超级用户权限 */
-        else
+        } else {
             oom();
+        }
+    }
 
     to &= 0xfffff000;                         /* 页表页地址 */
     to_page = to + ((address >> 10) & 0xffc); /* PTE 地址 */
-    if (1 & *(unsigned long *)to_page)
+    if (1 & *(unsigned long *)to_page) {
         /* 要把 from 共享到 to, 自然要求 to 不存在 */
         panic("try_to_share: to_page already exists");
+    }
 
     /* share them: write-protect
      * 把写标记清除, 将来好 Copy-On-Write
@@ -755,16 +757,20 @@ void show_mem(void)
              * 如果当前页表项所指物理页面存在并且该物理页面 '地址' 大于 LOW_MEM,
              * 那么就将页表项对应页面纳入统计值
              * TODO: LOW_MEM 似乎没有约束主内存区域起始位置? */
-            if (pg_dir[i] > LOW_MEM)
+            if (pg_dir[i] > LOW_MEM) {
                 free++, k++;
+            }
 
             pg_tbl = (unsigned long *)(0xfffff000 & pg_dir[i]);
-            for (j = 0; j < 1024; j++)
-                if ((pg_tbl[j] & 1) && pg_tbl[j] > LOW_MEM)
-                    if (pg_tbl[j] > HIGH_MEMORY)
+            for (j = 0; j < 1024; j++) {
+                if ((pg_tbl[j] & 1) && pg_tbl[j] > LOW_MEM) {
+                    if (pg_tbl[j] > HIGH_MEMORY) {
                         printk("page_dir[%d][%d]: %08X\n\r", i, j, pg_tbl[j]);
-                    else
+                    } else {
                         k++, free++;
+                    }
+                }
+            }
         }
 
         /* 处理页目录项的统计信息 */

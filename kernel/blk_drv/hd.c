@@ -42,6 +42,7 @@
 
 static void recal_intr(void);  /* 重新校正处理函数 */
 static void bad_rw_intr(void); /* 读写硬盘失败处理调用函数 */
+extern void init_swapping(void);
 
 static int recalibrate = 0; /* 重新校正标志 */
 static int reset = 0;       /* 复位标志 */
@@ -107,8 +108,7 @@ static int hd_sizes[5 * MAX_HD] = {
 #define port_read(port, buf, nr)                                                                   \
     __asm__("cld;rep insw" /* fmt */                                                               \
             :                                                                                      \
-            : "d"(port), "D"(buf), "c"(nr)                                                         \
-            : "cx", "dx", "di")
+            : "d"(port), "D"(buf), "c"(nr))
 
 /**
  * @brief 写端口数据
@@ -120,10 +120,10 @@ static int hd_sizes[5 * MAX_HD] = {
  * @param nr 写出数量
  */
 #define port_write(port, buf, nr)                                                                  \
-    __asm__("cld;rep outsw" /* fmt */                                                              \
+    __asm__("cld\n\t"                                                                              \
+            "rep outsw" /* fmt */                                                                  \
             :                                                                                      \
-            : "d"(port), "S"(buf), "c"(nr)                                                         \
-            : "cx", "dx", "si")
+            : "d"(port), "S"(buf), "c"(nr))
 
 extern void hd_interrupt(void); /* 硬盘中断过程 */
 extern void rd_load(void);      /* 虚拟盘创建加载函数 */

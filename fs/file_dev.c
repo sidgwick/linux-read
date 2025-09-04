@@ -37,7 +37,7 @@ int file_read(struct m_inode *inode, struct file *filp, char *buf, int count)
     /* 剩余未读字节数不为 0, 就持续读 */
     while (left) {
         /* 找到待读取的文件指针相应的逻辑块, 然后吧相应的数据块读取到内存 */
-        if (nr = bmap(inode, (filp->f_pos) / BLOCK_SIZE)) {
+        if ((nr = bmap(inode, (filp->f_pos) / BLOCK_SIZE))) {
             if (!(bh = bread(inode->i_dev, nr))) {
                 break;
             }

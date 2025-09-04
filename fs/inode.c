@@ -150,7 +150,7 @@ static int _bmap(struct m_inode *inode, int block, int create)
     if (block < 7) {
         /* 如果是建立关系, 并且 block 之前对应的设备逻辑块不存在 */
         if (create && !inode->i_zone[block]) {
-            if (inode->i_zone[block] = new_block(inode->i_dev)) {
+            if ((inode->i_zone[block] = new_block(inode->i_dev))) {
                 inode->i_ctime = CURRENT_TIME;
                 inode->i_dirt = 1;
             }
@@ -167,7 +167,7 @@ static int _bmap(struct m_inode *inode, int block, int create)
     if (block < 512) {
         /* 如果是保存, 但是现在还没有一次间接块, 创建这个一次间接块 */
         if (create && !inode->i_zone[7]) {
-            if (inode->i_zone[7] = new_block(inode->i_dev)) {
+            if ((inode->i_zone[7] = new_block(inode->i_dev))) {
                 inode->i_dirt = 1;
                 inode->i_ctime = CURRENT_TIME;
             }
@@ -189,7 +189,7 @@ static int _bmap(struct m_inode *inode, int block, int create)
         /* 如果是保存, 则创建对应的新块, 并更新一次间接块数据内容. 看这里可能
          * 不涉及到 inode 的 dirt, 只需要把一次间接块对应的缓冲区标识为脏就行了 */
         if (create && !i) {
-            if (i = new_block(inode->i_dev)) {
+            if ((i = new_block(inode->i_dev))) {
                 ((unsigned short *)(bh->b_data))[block] = i;
                 bh->b_dirt = 1;
             }
@@ -205,7 +205,7 @@ static int _bmap(struct m_inode *inode, int block, int create)
 
     /* 如果二次间接块还不存在, 创建它 */
     if (create && !inode->i_zone[8]) {
-        if (inode->i_zone[8] = new_block(inode->i_dev)) {
+        if ((inode->i_zone[8] = new_block(inode->i_dev))) {
             inode->i_dirt = 1;
             inode->i_ctime = CURRENT_TIME;
         }
@@ -227,7 +227,7 @@ static int _bmap(struct m_inode *inode, int block, int create)
 
     /* 如果一次间接块不存在, 创建它 */
     if (create && !i) {
-        if (i = new_block(inode->i_dev)) {
+        if ((i = new_block(inode->i_dev))) {
             ((unsigned short *)(bh->b_data))[block >> 9] = i;
             bh->b_dirt = 1;
         }
@@ -248,7 +248,7 @@ static int _bmap(struct m_inode *inode, int block, int create)
 
     /* 创建 block 和逻辑块的关联关系 */
     if (create && !i) {
-        if (i = new_block(inode->i_dev)) {
+        if ((i = new_block(inode->i_dev))) {
             ((unsigned short *)(bh->b_data))[block & 511] = i;
             bh->b_dirt = 1;
         }

@@ -28,7 +28,7 @@ static int free_ind(int dev, int block)
 
     /* 将一次间接块 block 读入内存 */
     block_busy = 0;
-    if (bh = bread(dev, block)) {
+    if ((bh = bread(dev, block))) {
         p = (unsigned short *)bh->b_data;
 
         /* 一次间接块里面可以容纳 512 个 block 信息 */
@@ -72,7 +72,7 @@ static int free_dind(int dev, int block)
     }
 
     block_busy = 0;
-    if (bh = bread(dev, block)) {
+    if ((bh = bread(dev, block))) {
         p = (unsigned short *)bh->b_data;
         for (i = 0; i < 512; i++, p++) {
             if (*p) {

@@ -13,11 +13,11 @@ bd = setup1.bin
 AS86 = as86 -0 -a
 LD86 = ld86 -0
 
-AS = gas
-LD = gld
+AS = as --32
+LD = ld -m elf_i386
 LDFLAGS	= -s -x -M
 CC = gcc $(RAMDISK)
-CFLAGS = -Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs -mstring-insns
+CFLAGS = -fno-builtin  -Wall -fno-stack-protector -m32 -g -fno-pie -fstrength-reduce -fomit-frame-pointer
 CPP	= cpp -nostdinc -I./../include
 
 rewrite:

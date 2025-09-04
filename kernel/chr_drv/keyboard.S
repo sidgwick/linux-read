@@ -33,7 +33,7 @@
 .text
 
 /* 全局符号, 在 console.c 里面有使用 */
-.globl _keyboard_interrupt
+.globl keyboard_interrupt
 
 /*
  * these are for the keyboard read functions
@@ -93,7 +93,7 @@ e0:    .byte 0
  * 当 CPU 响应该请求时就会执行键盘中断处理程序, 中断处理程序会从键盘控制器相应端口(0x60)
  * 读入按键扫描码, 并调用对应的扫描码子程序进行处理
  */
-_keyboard_interrupt:
+keyboard_interrupt:
     pushl %eax
     pushl %ebx
     pushl %ecx
@@ -103,20 +103,20 @@ _keyboard_interrupt:
     movl $0x10,%eax # 内核数据段
     mov %ax,%ds
     mov %ax,%es
-    movl _blankinterval, %eax # 屏幕黑屏间隔时间
-    movl %eax, _blankcount  # 预置黑屏时间计数值为 blankinterval (滴答数)
+    movl blankinterval, %eax # 屏幕黑屏间隔时间
+    movl %eax, blankcount  # 预置黑屏时间计数值为 blankinterval (滴答数)
     xorl %eax,%eax        /* %eax is scan code, EAX 用来装键盘输入码值 */
     inb $0x60, %al # 读键盘输入, 得到键盘扫描码
 
-#判断该扫描码是否是 0xe0 或 0xe1, 是的话就立刻对键盘控制器作出应答
-#并向中断控制器发送 EOI 信号, 以允许键盘控制器能继续产生中断信号, 从而接收后续的字符
+    # 判断该扫描码是否是 0xe0 或 0xe1, 是的话就立刻对键盘控制器作出应答
+    # 并向中断控制器发送 EOI 信号, 以允许键盘控制器能继续产生中断信号, 从而接收后续的字符
     cmpb $0xe0,%al # al = 0xe0
     je set_e0
     cmpb $0xe1,%al
     je set_e1
 
-#不是 0xe0, 0xe1, 正常执行字符处理程序, 然后复位 e0 标志
-    call key_table(,%eax,4) # 字符处理程序 `key_table + EAX * 4`
+    # 不是 0xe0, 0xe1, 正常执行字符处理程序, 然后复位 e0 标志
+    call key_table(, %eax, 4) # 字符处理程序 `key_table + EAX * 4`
     movb $0, e0
 e0_e1:
     /* 下面这段代码针对使用 8255A 的 PC 标准键盘电路进行硬件复位处理. 端口 0x61
@@ -124,21 +124,21 @@ e0_e1:
      * 这段程序用于对收到的扫描码做出应答, 方法是首先禁止键盘, 然后立刻重新允许键盘工作 */
     inb $0x61, %al # 取 PPI 端口 B 状态, 其位 7 用于 0-允许/1-禁止键盘
     jmp 1f
-1:    jmp 1f
-1:    orb $0x80,%al
+1:  jmp 1f
+1:  orb $0x80,%al
     jmp 1f
-1:    jmp 1f
-1:    outb %al,$0x61 # 禁止键盘工作
+1:  jmp 1f
+1:  outb %al,$0x61 # 禁止键盘工作
     jmp 1f
-1:    jmp 1f
-1:    andb $0x7F,%al
+1:  jmp 1f
+1:  andb $0x7F,%al
     outb %al,$0x61 # 复位 PPI PB7, 恢复键盘工作
 
     movb $0x20,%al
     outb %al,$0x20 # 给 8259A 主片发送 EOI 信号
 
     pushl $0 # 没有指定 tty, 默认使用 fg_console
-    call _do_tty_interrupt # 将收到数据转换成规范模式并存放在辅助队列中
+    call do_tty_interrupt # 将收到数据转换成规范模式并存放在辅助队列中
     addl $4,%esp
     pop %es
     pop %ds
@@ -163,8 +163,8 @@ put_queue:
     pushl %ecx
     pushl %edx
 
-#找到 console 对应的 read queue
-    movl _table_list, %edx  # read-queue for console
+    # 找到 console 对应的 read queue
+    movl table_list, %edx  # read-queue for console
     movl head(%edx), %ecx   # ECX 是缓冲区中数据头游标
 1:
     movb %al,buf(%edx,%ecx) # 把 al 移动到 `[buf_start=(edx + buf) + ecx]` 的位置
@@ -182,7 +182,7 @@ put_queue:
     testl %ecx, %ecx
     je 3f                       # 没有正在等待进程, 直接结束
     movl $0,(%ecx)              # 把进程唤醒
-#TODO : 为啥不适用 wake_up 调用 ? 这里少了一些判断
+    # TODO : 为啥不适用 wake_up 调用 ? 这里少了一些判断
 3:
     popl %edx
     popl %ecx
@@ -190,23 +190,23 @@ put_queue:
 
 /* 从这里开始是键跳转表 key_table 中指针对应的各个按键(或松键)处理子程序 */
 
-#ctrl 按键处理程序
+# ctrl 按键处理程序
 ctrl:
     movb $0x04, %al # 0x04 是 mode 中左 ctrl 键对应的比特位(位2)
     jmp 1f
 
-#alt 按键处理程序
+# alt 按键处理程序
 alt:
     movb $0x10, %al # 0x10 是 mode 中左 alt 键对应的比特位(位4)
 1:
     cmpb $0, e0     # 如果 e0 置位, 说明按下的是右边的 ctrl/alt 键
     je 2f           # 没有置位, 跳转
     addb %al, %al   # 置位, 则改成置相应右键标志位(位3或位5)
-#好牛逼位运算 : 以 ctrl 为例:
-#(左, 右) =(0x04, 0x08) --> `0x04 + 0x04 = 0x08`
+    # 好牛逼位运算 : 以 ctrl 为例:
+    # (左, 右) =(0x04, 0x08) --> `0x04 + 0x04 = 0x08`
 2:
-#TODO - DONE : mode 这样 or, 不怕最后混淆吗 ? 研究一下它在什么地方被 clear 了
-#答 : 在 unctrl / unalt 处理程序里面, 有清理操作
+    # TODO-DONE: mode 这样 or, 不怕最后混淆吗 ? 研究一下它在什么地方被 clear 了
+    # 答 : 在 unctrl / unalt 处理程序里面, 有清理操作
     orb %al, mode # 记录 ctrl 或者 alt 的按压结果
     ret
 
@@ -242,7 +242,7 @@ unrshift:
     andb $0xfd, mode
     ret
 
-#caps 键按下之后的处理
+# caps 键按下之后的处理
 caps:
     testb $0x80, mode
     jne 1f              # 先判断 caps 是否正在按下状态, 如实跳转到 1f 执行, 否则继续执行
@@ -250,8 +250,8 @@ caps:
     xorb $0x40, mode    # 翻转 mode 标志中 caps 键按下的比特位
     orb $0x80, mode     # 设置 mode 标志中 caps 键已按下标志位
 
-#根据 leds 标志, 开启或关闭 LED 指示器
-#所以键盘上的 LED 指示灯不是单纯的硬件行为, 是软件在控制的
+# 根据 leds 标志, 开启或关闭 LED 指示器
+# 所以键盘上的 LED 指示灯不是单纯的硬件行为, 是软件在控制的
 set_leds:
     call kb_wait        # 等待键盘控制器输入缓冲为空
     movb $0xed, %al        # set leds command
@@ -268,10 +268,10 @@ uncaps:
 scroll:
     testb $0x03, mode   # 左右 shift 任一按下
     je 1f               # 没有按下跳转, 按下继续执行
-    call _show_mem      # 显示内存使用信息
+    call show_mem      # 显示内存使用信息
     jmp 2f
 1:
-    call _show_state    # 显示进程状态信息
+    call show_state    # 显示进程状态信息
 2:
     xorb $1, leds       # 翻转 leds 中 scroll 对应的位
     jmp set_leds
@@ -304,7 +304,7 @@ cur2:
     testb $0x03, mode    # shift forces cursor
     jne cur             # 有 shift 按下, 跳转
 
-#后面要把字符放入缓冲队列中, ebx 清零是 put_queue 的要求
+    # 后面要把字符放入缓冲队列中, ebx 清零是 put_queue 的要求
     xorl %ebx, %ebx
 
     movb num_table(%eax), %al # 取得对应按键的字符值
@@ -315,8 +315,8 @@ cur2:
 cur:
     movb cur_table(%eax), %al
 
-#若字符 <= '9'(也即 5 / 6 / 2 / 3)
-#说明是上一页 / 下一页 / 插入 / 删除键, 则功能字符序列中要添入字符 '~'
+    # 若字符 <= '9'(也即 5 / 6 / 2 / 3)
+    # 说明是上一页 / 下一页 / 插入 / 删除键, 则功能字符序列中要添入字符 '~'
     cmpb $'9, %al
     ja ok_cur
     movb $'~, %ah
@@ -334,7 +334,7 @@ num_table:
     .ascii "789 456 1230,"
 #endif
 
-#小键盘区对应的非数字功能(移动 / 翻页 / 删除等)
+# 小键盘区对应的非数字功能(移动 / 翻页 / 删除等)
 cur_table:
     .ascii "HA5 DGC YB623"
 
@@ -360,7 +360,7 @@ ok_func:
     jmp put_queue
 alt_func:
     pushl %eax
-    call _change_console # 使用 alt+FX 切换前台 console
+    call change_console # 使用 alt+FX 切换前台 console
     popl %eax
 end_func:
     ret
@@ -373,7 +373,7 @@ func_table:
     .long 0x455b5b1b,0x465b5b1b,0x475b5b1b,0x485b5b1b
     .long 0x495b5b1b,0x4a5b5b1b,0x4b5b5b1b,0x4c5b5b1b
 
-#定义 扫描码 - ASCII字符映射表
+# 定义 扫描码 - ASCII字符映射表
 #if defined(KBD_FINNISH)
 key_map:
     .byte 0,27
@@ -595,7 +595,7 @@ do_self:
     orb %al,%al
     je none                 # al == 0 ? 跳转到 none 啥都不做
 
-#接下来若 ctrl 键已按下或 caps 键锁定, 并且字符在 'a ~ }' 范围内, 则将其转成大写字符
+    # 接下来若 ctrl 键已按下或 caps 键锁定, 并且字符在 'a ~ }' 范围内, 则将其转成大写字符
     testb $0x4c, mode   # ctrl or caps
     je 2f
     cmpb $'a, %al
@@ -615,11 +615,11 @@ do_self:
     testb $0x10, mode   # left alt
     je 4f               # 没有按下 Alt(left)
 
-#按下了 Alt(left), 将 code 转为对应的扩展字符
-#即此时生成值大于 0x7f 的扩展字符集中的字符
+    # 按下了 Alt(left), 将 code 转为对应的扩展字符
+    # 即此时生成值大于 0x7f 的扩展字符集中的字符
     orb $0x80, %al
 4:
-#将 al 中字符放到读缓冲区
+    # 将 al 中字符放到读缓冲区
     andl $0xff, %eax
     xorl %ebx, %ebx
     call put_queue

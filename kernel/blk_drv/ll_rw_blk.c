@@ -183,7 +183,7 @@ static void make_request(int major, int rw, struct buffer_head *bh)
      *
      * 对于这两个命令, 当指定的缓冲区正在使用而已被上锁时, 就放弃预读/写请求
      * 否则就作为普通的READ/WRITE命令进行操作 */
-    if (rw_ahead = (rw == READA || rw == WRITEA)) {
+    if ((rw_ahead = (rw == READA || rw == WRITEA))) {
         if (bh->b_lock) {
             return;
         }
