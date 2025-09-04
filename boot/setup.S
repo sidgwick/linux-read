@@ -65,9 +65,8 @@ start:
         mov $0x5019, %ax # 默认是 0x50=80 列, 0x19=25 行
         cmp $0x10, %bl # ​​基础 EGA 适配器​​(无 VGA 扩展功能)
 
-        // TODO: uncomment
-        // je novga
-        // call chsvga
+        je novga
+        call chsvga
     novga:
         mov %ax, 0x0e
         mov $0x03, %ah # read cursor pos

@@ -7,7 +7,7 @@
 #
 
 AR	=ar
-AS	=as --32
+AS	=as -g --32
 LD	=ld -m elf_i386
 LDFLAGS	=-s -x
 CC	=gcc
@@ -27,8 +27,12 @@ CPP	=gcc -E -nostdinc -I../../include
 OBJS  = math_emulate.o error.o convert.o ea.o get_put.o \
 	add.o mul.o div.o compare.o
 
-math.a: $(OBJS)
-	$(AR) rcs math.a $(OBJS)
+# math.a: $(OBJS)
+# 	$(AR) rcs math.a $(OBJS)
+# 	sync
+
+math.o: $(OBJS)
+	$(LD) -r -o math.o $(OBJS)
 	sync
 
 clean:

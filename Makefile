@@ -11,8 +11,8 @@ LD86	=ld86 -0
 # AS = as --32
 # LD = ld -m elf_i386
 
-AS	= as --32
-LD	= ld -m elf_i386
+AS	=as -g --32
+LD	=ld -m elf_i386
 LDFLAGS = -M -x -Ttext 0 -e startup_32 -z noexecstack
 CC	=gcc $(RAMDISK)
 CFLAGS	= -fno-builtin -Wall -fno-stack-protector -m32 -g -fno-pie -fstrength-reduce -fomit-frame-pointer
@@ -27,9 +27,9 @@ ROOT_DEV=FLOPPY
 SWAP_DEV=
 
 ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
-DRIVERS =kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
-MATH	=kernel/math/math.a
-LIBS	=lib/lib.a
+DRIVERS =kernel/blk_drv/blk_drv.o kernel/chr_drv/chr_drv.o
+MATH	=kernel/math/math.o
+LIBS	=lib/lib.o
 
 .c.s:
 	$(CC) $(CFLAGS) \
@@ -57,22 +57,31 @@ boot/head.o: boot/head.s
 
 tools/system:	boot/head.o init/main.o \
 				$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
+	# $(LD) $(LDFLAGS) boot/head.o init/main.o \
+	# 	$(ARCHIVES) \
+	# 	$(DRIVERS) \
+	# 	$(MATH) \
+	# 	$(LIBS) \
+	# 	--oformat=binary --Ttext=0 -o tools/system > System.map
+
 	$(LD) $(LDFLAGS) boot/head.o init/main.o \
 		$(ARCHIVES) \
 		$(DRIVERS) \
 		$(MATH) \
 		$(LIBS) \
-		--oformat=binary --Ttext=0 -o tools/system > System.map
+		-o tools/system.elf > System.map
+
+	objcopy -R .pdr -R .comment -R .note -S -O binary tools/system.elf tools/system
 	# objcopy -O binary tools/system kernel.bin
 	# mv kernel.bin tools/system
 
-kernel/math/math.a:
+kernel/math/math.o:
 	(cd kernel/math; make)
 
-kernel/blk_drv/blk_drv.a:
+kernel/blk_drv/blk_drv.o:
 	(cd kernel/blk_drv; make)
 
-kernel/chr_drv/chr_drv.a:
+kernel/chr_drv/chr_drv.o:
 	(cd kernel/chr_drv; make)
 
 kernel/kernel.o:
@@ -84,7 +93,7 @@ mm/mm.o:
 fs/fs.o:
 	(cd fs; make)
 
-lib/lib.a:
+lib/lib.o:
 	(cd lib; make)
 
 # --------- OK ---------
@@ -105,7 +114,7 @@ boot/bootsect:	boot/bootsect.s
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup \
 		boot/bootsect.s boot/setup.s boot/bootsect0.s boot/bootsect1.s
-	rm -f init/*.o tools/system tools/build boot/*.o boot/*.bin
+	rm -f init/*.o tools/system tools/system.elf tools/build boot/*.o boot/*.bin
 	(cd mm;make clean)
 	(cd fs;make clean)
 	(cd kernel;make clean)

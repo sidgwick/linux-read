@@ -10,4 +10,6 @@ boot/bootsect
 boot/setup
 tools/build
 tools/system
+tools/system.elf
 explain.txt
+bochsout.txt

@@ -156,8 +156,6 @@ struct drive_info {
  *         V    */
 void main(void)
 {
-    asm("xchg %bx, %bx");
-
     /*
      * Interrupts are still disabled. Do necessary setups, then
      * enable them
@@ -210,6 +208,7 @@ void main(void)
     blk_dev_init();                          /* 初始化块设备请求数组 */
     chr_dev_init();                          /* 空 */
     tty_init();
+    // asm("xchg %bx, %bx");
     time_init(); /* 初始化开机时间 */
     sched_init();
     buffer_init(buffer_memory_end);

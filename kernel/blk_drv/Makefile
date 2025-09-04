@@ -7,7 +7,7 @@
 #
 
 AR	=ar
-AS	=as --32
+AS	=as -g --32
 LD	=ld -m elf_i386
 LDFLAGS	=-s -x
 CC	=gcc
@@ -26,8 +26,12 @@ CPP	=gcc -E -nostdinc -I../../include
 
 OBJS  = ll_rw_blk.o floppy.o hd.o ramdisk.o
 
-blk_drv.a: $(OBJS)
-	$(AR) rcs blk_drv.a $(OBJS)
+# blk_drv.a: $(OBJS)
+# 	$(AR) rcs blk_drv.a $(OBJS)
+# 	sync
+
+blk_drv.o: $(OBJS)
+	$(LD) -r -o blk_drv.o $(OBJS)
 	sync
 
 clean:

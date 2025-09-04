@@ -7,7 +7,7 @@
 #
 
 AR	=ar
-AS	=as --32
+AS	=as -g --32
 LD	=ld -m elf_i386
 LDFLAGS	=-s -x
 CC	=gcc
@@ -27,8 +27,12 @@ CPP	=gcc -E -nostdinc -I../../include
 OBJS  = tty_io.o console.o keyboard.o serial.o rs_io.o \
 	tty_ioctl.o pty.o
 
-chr_drv.a: $(OBJS)
-	$(AR) rcs chr_drv.a $(OBJS)
+# chr_drv.a: $(OBJS)
+# 	$(AR) rcs chr_drv.a $(OBJS)
+# 	sync
+
+chr_drv.o: $(OBJS)
+	$(LD) -r -o chr_drv.o $(OBJS)
 	sync
 
 keyboard.s: keyboard.S

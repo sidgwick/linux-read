@@ -4,6 +4,7 @@
 # 图形模式设置，这两个一起开启
 magic_break: enabled=1
 display_library: sdl2
+# display_library: term
 
 # bios 和 vga bios
 romimage: file=$BXSHARE/BIOS-bochs-latest, options=fastboot
@@ -33,5 +34,5 @@ keyboard: keymap=#$BXSHARE/keymaps/x11-pc-us.map
 # 内存容量
 megs: 128
 
-# # debug
-# gdbstub: enabled=1, port=1234, text_base=0, data_base=0, bss_base=0
+# debug
+gdbstub: enabled=1, port=1234, text_base=0, data_base=0, bss_base=0

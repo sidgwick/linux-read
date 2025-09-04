@@ -14,3 +14,9 @@ s/；/; /g
 s/，/, /g
 s/：/: /g
 ```
+
+# compile bochs from source
+
+```console
+brew install --build-from-source --formula bochs.rb
+```

@@ -7,7 +7,7 @@
 #
 
 AR	=ar
-AS	=as --32
+AS	=as -g --32
 LD	=ld -m elf_i386
 LDFLAGS	=-s -x
 CC	=gcc
@@ -27,8 +27,12 @@ CPP	=gcc -E -nostdinc -I../include
 OBJS  = ctype.o _exit.o open.o close.o errno.o write.o dup.o setsid.o \
 	execve.o wait.o string.o malloc.o
 
-lib.a: $(OBJS)
-	$(AR) rcs lib.a $(OBJS)
+# lib.a: $(OBJS)
+# 	$(AR) rcs lib.a $(OBJS)
+# 	sync
+
+lib.o: $(OBJS)
+	$(LD) -r -o lib.o $(OBJS)
 	sync
 
 clean:
