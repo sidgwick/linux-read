@@ -472,7 +472,8 @@ void mount_root(void)
 
     if (MAJOR(ROOT_DEV) == 2) {
         /* 等待按键 ENTRT
-         * TODO: 这里似乎并仅仅是 ENTER, 任意键都会触发继续执行 */
+         * TODO-DONE: 这里似乎并仅仅是 ENTER, 任意键都会触发继续执行
+         * 答: 使用 bochs 实测, 是这样的 */
         printk("Insert root floppy and press ENTER");
         wait_for_keypress();
     }

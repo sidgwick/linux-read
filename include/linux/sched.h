@@ -472,8 +472,9 @@ extern int in_group_p(gid_t grp);
             "cmpl %%ecx,last_task_used_math\n\t" /* 任取切换回来之后, 从这里继续, 检查数学协处理器的情况 */      \
             "jne 1f\n\t"                                                                                         \
             "clts\n" /* 如果本任务之前用到了协处理器, 需要清空 TS 标记 */                                        \
-            "1:" ::"m"(*&__tmp.a),                                                                               \
-            "m"(*&__tmp.b), "d"(_TSS(n)), "c"((long)task[n]));                                                   \
+            "1:"                                                                                                 \
+            :                                                                                                    \
+            : "m"(*&__tmp.a), "m"(*&__tmp.b), "d"(_TSS(n)), "c"((long)task[n]));                                 \
     }
 
 // 4Kb 对齐
@@ -482,22 +483,22 @@ extern int in_group_p(gid_t grp);
 // 更新位于地址 addr 处描述符中的基地址字段(基地址是base)
 // 假如 base = %edx = HGEF_CDAB
 #define _set_base(addr, base)                                                                      \
-    __asm__("movw %%dx,%0\n\t"   /* base 一开始被加载到 %edx, 因此这里就是把 *(addr+2) = DCBA */   \
-            "rorl $16,%%edx\n\t" /* ror $16, %ebx --> CDAB_HGEF */                                 \
-            "movb %%dl,%1\n\t"   /* *(addr+4) = dl = EF */                                         \
-            "movb %%dh,%2"       /* *(addr+7) = dh = GH */                                         \
+    __asm__("movw %%dx, %0\n\t"   /* base 一开始被加载到 %edx, 因此这里就是把 *(addr+2) = DCBA */  \
+            "rorl $16, %%edx\n\t" /* ror $16, %ebx --> CDAB_HGEF */                                \
+            "movb %%dl, %1\n\t"   /* *(addr+4) = dl = EF */                                        \
+            "movb %%dh, %2"       /* *(addr+7) = dh = GH */                                        \
             :                                                                                      \
             : "m"(*((addr) + 2)), "m"(*((addr) + 4)), "m"(*((addr) + 7)), "d"(base))
 
 // 更新位于地址 addr 处描述符的 limit 字段, 注意 limit 在高位字节部分是
 // (BBRL-RRBB) 假如 limit = %edx = 000F_CDAB
 #define _set_limit(addr, limit)                                                                    \
-    __asm__("movw %%dx,%0\n\t"    /* limit 一开始被加载到 edx, 这里把 *addr=CDAB */                \
-            "rorl $16,%%edx\n\t"  /* ror $16, %edx --> CDAB_000F, 需要 F_CDAB */                   \
-            "movb %1,%%dh\n\t"    /* dx=RL0F */                                                    \
-            "andb $0xf0,%%dh\n\t" /* dx=R00F */                                                    \
-            "orb %%dh,%%dl\n\t"   /* dl=RF */                                                      \
-            "movb %%dl,%1"        /* *(addr+6)=RF */                                               \
+    __asm__("movw %%dx, %0\n\t"    /* limit 一开始被加载到 edx, 这里把 *addr=CDAB */               \
+            "rorl $16, %%edx\n\t"  /* ror $16, %edx --> CDAB_000F, 需要 F_CDAB */                  \
+            "movb %1, %%dh\n\t"    /* dx=RL0F */                                                   \
+            "andb $0xf0, %%dh\n\t" /* dx=R00F */                                                   \
+            "orb %%dh, %%dl\n\t"   /* dl=RF */                                                     \
+            "movb %%dl, %1"        /* *(addr+6)=RF */                                              \
             :                                                                                      \
             : "m"(*(addr)), "m"(*((addr) + 6)), "d"(limit))
 
@@ -511,10 +512,10 @@ extern int in_group_p(gid_t grp);
 #define _get_base(addr)                                                                            \
     ({                                                                                             \
         unsigned long __base;                                                                      \
-        __asm__("movb %3,%%dh\n\t"                                                                 \
-                "movb %2,%%dl\n\t"                                                                 \
-                "shll $16,%%edx\n\t"                                                               \
-                "movw %1,%%dx"                                                                     \
+        __asm__("movb %2, %%dl\n\t"                                                                \
+                "movb %3, %%dh\n\t"                                                                \
+                "shll $16, %%edx\n\t"                                                              \
+                "movw %1, %%dx"                                                                    \
                 : "=d"(__base)                                                                     \
                 : "m"(*((addr) + 2)), "m"(*((addr) + 4)), "m"(*((addr) + 7)));                     \
         __base;                                                                                    \
@@ -529,7 +530,10 @@ extern int in_group_p(gid_t grp);
 #define get_limit(segment)                                                                         \
     ({                                                                                             \
         unsigned long __limit;                                                                     \
-        __asm__("lsll %1,%0\n\tincl %0" : "=r"(__limit) : "r"(segment));                           \
+        __asm__("lsll %1,%0\n\t"                                                                   \
+                "incl %0"                                                                          \
+                : "=r"(__limit)                                                                    \
+                : "r"(segment));                                                                   \
         __limit;                                                                                   \
     })
 

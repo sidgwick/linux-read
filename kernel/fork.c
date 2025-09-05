@@ -11,6 +11,7 @@
  * management can be a bitch. See 'mm/mm.c': 'copy_page_tables()'
  */
 #include <errno.h>
+#include <string.h>
 
 #include <asm/segment.h>
 #include <asm/system.h>
@@ -138,7 +139,9 @@ int copy_process(int nr, long ebp, long edi, long esi,
     task[nr] = p;
 
     /* 接着把当前进程任务结构内容复制到刚申请到的内存页面p开始处 */
-    *p = *current; /* NOTE! this doesn't copy the supervisor stack */
+    // TODO: 这个拷贝语句不好使, 换成 memcpy
+    // *p = *current; /* NOTE! this doesn't copy the supervisor stack */
+    memcpy((void *)p, (void *)current, sizeof(struct task_struct));
 
     /* 修改新任务的参数 */
     p->state = TASK_UNINTERRUPTIBLE; /* 新进程状态置为不可中断等待状态, 以防止内核调度其执行 */

@@ -241,6 +241,8 @@ void schedule(void)
             break;
         }
 
+        /* 重新计算大家的 counter, 给下一次调度使用
+         * 注意看这里并没有处理 task-0 的内容 */
         for (p = &LAST_TASK; p > &FIRST_TASK; --p) {
             if (*p) {
                 (*p)->counter = ((*p)->counter >> 1) + (*p)->priority;
