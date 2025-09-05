@@ -40,9 +40,13 @@ void buffer_init(long buffer_end); // 高速缓冲区初始化函数
 #define NAME_LEN 14 // 名字长度值
 #define ROOT_INO 1  // Minix 文件系统的根目录是 #1 inode
 
-#define I_MAP_SLOTS 8      // inode 位图槽数
-#define Z_MAP_SLOTS 8      // 逻辑块(区段块)位图槽数
-#define SUPER_MAGIC 0x137F // 文件系统魔数
+#define I_MAP_SLOTS 8 // inode 位图槽数
+#define Z_MAP_SLOTS 8 // 逻辑块(区段块)位图槽数
+
+/* 文件系统魔数
+ * 源代码里面的 0x137F 不好使了
+ * 参考: https://zhuanlan.zhihu.com/p/538494573 */
+#define SUPER_MAGIC 0x138F
 
 #define NR_OPEN 20            // 进程最多打开文件数
 #define NR_INODE 64           // 系统同时最多使用 inode 个数

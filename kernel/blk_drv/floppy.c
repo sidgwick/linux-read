@@ -571,6 +571,9 @@ static void transfer(void)
  * Special case - used after a unexpected interrupt (or reset) */
 static void recal_interrupt(void)
 {
+    // bochs 这里似乎有个 bug, 会不断地 (Reset-floppy Called)
+    // https://mmmyddd.github.io/wiki/debian/oldlinuxsetup.html
+
     output_byte(FD_SENSEI); /* 发送检测中断状态命令(无参数) */
 
     if (result() != 2 || (ST0 & 0xE0) == 0x60) {
@@ -623,15 +626,17 @@ static void reset_interrupt(void)
     do_fd_request(); /* 调用执行软盘请求 */
 }
 
-/* 复位软盘控制器
+/**
+ * @brief 复位软盘控制器
+ *
  * reset is done by pulling bit 2 of DOR low for a while.
+ *
+ * 该函数首先设置参数和标志, 把复位标志清0, 然后把软驱变量cur_spec1和cur_rate
+ * 置为无效. 因为复位操作后, 这两个参数就需要重新设置. 接着设置需要重新校正标志,
+ * 并设置FDC执行复位操作后引发的软盘中断中调用的C函数reset_interrupt(). 最后
+ * 把DOR寄存器位2置0一会儿以对软驱执行复位操作. 当前数字输出寄存器DOR的位2
+ * 是启动/复位软驱位.
  */
-//// .
-// 该函数首先设置参数和标志, 把复位标志清0, 然后把软驱变量cur_spec1和cur_rate
-// 置为无效. 因为复位操作后, 这两个参数就需要重新设置. 接着设置需要重新校正标志,
-// 并设置FDC执行复位操作后引发的软盘中断中调用的C函数reset_interrupt(). 最后
-// 把DOR寄存器位2置0一会儿以对软驱执行复位操作. 当前数字输出寄存器DOR的位2
-// 是启动/复位软驱位.
 static void reset_floppy(void)
 {
     int i;

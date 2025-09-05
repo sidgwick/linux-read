@@ -310,8 +310,12 @@ static int controller_ready(void)
 
     /* 读硬盘控制器状态寄存器端口 0x1f7, 循环检测其中的驱动器就绪比特位(位6)是
      * 否被置位并且控制器忙位(位7)是否被复位 */
-    while (--retries && (inb_p(HD_STATUS) & 0xc0) != 0x40)
+    while (--retries && (inb_p(HD_STATUS) & 0x80))
         ;
+
+    // 下面的语句不好使, 请参考: https://bbs.eetop.cn/blog-193015-21187.html
+    // while (--retries && (inb_p(HD_STATUS) & 0xc0) != 0x40)
+    //     ;
 
     return (retries);
 }

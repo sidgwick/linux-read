@@ -37,7 +37,7 @@
 #define SYS_SIZE 0x3000
 
 #define DEFAULT_MAJOR_ROOT 3
-#define DEFAULT_MINOR_ROOT 6
+#define DEFAULT_MINOR_ROOT 1
 
 #define DEFAULT_MAJOR_SWAP 0
 #define DEFAULT_MINOR_SWAP 0
@@ -59,7 +59,7 @@ void die(char *str)
 
 void usage(void)
 {
-    die("Usage: build bootsect setup system [rootdev] [> image]");
+    die("Usage: build bootsect setup system [> image]");
 }
 
 int main(int argc, char **argv)
@@ -68,42 +68,17 @@ int main(int argc, char **argv)
     char buf[1024];
     char major_root, minor_root;
     char major_swap, minor_swap;
-    struct stat sb;
 
-    if ((argc < 4) || (argc > 6))
+    if ((argc != 4)) {
         usage();
-    if (argc > 4) {
-        if (strcmp(argv[4], "FLOPPY")) {
-            if (stat(argv[4], &sb)) {
-                perror(argv[4]);
-                die("Couldn't stat root device.");
-            }
-            major_root = MAJOR(sb.st_rdev);
-            minor_root = MINOR(sb.st_rdev);
-        } else {
-            major_root = 0;
-            minor_root = 0;
-        }
-    } else {
-        major_root = DEFAULT_MAJOR_ROOT;
-        minor_root = DEFAULT_MINOR_ROOT;
     }
-    if (argc == 6) {
-        if (strcmp(argv[5], "NONE")) {
-            if (stat(argv[5], &sb)) {
-                perror(argv[5]);
-                die("Couldn't stat root device.");
-            }
-            major_swap = MAJOR(sb.st_rdev);
-            minor_swap = MINOR(sb.st_rdev);
-        } else {
-            major_swap = 0;
-            minor_swap = 0;
-        }
-    } else {
-        major_swap = DEFAULT_MAJOR_SWAP;
-        minor_swap = DEFAULT_MINOR_SWAP;
-    }
+
+    major_root = DEFAULT_MAJOR_ROOT;
+    minor_root = DEFAULT_MINOR_ROOT;
+
+    major_swap = DEFAULT_MAJOR_SWAP;
+    minor_swap = DEFAULT_MINOR_SWAP;
+
     fprintf(stderr, "Root device is (%d, %d)\n", major_root, minor_root);
     fprintf(stderr, "Swap device is (%d, %d)\n", major_swap, minor_swap);
     if ((major_root != 2) && (major_root != 3) && (major_root != 0)) {

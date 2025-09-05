@@ -18,7 +18,7 @@
 #define outb_p(value, port)                                                                        \
     __asm__("outb %%al,%%dx\n\t"                                                                   \
             "jmp 1f\n"                                                                             \
-            "1:\t jmp 1f\n"                                                                        \
+            "1:  jmp 1f\n"                                                                         \
             "1:"                                                                                   \
             :                                                                                      \
             : "a"(value), "d"(port))
@@ -27,9 +27,9 @@
 #define inb_p(port)                                                                                \
     ({                                                                                             \
         unsigned char _v;                                                                          \
-        __asm__ volatile("inb %%dx,%%al\n\t"                                                       \
+        __asm__ volatile("inb %%dx, %%al\n\t"                                                      \
                          "jmp 1f\n"                                                                \
-                         "1:\t jmp 1f\n"                                                           \
+                         "1:  jmp 1f\n"                                                            \
                          "1:"                                                                      \
                          : "=a"(_v)                                                                \
                          : "d"(port));                                                             \

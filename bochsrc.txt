@@ -2,9 +2,12 @@
 #### ------------------
 
 # 图形模式设置，这两个一起开启
-magic_break: enabled=1
-display_library: sdl2
-# display_library: term
+# magic_break: enabled=1
+# display_library: sdl2
+display_library: term
+
+# 插件
+plugin_ctrl: iodebug=1
 
 # bios 和 vga bios
 romimage: file=$BXSHARE/BIOS-bochs-latest, options=fastboot
@@ -13,17 +16,24 @@ vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest.bin
 # RTC
 clock: sync=realtime, rtc_sync=1, time0=local
 
-# # 硬盘启动
-# boot: disk
-# ata0-master: type=disk, mode=flat, path="a.img"
-# ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
-
-# 软盘启动
-floppya: 1_44=Image, status=inserted
+# 启动项
 boot: floppy
+# boot: disk
+
+# 硬盘配置
+ata0-master: type=disk, path="minix.img", mode=flat
+ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+
+# 软盘配置
+floppya: 1_44=Image, status=inserted
+# floppyb: 1_44=minix.img, status=inserted
 
 # 输出日志
 log: bochsout.txt
+panic: action=ask
+error: action=report
+info: action=report
+# debug: action=ignore, harddrv=report
 
 # 鼠标不可用
 mouse: enabled=0
@@ -35,4 +45,5 @@ keyboard: keymap=#$BXSHARE/keymaps/x11-pc-us.map
 megs: 128
 
 # debug
-gdbstub: enabled=1, port=1234
+gdbstub: enabled=0, port=1234
+iodebug: all_rings=1
