@@ -59,7 +59,7 @@ OBJS = boot/head.o init/main.o \
 all: $(SUBDIRS) Image
 
 Image: boot/bootsect boot/setup tools/system tools/build
-	tools/build boot/bootsect boot/setup tools/system $(ROOT_DEV) $(SWAP_DEV) > Image
+	tools/build boot/bootsect boot/setup tools/system > Image
 
 tools/build: tools/build.c
 	$(CC) -Wall -o tools/build tools/build.c

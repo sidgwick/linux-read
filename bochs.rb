@@ -34,16 +34,41 @@ class Bochs < Formula
   patch :DATA
 
   def install
-    args = %W[
-      --prefix=#{prefix}
-      --enable-gdb-stub
-      --enable-disasm
-      --enable-logging
-      --enable-readline
-      --with-nogui
-      --with-sdl2
-      --with-term
+    args = [
+      "--prefix=#{prefix}",
+      "--enable-gdb-stub",
+      "--enable-disasm",
+      "--enable-logging",
+      "--enable-readline",
+      "--with-nogui",
+      "--with-sdl2",
+      "--with-term",
+      "--disable-docbook",
+      "--enable-a20-pin",
+      "--enable-alignment-check",
+      "--enable-all-optimizations",
+      "--enable-cdrom",
+      "--enable-clgd54xx",
+      "--enable-cpu-level=6",
+      "--enable-iodebug",
+      "--enable-large-ramfile",
+      "--enable-long-phy-address",
+      "--enable-pci",
+      "--enable-plugins",
+      "--enable-show-ips",
+      "--enable-debugger-gui",
+      "--enable-fpu",
+      "--enable-usb",
+
+      # 下面打开没法 gdb debug, 用不到先关闭了
+
+      # "--enable-avx",
+      # "--enable-vmx=2",
+      # "--enable-evex",
+      # "--enable-x86-64"
     ]
+
+
 
     system "./configure", *args
 

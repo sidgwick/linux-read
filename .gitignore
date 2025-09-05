@@ -15,3 +15,4 @@ boot/bootsect.elf
 boot/setup.elf
 explain.txt
 bochsout.txt
+minix.img

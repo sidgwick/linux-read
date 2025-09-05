@@ -400,7 +400,7 @@ floppy_interrupt:
     testl %eax, %eax
     jne 1f
     movl $unexpected_floppy_interrupt, %eax
-1:    call *%eax        # "interesting" way of handling intr.
+1:  call *%eax        # "interesting" way of handling intr.
     pop %fs
     pop %es
     pop %ds
