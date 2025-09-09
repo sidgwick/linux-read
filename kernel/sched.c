@@ -264,22 +264,24 @@ int sys_pause(void)
     return 0;
 }
 
-/*
-// 把当前任务置为指定的睡眠状态(可中断的或不可中断的),
-// 并让睡眠队列头指针指向当前任务。
-// 函数参数p是等待任务队列头指针。指针是含有一个变量地址的变量。这里参数p使用了指针的
-// 指针形式
-// '**p'，这是因为C函数参数只能传值，没有直接的方式让被调用函数改变调用该函数
-// 程序中变量的值。但是指针'*p'指向的目标（这里是任务结构）会改变，因此为了能修改调用该
-// 函数程序中原来就是指针变量的值，就需要传递指针'*p'的指针，即'**p'。参见程序前示例图中
-// p指针的使用情况。
-// 参数state是任务睡眠使用的状态：TASK_UNINTERRUPTIBLE或TASK_INTERRUPTIBLE
-// 处于不可中断睡眠状态 (TASK_UNINTERRUPTIBLE) 的任务需要内核程序利用 wake_up
-// 函数明确唤醒之 处于可中断睡眠状态 (TASK_INTERRUPTIBLE)
-// 可以通过信号、任务超时等手段唤醒(置为就绪状态 TASK_RUNNING)
-// ***
-// 注意，由于本内核代码不是很成熟，因此下列与睡眠相关的代码存在一些问题，不宜深究。
-// TODO: 重新读一读这个函数 */
+/**
+ * @brief 把当前任务置为指定的睡眠状态(可中断的或不可中断的)
+ *
+ * 函数参数p是等待任务队列头指针。指针是含有一个变量地址的变量。这里参数p使用了指针的
+ * 指针形式 '**p'，这是因为C函数参数只能传值，没有直接的方式让被调用函数改变调用该函数
+ * 程序中变量的值。但是指针'*p'指向的目标（这里是任务结构）会改变，因此为了能修改调用该
+ * 函数程序中原来就是指针变量的值，就需要传递指针'*p'的指针，即'**p'。参见程序前示例图中
+ * p指针的使用情况。
+ * 参数state是任务睡眠使用的状态：TASK_UNINTERRUPTIBLE或TASK_INTERRUPTIBLE
+ * 处于不可中断睡眠状态 (TASK_UNINTERRUPTIBLE) 的任务需要内核程序利用 wake_up
+ * 函数明确唤醒之 处于可中断睡眠状态 (TASK_INTERRUPTIBLE)
+ * 可以通过信号、任务超时等手段唤醒(置为就绪状态 TASK_RUNNING)
+ * ***
+ * 注意，由于本内核代码不是很成熟，因此下列与睡眠相关的代码存在一些问题，不宜深究
+ *
+ * @param p
+ * @param state
+ */
 static inline void __sleep_on(struct task_struct **p, int state)
 {
     struct task_struct *tmp;
@@ -303,6 +305,19 @@ static inline void __sleep_on(struct task_struct **p, int state)
      *     是 current, 程序继续向本函数后面执行, 也有对 tmp 唤醒(恢复状态 0)的操作, 因此
      *     原来的那个线程也会被唤醒
      *     更多参考: https://blog.csdn.net/jmh1996/article/details/90139485
+     *
+     *
+     * 假如有 A, B, C 三个任务, 分别都来等待同一个 i_wait
+     * 刚开始的时候, i_wait = NULL, current=A
+     *
+     * A 执行 sleep 到这里, 操作完成后有: tmp = *p = NULL, *p = A, 之后 A 睡眠
+     * B 执行 sleep 到这里, 操作完成后有: tmp = *p = A,    *p = B, 之后 B 睡眠
+     * C 执行 sleep 到这里, 操作完成后有: tmp = *p = B,    *p = C, 之后 C 睡眠
+     *
+     * 之后, i_wait 准备好, 首先 wake_up 唤醒的是 i_wait 上记录的进程 C:
+     * C 被唤醒, 执行: *p = tmp = B, 唤醒 B
+     * B 被唤醒, 执行: *p = tmp = A, 唤醒 A
+     * A 被唤醒, 执行: *p = tmp = NULL
      */
     tmp = *p;
     *p = current;
@@ -314,17 +329,16 @@ static inline void __sleep_on(struct task_struct **p, int state)
 repeat:
     schedule();
 
-    /* TODO: 唤醒逻辑是什么样的? */
+    /* TODO-DONE: 唤醒逻辑是什么样的?
+     * 答: 唤醒发生在内核的很多地方.
+     *    参考调用 wake_up, 或者直接设置 task->status = 0 的写法出现的位置 */
 
-    // 只有当这个等待任务被唤醒时, 程序才又会返回到这里,
-    // 表示进程已被明确地唤醒并执行
-    //
-    // 如果等待队列中还有等待任务, 并且队列头指针 *p 所指向的任务不是当前任务时,
-    // 说明在本任务插入等待队列后还有任务进入等待队列.
-    // 于是我们应该也要唤醒这个任务, 而我们自己应按顺序让这些后面进入队列的任务唤醒,
-    // 因此这里将等待队列头所指任务先置为就绪状态,
-    // 而自己则置为不可中断等待状态, 即自己要等待这些后续进队列的任务被唤醒
-    // 而执行时来唤醒本任务. 然后重新执行调度程序
+    /* 这个 if 块处理的情况是, 因为某些原因全局变量 i_wait 就绪后唤醒了 C, 但是此时
+     * i_wait=*p 上记录的内容却不是 C, 假如说 *p=X, 下面通过先把 X 唤醒, C 休眠的方式,
+     * 让逻辑回到 X ~~> C->B->A 这样的执行链路上来
+     * ---------------------------------------------
+     * TODO-DONE: 什么情况下, i_wait 会被修改为 X, 并且还能唤醒 C?
+     * 答: 在 select 的 add_wait 里面可以做这样的操作 */
     if (*p && *p != current) {
         (**p).state = 0;
         current->state = TASK_UNINTERRUPTIBLE;

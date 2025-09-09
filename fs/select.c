@@ -35,15 +35,21 @@
  */
 
 typedef struct {
-    struct task_struct *old_task;
-    struct task_struct **wait_address;
+    struct task_struct *old_task;      /* 指向发起等待的进程 */
+    struct task_struct **wait_address; /* 指向发起等待的进程的指针地址 */
 } wait_entry;
 
 typedef struct {
     int nr;
-    wait_entry entry[NR_OPEN * 3];
+    wait_entry entry[NR_OPEN * 3]; /* 每个文件描述符, 可以监控 read/write/exception 三种状态 */
 } select_table;
 
+/**
+ * @brief 将 wait_address 代表的任务, 追加到 select_table 里面
+ *
+ * @param wait_address 等待事件的任务
+ * @param p 等待表
+ */
 static void add_wait(struct task_struct **wait_address, select_table *p)
 {
     int i;
@@ -59,7 +65,10 @@ static void add_wait(struct task_struct **wait_address, select_table *p)
         }
     }
 
-    /* 加入表中 */
+    /* pipe/tty 里面有个记录等待事件的指针字段(统一都叫做 i_wait), 这里把这个字段上记录的以前
+     * 的等待进程(如有的话), 记录在 wait_address 和 old_task 里面
+     *
+     * 然后把当前进程塞道这个等待字段(i_wait)里面来 */
     p->entry[p->nr].wait_address = wait_address;
     p->entry[p->nr].old_task = *wait_address;
     *wait_address = current;
@@ -69,17 +78,25 @@ static void add_wait(struct task_struct **wait_address, select_table *p)
 /**
  * @brief 尝试将等待表归零
  *
+ * 这里和 __sleep_on 函数里面的处理差不多, 不同的是这里是多个文件描述符, 在 for 循环里面处理
+ *
  * @param p
  */
 static void free_wait(select_table *p)
 {
     int i;
-    struct task_struct **tpp;
+    struct task_struct **tpp; /* task pointer pointer */
 
     /* 遍历等待表中的 entry
      * 如果 wait_address 不为空, 就尝试唤醒 wait_address 对应的任务, 并挂起当前任务 */
     for (i = 0; i < p->nr; i++) {
         tpp = p->entry[i].wait_address;
+
+        /* wait_address 指向的是 i_wait 的二级指针, 在 select 期间, 完全有可能有其他的进程
+         * 通过 sleep_on 函数修改了 i_wait, 这时候就出现了 (*tpp != current) 的情况, 通过
+         * 将发起 sleep_on 的那个进程唤醒, 让那边先得到执行. 在 sleep_on 的执行里面, 会对此前
+         * 记录在 i_wait 上的那个的进程(发起 select 的进程, 也就是这里的 current)执行唤醒,
+         * 然后程序就可以继续执行下去了 */
         while (*tpp && *tpp != current) {
             (*tpp)->state = 0;
             current->state = TASK_UNINTERRUPTIBLE;
@@ -90,6 +107,7 @@ static void free_wait(select_table *p)
             printk("free_wait: NULL");
         }
 
+        /* wait_address 指向的内容可以变化, 但是 old_task 永远都是 add_wait 的时候的那个进程 */
         if ((*tpp = p->entry[i].old_task)) {
             (**tpp).state = 0;
         }
@@ -303,13 +321,17 @@ repeat:
         }
     }
 
-    /* 1. (没有信号出现) 且 (有需要等待的 fd) 且 (没有文件描述符更新)
+    /* 注意: 因为已经 cli, 这个函数里不会因为中断被打断执行
+       1. (没有信号出现) 且 (有需要等待的 fd) 且 (没有文件描述符更新)
        2. (没有信号出现) 且 (进程没有等待超时) 且 (没有文件描述符更新) */
     if (!(current->signal & ~current->blocked) && (wait_table.nr || current->timeout) && !count) {
         current->state = TASK_INTERRUPTIBLE;
         schedule();
 
-        /* 注意看每个循环这里都 free */
+        /* 执行到这里, 是因为信号/描述符状态有改变导致的, 此时使用 free_wait
+         * 激活等待进程的状态, 然后重新统计描述符的变化情况
+         *
+         * 注意看这里每个循环都 free */
         free_wait(&wait_table);
         goto repeat;
     }
