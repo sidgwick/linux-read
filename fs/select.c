@@ -48,22 +48,36 @@ static void add_wait(struct task_struct **wait_address, select_table *p)
 {
     int i;
 
-    if (!wait_address)
+    if (!wait_address) {
         return;
-    for (i = 0; i < p->nr; i++)
-        if (p->entry[i].wait_address == wait_address)
+    }
+
+    /* 如果已经在表中, 直接退出 */
+    for (i = 0; i < p->nr; i++) {
+        if (p->entry[i].wait_address == wait_address) {
             return;
+        }
+    }
+
+    /* 加入表中 */
     p->entry[p->nr].wait_address = wait_address;
     p->entry[p->nr].old_task = *wait_address;
     *wait_address = current;
     p->nr++;
 }
 
+/**
+ * @brief 尝试将等待表归零
+ *
+ * @param p
+ */
 static void free_wait(select_table *p)
 {
     int i;
     struct task_struct **tpp;
 
+    /* 遍历等待表中的 entry
+     * 如果 wait_address 不为空, 就尝试唤醒 wait_address 对应的任务, 并挂起当前任务 */
     for (i = 0; i < p->nr; i++) {
         tpp = p->entry[i].wait_address;
         while (*tpp && *tpp != current) {
@@ -71,55 +85,94 @@ static void free_wait(select_table *p)
             current->state = TASK_UNINTERRUPTIBLE;
             schedule();
         }
-        if (!*tpp)
+
+        if (!*tpp) {
             printk("free_wait: NULL");
-        if ((*tpp = p->entry[i].old_task))
+        }
+
+        if ((*tpp = p->entry[i].old_task)) {
             (**tpp).state = 0;
+        }
     }
+
     p->nr = 0;
 }
 
+/**
+ * @brief 获取 inode 对应的控制终端
+ *
+ * @param inode 设备文件 inode
+ * @return struct tty_struct* 设备文件对应的 tty 结构
+ */
 static struct tty_struct *get_tty(struct m_inode *inode)
 {
     int major, minor;
 
-    if (!S_ISCHR(inode->i_mode))
+    /* tty 设备肯定是字符设备 */
+    if (!S_ISCHR(inode->i_mode)) {
         return NULL;
-    if ((major = MAJOR(inode->i_zone[0])) != 5 && major != 4)
+    }
+
+    if ((major = MAJOR(inode->i_zone[0])) != 5 && major != 4) {
         return NULL;
-    if (major == 5)
+    }
+
+    /* MAJOR == 4: /dev/ttyx
+     * MAJOR == 5: /dev/tty
+     * 所以通过这里就能看出来 /dev/tty 特指当亲进程使用的那个控制终端 */
+    if (major == 5) {
         minor = current->tty;
-    else
+    } else {
         minor = MINOR(inode->i_zone[0]);
-    if (minor < 0)
+    }
+
+    if (minor < 0) {
         return NULL;
+    }
+
     return TTY_TABLE(minor);
 }
 
-/*
+/**
+ * @brief 检查 inode 是否可读
+ *
  * The check_XX functions check out a file. We know it's either
  * a pipe, a character device or a fifo (fifo's not implemented)
+ *
+ * @param wait
+ * @param inode
+ * @return int
  */
 static int check_in(select_table *wait, struct m_inode *inode)
 {
     struct tty_struct *tty;
 
     if ((tty = get_tty(inode))) {
+        /* tty 设备的话, 检查它的辅助队列 */
         if (!EMPTY(tty->secondary)) {
             return 1;
         } else {
             add_wait(&tty->secondary->proc_list, wait);
         }
     } else if (inode->i_pipe) {
+        /* pipe 的话, 检查它不为空 */
         if (!PIPE_EMPTY(*inode)) {
             return 1;
         } else {
             add_wait(&inode->i_wait, wait);
         }
     }
+
     return 0;
 }
 
+/**
+ * @brief 检查 inode 是否可写
+ *
+ * @param wait
+ * @param inode
+ * @return int
+ */
 static int check_out(select_table *wait, struct m_inode *inode)
 {
     struct tty_struct *tty;
@@ -137,29 +190,51 @@ static int check_out(select_table *wait, struct m_inode *inode)
             add_wait(&inode->i_wait, wait);
         }
     }
+
     return 0;
 }
 
+/**
+ * @brief 检查 inode 是否出现异常
+ *
+ * @param wait
+ * @param inode
+ * @return int
+ */
 static int check_ex(select_table *wait, struct m_inode *inode)
 {
     struct tty_struct *tty;
 
     if ((tty = get_tty(inode))) {
+        /* tty 设备永远不会异常 */
         if (!FULL(tty->write_q)) {
             return 0;
         } else {
             return 0;
         }
     } else if (inode->i_pipe) {
+        /* 管道文件, 读写端都要存在才是正常 */
         if (inode->i_count < 2) {
             return 1;
         } else {
             add_wait(&inode->i_wait, wait);
         }
     }
+
     return 0;
 }
 
+/**
+ * @brief
+ *
+ * @param in
+ * @param out
+ * @param ex
+ * @param inp
+ * @param outp
+ * @param exp
+ * @return int
+ */
 int do_select(fd_set in, fd_set out, fd_set ex, fd_set *inp, fd_set *outp, fd_set *exp)
 {
     int count;
@@ -168,57 +243,92 @@ int do_select(fd_set in, fd_set out, fd_set ex, fd_set *inp, fd_set *outp, fd_se
     fd_set mask;
 
     mask = in | out | ex;
+
+    /* 现在仅支持字符设备, 管道文件, fifo 文件的处理 */
     for (i = 0; i < NR_OPEN; i++, mask >>= 1) {
-        if (!(mask & 1))
+        if (!(mask & 1)) {
             continue;
-        if (!current->filp[i])
+        }
+
+        if (!current->filp[i]) {
             return -EBADF;
-        if (!current->filp[i]->f_inode)
+        }
+
+        if (!current->filp[i]->f_inode) {
             return -EBADF;
-        if (current->filp[i]->f_inode->i_pipe)
+        }
+
+        if (current->filp[i]->f_inode->i_pipe) {
             continue;
-        if (S_ISCHR(current->filp[i]->f_inode->i_mode))
+        }
+
+        if (S_ISCHR(current->filp[i]->f_inode->i_mode)) {
             continue;
-        if (S_ISFIFO(current->filp[i]->f_inode->i_mode))
+        }
+
+        if (S_ISFIFO(current->filp[i]->f_inode->i_mode)) {
             continue;
+        }
+
         return -EBADF;
     }
+
 repeat:
     wait_table.nr = 0;
     *inp = *outp = *exp = 0;
     count = 0;
     mask = 1;
+
+    /*                            mask = mask << 1      */
     for (i = 0; i < NR_OPEN; i++, mask += mask) {
-        if (mask & in)
+        if (mask & in) {
             if (check_in(&wait_table, current->filp[i]->f_inode)) {
                 *inp |= mask;
                 count++;
             }
-        if (mask & out)
+        }
+
+        if (mask & out) {
             if (check_out(&wait_table, current->filp[i]->f_inode)) {
                 *outp |= mask;
                 count++;
             }
-        if (mask & ex)
+        }
+
+        if (mask & ex) {
             if (check_ex(&wait_table, current->filp[i]->f_inode)) {
                 *exp |= mask;
                 count++;
             }
+        }
     }
+
+    /* 1. (没有信号出现) 且 (有需要等待的 fd) 且 (没有文件描述符更新)
+       2. (没有信号出现) 且 (进程没有等待超时) 且 (没有文件描述符更新) */
     if (!(current->signal & ~current->blocked) && (wait_table.nr || current->timeout) && !count) {
         current->state = TASK_INTERRUPTIBLE;
         schedule();
+
+        /* 注意看每个循环这里都 free */
         free_wait(&wait_table);
         goto repeat;
     }
+
     free_wait(&wait_table);
     return count;
 }
 
-/*
+/**
+ * @brief select 系统调用
+ *
  * Note that we cannot return -ERESTARTSYS, as we change our input
  * parameters. Sad, but there you are. We could do some tweaking in
  * the library function ...
+ *
+ * @param buffer
+ * @return int
+ *
+ * TODO: select 系统调用的参数怎么穿进来的?
  */
 int sys_select(unsigned long *buffer)
 {
@@ -231,47 +341,73 @@ int sys_select(unsigned long *buffer)
     struct timeval *tvp;
     unsigned long timeout;
 
+    /* buffer = [mask(nfds), inp, outp, exp, tvp]
+     *
+     * 假如 nfds = 8, 则 ~((~0) << 8) =
+     * ~((~0) << 8)
+     * = ~((1111_1111_1111_1111) << 8)
+     * = ~(1111_1111_1111_1100)
+     * = 0000_0000_0000_0011
+     * 所以这个操作实际上就是 组装一个低 nfds 位都是1 的掩码出来  */
+
     mask = ~((~0) << get_fs_long(buffer++));
     inp = (fd_set *)get_fs_long(buffer++);
     outp = (fd_set *)get_fs_long(buffer++);
     exp = (fd_set *)get_fs_long(buffer++);
     tvp = (struct timeval *)get_fs_long(buffer);
 
-    if (inp)
+    if (inp) {
         in = mask & get_fs_long(inp);
-    if (outp)
+    }
+
+    if (outp) {
         out = mask & get_fs_long(outp);
-    if (exp)
+    }
+
+    if (exp) {
         ex = mask & get_fs_long(exp);
+    }
+
     timeout = 0xffffffff;
     if (tvp) {
         timeout = get_fs_long((unsigned long *)&tvp->tv_usec) / (1000000 / HZ);
         timeout += get_fs_long((unsigned long *)&tvp->tv_sec) * HZ;
         timeout += jiffies;
     }
+
     current->timeout = timeout;
     cli();
     i = do_select(in, out, ex, &res_in, &res_out, &res_ex);
-    if (current->timeout > jiffies)
+
+    if (current->timeout > jiffies) {
+        /* 未超时 */
         timeout = current->timeout - jiffies;
-    else
+    } else {
         timeout = 0;
+    }
+
     sti();
     current->timeout = 0;
-    if (i < 0)
+
+    if (i < 0) {
         return i;
+    }
+
     if (inp) {
         verify_area(inp, 4);
         put_fs_long(res_in, inp);
     }
+
     if (outp) {
         verify_area(outp, 4);
         put_fs_long(res_out, outp);
     }
+
     if (exp) {
         verify_area(exp, 4);
         put_fs_long(res_ex, exp);
     }
+
     if (tvp) {
         verify_area(tvp, sizeof(*tvp));
         put_fs_long(timeout / HZ, (unsigned long *)&tvp->tv_sec);
@@ -279,7 +415,11 @@ int sys_select(unsigned long *buffer)
         timeout *= (1000000 / HZ);
         put_fs_long(timeout, (unsigned long *)&tvp->tv_usec);
     }
-    if (!i && (current->signal & ~current->blocked))
+
+    /* 因为信号导致的 select 返回 */
+    if (!i && (current->signal & ~current->blocked)) {
         return -EINTR;
+    }
+
     return i;
 }

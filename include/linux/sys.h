@@ -2,6 +2,8 @@
  * Why isn't this a .c file?  Enquiring minds....
  */
 
+#include <linux/sched.h>
+
 extern int sys_setup();        //  0 - 系统启动初始化设置函数。   (kernel/blk_drv/hd.c)
 extern int sys_exit();         //  1 - 程序退出。                 (kernel/exit.c )
 extern int sys_fork();         //  2 - 创建进程。                 (kernel/system_call.s)

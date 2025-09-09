@@ -179,7 +179,7 @@ void schedule(void)
             /* 如果设置过任务超时定时 timeout, 并且已经超时, 则复位超时定时值
              * 并且如果任务处于可中断睡眠状态下, 将其置为就绪状态(TASK_RUNNING)
              *
-             * NOTICE: timeout 一般实在 tty_io 里面设置的 */
+             * NOTICE: timeout 一般在 tty_io, select 里面设置的 */
             if ((*p)->timeout && (*p)->timeout < jiffies) {
                 (*p)->timeout = 0;
                 if ((*p)->state == TASK_INTERRUPTIBLE) {
@@ -196,11 +196,9 @@ void schedule(void)
                 (*p)->alarm = 0;
             }
 
-            /* 检查是否收到了待处理的信号
-             * 如果信号位图中除被阻塞的信号外还有其他信号,
-             * 并且任务处于可中断状态, 则置任务为就绪状态 其中 `~(_BLOCKABLE &
-             * (*p)->blocked)` 用于忽略被阻塞的信号, 但 SIGKILL 和 SIGSTOP
-             * 不能被阻塞 */
+            /* 检查是否收到了待处理的信号. 如果信号位图中除被阻塞的信号外还有其他信号, 并且任务处于
+             * 可中断状态, 则置任务为就绪状态 其中 `~(_BLOCKABLE & (*p)->blocked)` 用于忽略被
+             * 阻塞的信号, 但 SIGKILL 和 SIGSTOP 不能被阻塞 */
             if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
                 (*p)->state == TASK_INTERRUPTIBLE) {
                 (*p)->state = TASK_RUNNING;
