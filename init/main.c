@@ -46,8 +46,7 @@ inline _syscall0(int, sync);
 
 static char printbuf[1024];
 
-extern char *strcpy();
-extern int vsprintf();
+extern int vsprintf(char *buf, const char *fmt, va_list args);
 extern void init(void);
 extern void blk_dev_init(void);
 extern void chr_dev_init(void);
