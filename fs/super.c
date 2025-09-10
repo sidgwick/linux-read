@@ -404,7 +404,7 @@ int sys_mount(char *dev_name, char *dir_name, int rw_flag)
 
     iput(dev_i);
 
-    /* 取目录的 inode */
+    /* 取被挂载目录的 inode */
     if (!(dir_i = namei(dir_name))) {
         return -ENOENT;
     }

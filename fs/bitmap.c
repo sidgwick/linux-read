@@ -126,7 +126,7 @@ int free_block(int dev, int block)
     // 以得到block在逻辑块位图当前块中的比特偏移位置.
 
     /* 计算数据区块索引(从 0 开始计数, 但是 0 不用)
-     * TODO: 确认清楚 inode/zone 位图, 区块之间的计数关系
+     * TODO: DEBUG: 确认清楚 inode/zone 位图, 区块之间的计数关系
      * NOTICE: linux 系统中, 约定第 0 个 inode, 第 0 个 zone, 都不使用 */
     block -= sb->s_firstdatazone - 1;
     if (clear_bit(block & 8191, sb->s_zmap[block / 8192]->b_data)) {
@@ -261,7 +261,10 @@ void free_inode(struct m_inode *inode)
     }
 
     /* 位图缓冲块标记为脏, 等待其他位置写磁盘
-     * TODO: 在了解一下这里后续的写磁盘是怎么发生的? */
+     * TODO-DONE: 在了解一下这里后续的写磁盘是怎么发生的?
+     * 答: 后续的写磁盘发生在 sys_sync/sync_dev-(iput/getblk/sys_umount)/getblk 等调用位置
+     *     这里要强调的是, 如果 bh 的 dirt 位置 1, 这个 bh 就不会被用作别处, 只有当刷写磁盘之后,
+     *     这个 bh 才再度空闲 */
     bh->b_dirt = 1;
     memset(inode, 0, sizeof(*inode));
 }

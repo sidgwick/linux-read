@@ -31,7 +31,9 @@ int read_pipe(struct m_inode *inode, char *buf, int count)
             /* 没有数据, 唤醒写进程 */
             wake_up(&PIPE_WRITE_WAIT(*inode));
 
-            /* TODO: i_count != 2 的话 */
+            /* TODO-DONE: i_count != 2
+             * 答: 说明写没有就绪, 读这样的管道, 是读不到数据的, 因此直接返回 0
+             *     如果是写的情况, 没有读端, 则需要直接报错 */
             if (inode->i_count != 2) { /* are there any writers? */
                 return read;
             }
@@ -41,12 +43,12 @@ int read_pipe(struct m_inode *inode, char *buf, int count)
                 return read ? read : -ERESTARTSYS;
             }
 
-            /*  */
+            /* 等文件节点有数据被唤醒 */
             interruptible_sleep_on(&PIPE_READ_WAIT(*inode));
         }
 
         /* 管道中有数据, 读取页面中剩余的字符
-         * TODO: 弄清楚管道和内存页面有啥关系? 环形缓冲区
+         * TODO-DONE: 弄清楚管道和内存页面有啥关系? 环形缓冲区
          * 答: 管道附加了一张内存页面, 这个内存页面作为环形缓冲区, 用于在管道两端交换数据 */
         chars = PAGE_SIZE - PIPE_TAIL(*inode);
         if (chars > count) {
@@ -90,12 +92,13 @@ int write_pipe(struct m_inode *inode, char *buf, int count)
 
     while (count > 0) {
         /* 判断管道是否已满
-         * TODO: 是否没有考虑游标回绕的情况?
-         * 答: 似乎不需要考虑, 因为:
-         *  1. 后面的写操作, 确保了每次写, 最多写到页面结尾位置就停了, head=0, tail=X
-         *  2. 再次循环 `size = (PAGE_SIZE - 1) - PIPE_SIZE(*inode)` 这时候得到的计算结果,
-         *     非常神奇的得到了 (PAGE_SIZE - X), 于是这次写, 还是不会越界
-         *  3. 不是很理解 2 里面的数学过程, 但是验算出来确实没问题, 后续可以分析一下 `&(PS-1)` 的魔力 */
+         * TODO-DONE: 是否没有考虑游标回绕的情况?
+         * 答: 似乎不需要考虑, 这里操作都操作到缓冲区结尾位置, 然后重新从开头位置来处理,
+         *    这么一搞, 就没有特别的回绕情况需要处理了:
+         *      1. 后面的写操作, 确保了每次写, 最多写到页面结尾位置就停了, head=0, tail=X
+         *      2. 再次循环 `size = (PAGE_SIZE - 1) - PIPE_SIZE(*inode)` 这时候得到的计算结果,
+         *         非常神奇的得到了 (PAGE_SIZE - X), 于是这次写, 还是不会越界
+         *      3. 不是很理解 2 里面的数学过程, 但是验算出来确实没问题, 后续可以分析一下 `&(PS-1)` 的魔力 */
         while (!(size = (PAGE_SIZE - 1) - PIPE_SIZE(*inode))) {
             /* 管道满, 唤醒读进程 */
             wake_up(&PIPE_READ_WAIT(*inode));

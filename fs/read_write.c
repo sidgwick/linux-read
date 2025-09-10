@@ -103,7 +103,7 @@ int sys_read(unsigned int fd, char *buf, int count)
 
     /* 如果是管道文件, 只有读端才允许读取(1 是读端标记) */
     if (inode->i_pipe) {
-        return (file->f_mode & 1) ? read_pipe(inode, buf, count) : -EIO;
+        return (file->f_mode & S_PIPE_READ) ? read_pipe(inode, buf, count) : -EIO;
     }
 
     /* 如果是字符设备, 使用 rw_char 函数处理读取请求 */
@@ -117,7 +117,8 @@ int sys_read(unsigned int fd, char *buf, int count)
     }
 
     /* 目录或者普通文件
-     * TODO: S_ISDIR 这里允许读取目录吗??? */
+     * TODO-DONE: S_ISDIR 这里允许读取目录吗???
+     * 答: 是的, 目录是特殊的文件 */
     if (S_ISDIR(inode->i_mode) || S_ISREG(inode->i_mode)) {
         if (count + file->f_pos > inode->i_size) {
             count = inode->i_size - file->f_pos;
@@ -159,7 +160,7 @@ int sys_write(unsigned int fd, char *buf, int count)
 
     /* 管道读端 */
     if (inode->i_pipe) {
-        return (file->f_mode & 2) ? write_pipe(inode, buf, count) : -EIO;
+        return (file->f_mode & S_PIPE_WRITE) ? write_pipe(inode, buf, count) : -EIO;
     }
 
     /* 字符设备 */

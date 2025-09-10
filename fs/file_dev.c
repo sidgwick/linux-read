@@ -60,8 +60,8 @@ int file_read(struct m_inode *inode, struct file *filp, char *buf, int count)
             brelse(bh);
         } else {
             /* 没有快缓冲区, 读到的数据就全都是 0
-             * TODO: 啥时候没有缓冲区呢?
-             * 答: 新文件, 磁盘读取失败 */
+             * TODO-DONE: 啥时候没有缓冲区呢?
+             * 答: 可以研究上面那个 bmap 调用, 在新文件, 磁盘读取失败的时候, bh 就会是 NULL */
             while (chars-- > 0) {
                 put_fs_byte(0, buf++);
             }

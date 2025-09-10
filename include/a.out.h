@@ -15,7 +15,7 @@ struct exec {
     unsigned a_text;       /* length of text, in bytes, 代码长度，字节数 */
     unsigned a_data;       /* length of data, in bytes, 数据长度，字节数 */
     unsigned a_bss;        /* length of uninitialized data area for file, in bytes,
-                        文件中的未初始化数据区长度，字节数 */
+                              文件中的未初始化数据区长度，字节数 */
     // TODO: 符号表是什么, 调试用吗?
     unsigned a_syms;   /* length of symbol table data in file, in bytes,
                           文件中的符号表长度，字节数 */
@@ -45,12 +45,10 @@ struct exec {
  */
 #define OMAGIC 0407
 /* Code indicating pure executable.
- * 指明为纯可执行文件的代号
- * New Magic, 1975 年以后开始使用. 涉及虚存机制 */
+ * 指明为纯可执行文件的代号, New Magic, 1975 年以后开始使用. 涉及虚存机制 */
 #define NMAGIC 0410
 /* Code indicating demand-paged executable.
- * 指明为需求分页处理的可执行文件
- * 其头结构占用文件开始处1K空间 */
+ * 指明为需求分页处理的可执行文件, 其头结构占用文件开始处1K空间 */
 #define ZMAGIC 0413
 #endif /* not OMAGIC */
 
@@ -70,9 +68,8 @@ struct exec {
 
 #ifndef N_TXTOFF // TeXT_OFFset
 // 计算代码部分起始偏移值
-// 如果文件是 ZMAGIC 类型的, 即是执行文件, 那么代码部分是从执行文件的 1024
-// 字节偏移处 开始, 否则执行代码部分紧随执行头结构末端(32字节)开始,
-// 即文件是模块文件(OMAGIC类型)
+// 如果文件是 ZMAGIC 类型的, 即是执行文件, 那么代码部分是从执行文件的 1024 字节偏移处开始,
+// 否则执行代码部分紧随执行头结构末端(32字节)开始, 即文件是模块文件(OMAGIC类型)
 #define N_TXTOFF(x)                                                                                \
     (N_MAGIC(x) == ZMAGIC ? _N_HDROFF((x)) + sizeof(struct exec) : sizeof(struct exec))
 #endif

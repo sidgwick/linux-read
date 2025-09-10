@@ -140,7 +140,8 @@ int sys_readlink(const char *path, char *buf, int bufsiz)
         return -ENOENT;
     }
 
-    /* TODO: 符号链接的第一个 block 里面, 存放了目标文件的名字? */
+    /* TODO-DONE: 符号链接的第一个 block 里面, 存放了目标文件的名字?
+     * 答: 是的, 可以参考 sys_symlink 调用 */
     if (inode->i_zone[0]) {
         bh = bread(inode->i_dev, inode->i_zone[0]);
     } else {

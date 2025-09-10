@@ -11,7 +11,7 @@ typedef char *va_list;
  * TYPE也可以是使用该类型的一个表达式 */
 
 // 这句定义了取整后的 TYPE 类型的字节长度值, 是 int 长度(4)的倍数
-// 这里算出来的实际上就是 TYPE 在参数栈上面的大小(占不够的话, 会补齐)
+// 这里算出来的实际上就是 TYPE 在参数栈上面的大小(栈不够的话, 会补齐)
 #define __va_rounded_size(TYPE) (((sizeof(TYPE) + sizeof(int) - 1) / sizeof(int)) * sizeof(int))
 
 // 函数 __builtin_saveregs() 是在gcc的库程序libgcc2.c中定义的，用于保存寄存器.
@@ -44,15 +44,13 @@ void va_end(va_list); /* Defined in gnulib */
 /**
  * 获取可变列表里面 AP 指向的那个参数
  *
- * 第一次使用 va_arg 时, 它返回表中的第一个参数(也是 AP 指向的), 然后 AP
- * 指向下一个参数 后续的每次调用都一样的处理, 返回 AP 指向的那个参数, 并将 AP
- * 指向下一个位置
+ * 第一次使用 va_arg 时, 它返回表中的第一个参数(也是 AP 指向的), 然后 AP 指向下一个参数
+ * 后续的每次调用都一样的处理, 返回 AP 指向的那个参数, 并将 AP 指向下一个位置
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * 这段宏非常精妙, `x=va_arg(y, int)` 展开之后是一个逗号表达式:
- * x, y += __va_rounded_size(int), *(int*)(AP-__va_rounded_size(int))`
- * 逗号表达式执行顺序为从左到右依次计算每个子表达式,
- * 整个表达式的值为最后一个子表达式的值 这样就实现了 y 指向下一个位置, x
- * 指向当前要获取的数据位置的操作 */
+ * `y += __va_rounded_size(int), *(int*)(y-__va_rounded_size(int))`
+ * 逗号表达式执行顺序为从左到右依次计算每个子表达式, 整个表达式的值为最后一个子表达式的值
+ * 这样就实现了 y 指向下一个位置, x 指向当前要获取的数据位置的操作 */
 #define va_arg(AP, TYPE) (AP += __va_rounded_size(TYPE), *((TYPE *)(AP - __va_rounded_size(TYPE))))
 
 #endif /* _STDARG_H */

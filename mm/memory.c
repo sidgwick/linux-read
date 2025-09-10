@@ -36,6 +36,8 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
+#define PRESENT_RW_USER (PAGE_PRESENT | PAGE_RW | PAGE_USER)
+
 /**
  * 该宏用于判断给定线性地址是否位于当前进程的代码段中
  * `(((addr)+4095)&~4095)` 用于取得线性地址 addr 所在内存页面的末端地址
@@ -45,7 +47,7 @@
 unsigned long HIGH_MEMORY = 0; // 内存高端地址
 
 /* 拷贝一页内容 */
-#define copy_page(from, to) __asm__("cld ; rep ; movsl" ::"S"(from), "D"(to), "c"(1024))
+#define copy_page(from, to) __asm__("cld ; rep movsl" ::"S"(from), "D"(to), "c"(1024))
 
 // 物理内存映射字节图(1字节代表1页内存)
 // 每个页面对应的字节用于标志页面当前被引用(占用)次数, 使用 PAGING_PAGES
@@ -201,24 +203,28 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
         nr = (from == 0) ? 0xA0 : 1024;
         for (; nr-- > 0; from_page_table++, to_page_table++) {
             this_page = *from_page_table; // PTE
-            if (!this_page)
+            if (!this_page) {
                 continue;
+            }
 
             /* 这个表示页面存在, 但是被交换到了 SWAP */
-            if (!(1 & this_page)) {
-                if (!(new_page = get_free_page()))
+            if (!(PAGE_PRESENT & this_page)) {
+                if (!(new_page = get_free_page())) {
                     return -1;
+                }
+
                 read_swap_page(this_page >> 1, (char *)new_page);
                 *to_page_table = this_page;
-                *from_page_table =
-                    new_page | (PAGE_DIRTY | 7); /* TODO: 这里设置 DIRTY 的含义, 可能是
-                                       '标记为 dirty 之后无法共享这个页' ??? */
+
+                /* TODO: 这里设置 DIRTY 的含义
+                 * 答: 可能是 '标记为 dirty 之后无法共享这个页' ??? */
+                *from_page_table = new_page | (PAGE_DIRTY | PRESENT_RW_USER);
                 continue;
             }
 
             /* 页面清理掉写标记, 主要是如果有页面是公用的, 就可以实现
              * copy-on-write 操作 */
-            this_page &= ~2; /* 清理掉 RW 属性 */
+            this_page &= ~PAGE_USER; /* 清理掉 RW 属性 */
             *to_page_table = this_page;
             /* 位于主内存区域的页面, 需要追加引用计数 */
             if (this_page > LOW_MEM) {
@@ -251,21 +257,26 @@ static unsigned long put_page(unsigned long page, unsigned long address)
 
     /* NOTE !!! This uses the fact that _pg_dir=0 */
 
-    if (page < LOW_MEM || page >= HIGH_MEMORY)
+    if (page < LOW_MEM || page >= HIGH_MEMORY) {
         printk("Trying to put page %p at %p\n", page, address);
+    }
 
-    if (mem_map[(page - LOW_MEM) >> 12] != 1)
+    if (mem_map[(page - LOW_MEM) >> 12] != 1) {
         printk("mem_map disagrees with %p at %p\n", page, address);
+    }
 
     page_table = (unsigned long *)((address >> 20) & 0xffc); // PDT
-    if ((*page_table) & 1)
+    if ((*page_table) & 1) {
         page_table = (unsigned long *)(0xfffff000 & *page_table); // PTE
-    else {
-        if (!(tmp = get_free_page()))
+    } else {
+        if (!(tmp = get_free_page())) {
             return 0;
+        }
+
         *page_table = tmp | 7;             // PTE
         page_table = (unsigned long *)tmp; // page table 只想最新分配的页面
     }
+
     page_table[(address >> 12) & 0x3ff] = page | 7;
     /* no need for invalidate */
     return page;
@@ -285,25 +296,36 @@ unsigned long put_dirty_page(unsigned long page, unsigned long address)
 
     /* NOTE !!! This uses the fact that _pg_dir=0 */
 
-    if (page < LOW_MEM || page >= HIGH_MEMORY)
+    if (page < LOW_MEM || page >= HIGH_MEMORY) {
         printk("Trying to put page %p at %p\n", page, address);
-    if (mem_map[(page - LOW_MEM) >> 12] != 1)
+    }
+
+    if (mem_map[(page - LOW_MEM) >> 12] != 1) {
         printk("mem_map disagrees with %p at %p\n", page, address);
-    page_table = (unsigned long *)((address >> 20) & 0xffc);
-    if ((*page_table) & 1)
+    }
+
+    page_table = (unsigned long *)((address >> 20) & 0xffc); /* PDE */
+    if ((*page_table) & 1) {
         page_table = (unsigned long *)(0xfffff000 & *page_table);
-    else {
-        if (!(tmp = get_free_page()))
+    } else {
+        if (!(tmp = get_free_page())) {
             return 0;
-        *page_table = tmp | 7;
+        }
+
+        *page_table = tmp | PRESENT_RW_USER;
         page_table = (unsigned long *)tmp;
     }
-    page_table[(address >> 12) & 0x3ff] = page | (PAGE_DIRTY | 7);
+
+    page_table[(address >> 12) & 0x3ff] = page | (PAGE_DIRTY | PRESENT_RW_USER); /* update PTE */
     /* no need for invalidate */
     return page;
 }
 
-/* 这个函数在页面触发写保护的时候执行 Copy-On_Write */
+/**
+ * @brief 这个函数在页面触发写保护的时候执行 Copy-On_Write
+ *
+ * @param table_entry
+ */
 void un_wp_page(unsigned long *table_entry)
 {
     unsigned long old_page, new_page;
@@ -312,14 +334,13 @@ void un_wp_page(unsigned long *table_entry)
 
     /* 如果这个页面只有一个引用, 那就直接让这个页面可写, 然后失效 TLB */
     if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)] == 1) {
-        *table_entry |= 2;
+        *table_entry |= PAGE_RW;
         invalidate();
         return;
     }
 
     /* 如果不是, 我们就看到了所谓的 copy on write 技术
-     * 这里需要复制一份页面, 并把老页面计数减一, 然后更新 PTE 为可读写的新页面
-     */
+     * 这里需要复制一份页面, 并把老页面计数减一, 然后更新 PTE 为可读写的新页面 */
     if (!(new_page = get_free_page()))
         oom();
 
@@ -327,11 +348,13 @@ void un_wp_page(unsigned long *table_entry)
         mem_map[MAP_NR(old_page)]--;
 
     copy_page(old_page, new_page);
-    *table_entry = new_page | 7;
+    *table_entry = new_page | PRESENT_RW_USER;
     invalidate();
 }
 
-/*
+/**
+ * @brief 处理页面写保护异常
+ *
  * This routine handles present pages, when users try to write
  * to a shared page. It is done by copying the page to a new address
  * and decrementing the shared-page counter for the old page.
@@ -348,20 +371,24 @@ void un_wp_page(unsigned long *table_entry)
  * CPU产生异常而自动生成的
  *
  * error_code 指出出错类型, 参见本章开始处的"内存页面出错异常"一节
- * address 是产生异常的页面线性地址 */
+ * address 是产生异常的页面线性地址
+ *
+ * @param error_code
+ * @param address
+ */
 void do_wp_page(unsigned long error_code, unsigned long address)
 {
-    // 首先判断 CPU 控制寄存器 CR2 给出的引起页面异常的线性地址在什么范围中
-    // 如果 address 小于 TASK_SIZE=0x4000000(即64MB),
-    // 表示异常页面位置在内核或任务 0 和任务 1 所处的线性地址范围内,
-    // 于是发出警告信息“内核范围内存被写保护”
-    if (address < TASK_SIZE)
+    /* 首先判断 CPU 控制寄存器 CR2 给出的引起页面异常的线性地址在什么范围中
+     * 如果 address 小于 TASK_SIZE=0x4000000(即64MB),
+     * 表示异常页面位置在内核或任务 0 和任务 1 所处的线性地址范围内,
+     * 于是发出警告信息“内核范围内存被写保护” */
+    if (address < TASK_SIZE) {
         printk("\n\rBAD! KERNEL MEMORY WP-ERR!\n\r");
+    }
 
-    // 如果 (address–当前进程代码起始地址) 大于一个进程的长度(64MB), 表示
-    // address 所指的线性地址不在引起异常的进程线性地址空间范围内,
-    // 则在发出出错信息后退出
-    // TODO: 在了解一下进程内存分布
+    /* 如果 (address–当前进程代码起始地址) 大于一个进程的长度(64MB), 表示
+     * address 所指的线性地址不在引起异常的进程线性地址空间范围内,
+     * 则在发出出错信息后退出 */
     if (address - current->start_code > TASK_SIZE) {
         printk("Bad things happen: page error in do_wp_page\n\r");
         do_exit(SIGSEGV);
@@ -411,7 +438,9 @@ void get_empty_page(unsigned long address)
     }
 }
 
-/*
+/**
+ * @brief 尝试对当前进程指定地址处的页面进行共享处理
+ *
  * try_to_share() checks the page at address "address" in the task "p",
  * to see if it exists, and if it is clean. If so, share it with the current
  * task.
@@ -419,17 +448,19 @@ void get_empty_page(unsigned long address)
  * NOTE! This assumes we have checked that p != current, and that they
  * share the same executable or library.
  *
- * 尝试对当前进程指定地址处的页面进行共享处理
+ * 这个函数有个前提知识点: 所有进程使用的页目录项和页表项, 都是同一个
  *
- * 当前进程与进程 p 是同一执行代码, 也可以认为当前进程是由 p 进程执行 fork
- * 操作产生的进程, 因此它们的代码内容一样.
- * 如果未对数据段内容作过修改那么数据段内容也应一样 如果 p 进程 address
- * 处的页面存在并且没有被修改过的话, 就让当前进程与 p 进程共享之.
+ * 因为只可以共享代码段或者共享库所在的数据区, 因此执行到本函数, 可以认为当前进程与进程 p
+ * 是同一执行代码, 也可以认为当前进程是由 p 进程执行 fork 操作产生的进程, 因此它们的代码
+ * 内容一样. 如果未对数据段内容作过修改那么数据段内容也应一样. 如果 p 进程 address 处的
+ * 页面存在并且没有被修改过的话, 就让当前进程与 p 进程共享之.
+ *
  * 同时还需要验证指定的地址处是否已经申请了页面, 若是则出错/死机
- * 参数:
- *      address 是当前进程中的逻辑地址, 希望能与 p 进程共享页面的逻辑页面地址
- *      p 是将被共享页面的进程
- * 返回: 1 - 页面共享处理成功, 0 - 失败 */
+ *
+ * @param address 当前进程中相对于代码段的起始地址的逻辑地址
+ * @param p 是将被共享页面的进程
+ * @return int 1-页面共享处理成功, 0-失败
+ */
 static int try_to_share(unsigned long address, struct task_struct *p)
 {
     unsigned long from;
@@ -441,40 +472,41 @@ static int try_to_share(unsigned long address, struct task_struct *p)
     /* 页目录项索引 */
     from_page = to_page = ((address >> 20) & 0xffc);
 
-    /* 这里的操作是 address 是进程空间里面的线性地址, 它的范围是 0-64MB
-     * 因此 address 对应的 PDE, 是相对于进程空间本身的
-     * 下面用 start_code 在计算一次 PDE, 这次算出来的是进程空间在 4GB
-     * 空间上的偏移 因此两者相加, 就是 address 在 4GB 空间上的页表项
-     *
-     * TODO: 确认这部分分析 */
+    /* 这里的操作是 address 是进程空间里面的线性地址, 它的范围是 0-64MB, 因此 address 对应的 PDE,
+     * 是相对于进程空间本身的, 下面用 start_code 在计算一次 PDE, 这次算出来的是进程空间在 4GB 空间
+     * 上的偏移, 因此两者相加, 就是 address 在 4GB 空间上的页表项 */
     from_page += ((p->start_code >> 20) & 0xffc);     // p进程目录项
     to_page += ((current->start_code >> 20) & 0xffc); // 当前进程目录项
 
     /* is there a page-directory at from?
      * 源页目录项内容. 如果标记不存在, 谈不上共享, 直接退出 */
     from = *(unsigned long *)from_page;
-    if (!(from & 1))
+    if (!(from & 1)) {
         return 0;
+    }
 
     from &= 0xfffff000;                           /* 得到源页表页地址 */
     from_page = from + ((address >> 10) & 0xffc); /* 页表页基址加上页表页索引, 得指向 PTE 指针 */
     phys_addr = *(unsigned long *)from_page;      /* 取出来 PTE 内容 */
-                                                  /* is the page clean and present?
-                                              * 查看 PTE 内容是否是 (!Dirty && Present) */
-    if ((phys_addr & 0x41) != 0x01)
+
+    /* is the page clean and present? */
+    if ((phys_addr & (PAGE_DIRTY || PAGE_PRESENT)) != PAGE_PRESENT) {
         return 0;
+    }
 
     /* 源页面物理地址 */
     phys_addr &= 0xfffff000;
-    if (phys_addr >= HIGH_MEMORY || phys_addr < LOW_MEM)
+    if (phys_addr >= HIGH_MEMORY || phys_addr < LOW_MEM) {
         /* 要求物理地址在主内存空间, 否则也不共享 */
         return 0;
+    }
 
     /* 目的页目录项内容, 如果标记不存在, 需要分配一个当做页表的页 */
     to = *(unsigned long *)to_page;
     if (!(to & 1)) {
         if ((to = get_free_page())) {
-            *(unsigned long *)to_page = to | 7; /* 页表是存在,可读写,超级用户权限 */
+            /* 页表属性: 存在,可读写,超级用户权限 */
+            *(unsigned long *)to_page = to | (PAGE_PRESENT | PAGE_USER | PAGE_RW);
         } else {
             oom();
         }
@@ -482,7 +514,7 @@ static int try_to_share(unsigned long address, struct task_struct *p)
 
     to &= 0xfffff000;                         /* 页表页地址 */
     to_page = to + ((address >> 10) & 0xffc); /* PTE 地址 */
-    if (1 & *(unsigned long *)to_page) {
+    if (PAGE_PRESENT & *(unsigned long *)to_page) {
         /* 要把 from 共享到 to, 自然要求 to 不存在 */
         panic("try_to_share: to_page already exists");
     }
@@ -490,7 +522,7 @@ static int try_to_share(unsigned long address, struct task_struct *p)
     /* share them: write-protect
      * 把写标记清除, 将来好 Copy-On-Write
      * 并让 from_page, to_page 都指向 from_page 对应的物理地址 */
-    *(unsigned long *)from_page &= ~2;
+    *(unsigned long *)from_page &= ~PAGE_RW;
     *(unsigned long *)to_page = *(unsigned long *)from_page;
 
     /* 更新 TLB */
@@ -504,7 +536,9 @@ static int try_to_share(unsigned long address, struct task_struct *p)
     return 1;
 }
 
-/*
+/**
+ * @brief 查找 inode 是否已经在内存中, 如果可能将对应的内存映射到 address
+ *
  * share_page() tries to find a process that could share a page with
  * the current one. Address is the address of the wanted page relative
  * to the current data space.
@@ -519,24 +553,21 @@ static int try_to_share(unsigned long address, struct task_struct *p)
  * 该 inode, 则它应该大于 1
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * 在发生缺页异常时, 首先看看能否与运行同一个执行文件的其他进程进行页面共享处理
- * 该函数首先判断系统中是否有另一个进程也在运行当前进程一样的执行文件. 若有,
- * 则在 系统当前所有任务中寻找这样的任务.
- * 若找到了这样的任务就尝试与其共享指定地址处的 页面.
- * 若系统中没有其他任务正在运行与当前进程相同的执行文件, 那么共享页面操作的
- * 前提条件不存在, 因此函数立刻退出.
+ * 在发生缺页异常时, 首先看看能否与运行同一个执行文件的其他进程进行页面共享处理该函数首先判断系统中
+ * 是否有另一个进程也在运行当前进程一样的执行文件. 若有, 则在系统当前所有任务中寻找这样的任务.
+ * 若找到了这样的任务就尝试与其共享指定地址处的页面. 若系统中没有其他任务正在运行与当前进程相同的
+ * 执行文件, 那么共享页面操作的前提条件不存在, 因此函数立刻退出.
  *
- * 判断系统中是否有另一个进程也在执行同一个执行文件的方法是利用进程任务数据结构中
- * 的 executable 字段(或 library 字段),
- * 该字段指向进程正在执行程序(或使用的库文件) 在内存中的 i 节点. 根据该 i
- * 节点的引用次数 i_count 我们可以进行这种判断 若节点的 i_count 值大于 1,
- * 则表明系统中有两个进程正在运行同一个执行文件(或库文件),
- * 于是可以再对任务结构数组中所有任务比较是否有相同的 executable 字段(或 library
- * 字段) 来最后确定多个进程运行着相同执行文件的情况
+ * 判断系统中是否有另一个进程也在执行同一个执行文件的方法是利用进程任务数据结构中的 executable
+ * 字段(或 library 字段), 该字段指向进程正在执行程序(或使用的库文件) 在内存中的 inode. 根据该
+ * inode 的引用次数 i_count 我们可以进行这种判断, 若节点的 i_count 值大于 1, 则表明系统中有两
+ * 个进程正在运行同一个执行文件(或库文件), 于是可以再对任务结构数组中所有任务比较是否有相同的
+ * executable 字段(或 library 字段) 来最后确定多个进程运行着相同执行文件的情况
  *
- * 参数: inode 是欲进行共享页面进程执行文件的内存 i 节点
- *      address 是进程中的逻辑地址, 即是当前进程欲与 p
- * 进程共享页面的逻辑页面地址 返回: 1-共享操作成功, 0-失败 */
+ * @param inode 欲进行共享页面进程执行文件的内存 inode
+ * @param address 当前进程中相对于代码段的起始地址的逻辑地址
+ * @return int 1-共享操作成功, 0-失败
+ */
 static int share_page(struct m_inode *inode, unsigned long address)
 {
     struct task_struct **p;
@@ -549,33 +580,42 @@ static int share_page(struct m_inode *inode, unsigned long address)
     /* 遍历进程列表, 找找是那个进程和当前进程共用了 inode,
      * 然后试着共享这个进程的页面 */
     for (p = &LAST_TASK; p > &FIRST_TASK; --p) {
-        if (!*p)
+        if (!*p) {
             continue;
+        }
 
-        if (current == *p)
+        if (current == *p) {
             continue;
+        }
 
         /* address 位于库区域还是自生可执行区域 */
         if (address < LIBRARY_OFFSET) {
-            if (inode != (*p)->executable)
+            if (inode != (*p)->executable) {
                 continue;
+            }
         } else {
-            if (inode != (*p)->library)
+            if (inode != (*p)->library) {
                 continue;
+            }
         }
 
-        /* 试着共享页面, 如果成功直接退出, 如果不成功继续尝试和其他的 task 共享
-         */
-        if (try_to_share(address, *p))
+        /* 试着共享页面, 如果成功直接退出, 如果不成功继续尝试和其他的 task 共享 */
+        if (try_to_share(address, *p)) {
             return 1;
+        }
     }
 
     return 0;
 }
 
 /**
- * 这个函数用来处理缺页异常
- * 页面异常有两种类型, 一种是写保护异常, 还有一种是缺页异常 */
+ * @brief 处理缺页异常
+ *
+ * 页面异常有两种类型, 一种是写保护异常, 还有一种是缺页异常
+ *
+ * @param error_code
+ * @param address
+ */
 void do_no_page(unsigned long error_code, unsigned long address)
 {
     int nr[4];
@@ -585,8 +625,9 @@ void do_no_page(unsigned long error_code, unsigned long address)
     struct m_inode *inode;
 
     /* 只为主内存空间服务 */
-    if (address < TASK_SIZE)
+    if (address < TASK_SIZE) {
         printk("\n\rBAD!! KERNEL PAGE MISSING\n\r");
+    }
 
     /* 超出了应用自身的空间范围 */
     if (address - current->start_code > TASK_SIZE) {
@@ -594,8 +635,9 @@ void do_no_page(unsigned long error_code, unsigned long address)
         do_exit(SIGSEGV);
     }
 
-    page = *(unsigned long *)((address >> 20) & 0xffc); /* PDE 内容 */
-    if (page & 1) {                                     /* PDE 有记录 */
+    /* 页目录表在 0x0 位置处 */
+    page = *(unsigned long *)((address >> 20) & 0xffc); /* PDE 内容, ((address >> 22) << 2) */
+    if (page & 1) {                                     /* PDE 对应的页存在 */
         page &= 0xfffff000;                             /* 页表页地址 */
         page += (address >> 10) & 0xffc;                /* PTE 地址 */
         tmp = *(unsigned long *)page;                   /* PTE 内容 */
@@ -605,22 +647,28 @@ void do_no_page(unsigned long error_code, unsigned long address)
         }
     }
 
-    /**
-     * 到这里有 2 种情况
+    /* 到这里有 2 种情况
      *  1. (page & 1) = 0, 即页表页不存在
-     *  2. PTE = nil 或者 (PTE & 1) == 1, 物理帧不存在
-     * 2 似乎不太可能发生?
-     * 这里先按 1 的情况理解 */
+     *  2. PTE = nil 或者 (PTE & 1) == 1, 物理帧不存在 */
 
-    address &= 0xfffff000;               /* 计算进程内地址的页面地址 */
-    tmp = address - current->start_code; /* 得到 address 在进程内部的相对位置 */
+    /* 进程内存模型如下:
+     * (代码段) -- (数据段 -- 栈 -- ARGS -- LIBRARY) */
+
+    address &= 0xfffff000; /* address 对应的线性空间页面起始位置地址 */
+
+    /* 得到 address 页面在进程内部的相对位置, 这个可以帮我们判断 address
+     * 对应的是什么性质的内存区域 */
+    tmp = address - current->start_code;
     if (tmp >= LIBRARY_OFFSET) {
+        /* 如果是 library 缺页异常, 加载 library 对应的 inode 数据 */
         inode = current->library;
         block = 1 + (tmp - LIBRARY_OFFSET) / BLOCK_SIZE;
     } else if (tmp < current->end_data) {
+        /* 这里是代码段对应的缺页, 加载代码段 */
         inode = current->executable;
         block = 1 + tmp / BLOCK_SIZE;
     } else {
+        /* 其他情况, 不用加载磁盘 */
         inode = NULL;
         block = 0;
     }
@@ -633,12 +681,14 @@ void do_no_page(unsigned long error_code, unsigned long address)
     }
 
     /* 尝试共享已有页面 */
-    if (share_page(inode, tmp))
+    if (share_page(inode, tmp)) {
         return;
+    }
 
     /* 不能共享页面的, 分配新页面 */
-    if (!(page = get_free_page()))
+    if (!(page = get_free_page())) {
         oom();
+    }
 
     /* TODO: 下面和文件系统相关,
      * 根据这个块号和执行文件的 i 节点,
@@ -669,8 +719,9 @@ void do_no_page(unsigned long error_code, unsigned long address)
      * 算出来是多读进来的数据
      */
     i = tmp + 4096 - current->end_data;
-    if (i > 4095)
+    if (i > 4095) {
         i = 0;
+    }
 
     /* page + 4096 表示的是 page 末尾地址
      * 下面的 for 循环, 从页面的结束为止开始, 擦除 i 字节数据 */

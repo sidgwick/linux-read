@@ -492,15 +492,16 @@ int tty_read(unsigned channel, char *buf, int nr)
         return (tty_signal(SIGTTIN, tty));
     }
 
-    /* TODO: 0x80 是什么? 0x40 又是什么?
-     * Master PTY 固定使用 0x40标志位，Slave 使用 0x80标志位
-     * 如果 tty 终端是一个伪终端, 则再取得另一个对应伪终端(主从
-     * 伪终端)的 tty 结构 other_tty
+    /* TODO-DONE: 0x80 是什么? 0x40 又是什么?
+     * 答: Master PTY 固定使用 0x40标志位，Slave 使用 0x80标志位
      *
+     * 如果 tty 终端是一个伪终端, 则再取得另一个对应伪终端(主从伪终端)的 tty 结构 other_tty
      *
-     * 若 channel = 0xC0 是 Master PTY, 则 `0xC0 ^ 0x40 = 1100_0000 ^ 0100_0000 = 1000_0000`
+     * 若 channel = 0xC0 是 Master PTY, 则 `0xC0 ^ 0x40` 就是在清除 Master 标志，转换为
+     * Slave 的设备索引, 运算原理是: `1100_0000 ^ 0100_0000 = 1000_0000`
      *
-     * 即清除 Master 标志，转换为 Slave 的设备索引
+     * 128: 10000000
+     * 192: 11000000
      *
      * 在数据结构层面, tty_table 是存放所有 TTY 设备的结构数组, 每个伪终端在主设备表中索引为 N 时,
      * 其对应的从设备在从设备表中的索引就是 N+128 (因为 NR_PTYS 定义为 4, 主设备表从 128 开始,
@@ -691,7 +692,7 @@ int tty_write(unsigned channel, char *buf, int nr)
             break;
         }
 
-        /* 没读够, 就一直读 */
+        /* 没读写, 就一直写 */
         while (nr > 0 && !FULL(tty->write_q)) {
             c = get_fs_byte(b);
 
@@ -707,7 +708,10 @@ int tty_write(unsigned channel, char *buf, int nr)
                 /* 如果该字符是换行符 LF 并且回车标志 cr_flag 没有置位, 但换行转回车-换行标志 ONLCR
                  * 置位的话, 则将 cr_flag 标志置位, 并将一回车符放入写队列中
                  *
-                 * TODO: 这是在干啥? 好像是吧 LF 替换换成了 CR 字符? */
+                 * TODO-DONE: 这是在干啥?
+                 * 答: 这里在 `\n` 之前自动插入一个 `\r` 字符. 在早期的终端和打印机设备中, 换行和回车是
+                 *     两个独立的控制字符, 某些终端设备只接收 `\r\n` 的组合来实现“换行到下一行开头”的效果,
+                 *     因此, 操作系统需要在输出时将单独的 `\n` 自动转换为 `\r\n` 序列 */
                 if (c == '\n' && !cr_flag && O_NLCR(tty)) {
                     cr_flag = 1;
                     PUTCH(13, tty->write_q);

@@ -161,9 +161,9 @@ struct task_struct {
                               // 在 64M 边界上)
     unsigned long end_code;   // 代码长度(字节数)
     unsigned long end_data;   // 代码长度 + 数据长度(字节数)
-    unsigned long brk;        // 总长度(字节数)
+    unsigned long brk;        // 程序总长度(字节数 code+data+bss)
 
-    unsigned long start_stack; // 堆栈段地址
+    unsigned long start_stack; // 栈底
     long pid;                  // 进程标识号(进程号)
     long pgrp;                 // 进程组号
     long session;              // 会话号

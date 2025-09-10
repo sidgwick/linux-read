@@ -245,7 +245,9 @@ static int set_termio(struct tty_struct *tty, struct termio *termio, int channel
  * @param arg 操作参数指针
  * @return int
  *
- * TODO: 研究一下 dev 是哪里来的
+ * TODO-DONE: 研究一下 dev 是哪里来的
+ * 答: dev 是根据 ioctl 系统调用中的文件描述符, 找到对应的 inode, 然后在设备文件
+ *     的 inode.zone[0] 里面获取到 dev
  */
 int tty_ioctl(int dev, int cmd, int arg)
 {
@@ -395,7 +397,10 @@ int tty_ioctl(int dev, int cmd, int arg)
         /* 执行该命令的前提条件是进程必须有控制终端
          * 如果当前进程没有控制终端或者 dev 不是其控制终端, 或者控制终端现在的确是
          * 正在处理的终端 dev, 但进程的会话号与该终端 dev 的会话号不同, 则返回无终端错误信息
-         * TODO: tty session 实在哪里赋值的? */
+         *
+         * TODO-DONE: tty session 实在哪里赋值的?
+         * 答: 在 open tty 设备文件的时候处理的. 执行任务的时候, 除了简单的使用 execve 执行程序之外,
+         *     也可以通过打开 tty 设备, 来关联 tty 和 task session. 参考 init/main.c 里面的处理 */
         if ((current->tty < 0) || (current->tty != dev) || (tty->session != current->session)) {
             return -ENOTTY;
         }

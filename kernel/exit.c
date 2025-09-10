@@ -397,13 +397,18 @@ static int has_stopped_jobs(int pgrp)
     return (0);
 }
 
-/* 程序退出处理函数
+/**
+ * @brief 程序退出处理函数
  *
  * 被系统调用处理函数 sys_exit 调用
  *
  * 该函数将根据当前进程自身的特性对其进行处理, 并把当前进程状态
  * 设置成僵死状态 TASK_ZOMBIE, 最后调用调度函数 schedule 去
- * 执行其它进程, 不再返回 */
+ * 执行其它进程, 不再返回
+ *
+ * @param code
+ * @return volatile
+ */
 volatile void do_exit(long code)
 {
     struct task_struct *p;
@@ -428,7 +433,7 @@ volatile void do_exit(long code)
     current->executable = NULL;
     iput(current->library);
     current->library = NULL;
-    current->state = TASK_ZOMBIE;
+    current->state = TASK_ZOMBIE; /* 注意看进程退出的时候状态变成僵死状态 */
     current->exit_code = code;
 
     /* Check to see if any process groups have become orphaned
@@ -473,7 +478,9 @@ volatile void do_exit(long code)
      *    as a result of our exiting, and if they have any stopped
      *    jons, send them a SIGUP and then a SIGCONT.  (POSIX 3.2.2.2)
      *
-     * 处理可能受影响的子进程 */
+     * 处理可能受影响的子进程
+     *  1. 让 init 收养子进程
+     *  2. 按照 POSIX 标准, 给因为此次退出而变成孤儿进程组的进程发送 `SIGUP + SIGCONT` */
     if ((p = current->p_cptr)) {
         while (1) {
             p->p_pptr = task[1]; /* init 进程收养子进程 */
@@ -517,7 +524,7 @@ volatile void do_exit(long code)
         }
     }
 
-    /* 如果当前进程是某个会话首领, 若它有控制终端, 则首先向使用该控制终端的
+    /* 如果当前进程是某个会话首领, 且它有控制终端, 则首先向使用该控制终端的
      * 进程组发送挂断信号 SIGHUP, 然后释放该终端
      *
      * 接着扫描任务数组, 把属于当前进程会话中进程的终端置空(取消) */
@@ -566,7 +573,9 @@ int sys_exit(int error_code)
     return 0;
 }
 
-/* 系统调用 waitpid
+/**
+ * @brief 系统调用 waitpid
+ *
  * 挂起当前进程, 直到 pid 指定的子进程:
  *  1. 退出(终止)
  *  2. 收到要求终止该进程的信号
@@ -582,10 +591,11 @@ int sys_exit(int error_code)
  * 若 options = WNOHANG, 表示如果没有子进程退出或终止就马上返回
  * 如果返回状态指针 stat_addr 不为空, 则就将状态信息保存到那里
  *
- * 参数:
- *  - pid 是进程号
- *  - stat_addr 是保存状态信息位置的指针
- *  - options 是 waitpid 选项 */
+ * @param pid 进程号
+ * @param stat_addr 保存状态信息位置的指针
+ * @param options waitpid 选项
+ * @return int
+ */
 int sys_waitpid(pid_t pid, unsigned long *stat_addr, int options)
 {
     int flag;

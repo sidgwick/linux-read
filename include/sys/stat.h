@@ -30,6 +30,9 @@ struct stat {
 // 名称 S_IRWXU 是 State/Inode/Read/Write/eXecute/User 的组合
 // 其它名称可以此类推
 
+#define S_PIPE_READ 1
+#define S_PIPE_WRITE 2
+
 /**
  * 总结一下, st_mode 字段使用一个 16 bits 整形来表示含义, 16 bits 记作
  * FEDC_BA9_876_543_210, 作用如下:
@@ -64,6 +67,8 @@ struct stat {
 // S_ISUID 用于测试文件的 set-user-ID 标志是否置位.
 // 若该标志置位, 则当执行该文件时, 进程的有效用户 ID 将被设置为该文件宿主的用户
 // ID S_ISGID 则是针对组 ID 进行相同处理
+// 这两个标志主要是让一般用户能够执行特权用户(如超级用户 root)的程序, 例如改变
+// 密码的程序 passwd 等
 #define S_ISUID 0004000 // 执行时设置用户 ID(set-user-ID)
 #define S_ISGID 0002000 // 执行时设置组 ID(set-group-ID)
 #define S_ISVTX 0001000 // 对于目录, 受限删除标志

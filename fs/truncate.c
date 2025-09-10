@@ -106,7 +106,10 @@ void truncate(struct m_inode *inode)
     int block_busy;
 
     /* 只有常规文件, 目录, 符号链接文件可以做清空处理
-     * TODO: 目录也可以??? */
+     * TODO-DONE: 目录也可以???
+     * 答: 从代码层面看, 是可以的. 目录是文件内容为 directory entry 的特殊的文件
+     *     PS: 在现代的 linux 上试着用 truncate 命令清空目录是不允许的, 可以在探究
+     *         一下现代 linux 在 truncate 方面的处理逻辑 */
     if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))) {
         return;
     }

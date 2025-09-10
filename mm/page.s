@@ -38,7 +38,7 @@ page_fault:
     call do_no_page # 处理缺页异常
     jmp 2f
 1:  call do_wp_page # 处理非缺页异常
-2:    addl $8,%esp # 清理栈上面参数
+2:  addl $8,%esp # 清理栈上面参数
     pop %fs
     pop %es
     pop %ds

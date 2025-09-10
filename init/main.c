@@ -250,27 +250,38 @@ void init(void)
     int pid, i;
 
     setup((void *)&drive_info);
-    (void)open("/dev/tty1", O_RDWR, 0);
-    (void)dup(0);
-    (void)dup(0);
+
+    /* 打开 tty1 文件, 这样 tty1 就和当前会话关联在一起了 */
+    (void)open("/dev/tty1", O_RDWR, 0); /* STDIN */
+    (void)dup(0);                       /* STDOUT */
+    (void)dup(0);                       /* STDERR */
 
     printf("%d buffers = %d bytes buffer space\n\r", NR_BUFFERS, NR_BUFFERS * BLOCK_SIZE);
     printf("Free mem: %d bytes\n\r", memory_end - main_memory_start);
+
+    /* fork 出来低一个进程, fork 父进程收到 pid, 子进程收到 0 */
     if (!(pid = fork())) {
-        close(0);
+        /* 子进程执行 */
+
+        close(0); /* 关闭标准输入 */
+
+        /* `/etc/rc` 是标准输入 */
         if (open("/etc/rc", O_RDONLY, 0)) {
             _exit(1);
         }
 
+        /* 使用 sh 执行 `/etc/rc` 中的内容 */
         execve("/bin/sh", argv_rc, envp_rc);
         _exit(2);
     }
 
+    /* 父进程等子进程结束 */
     if (pid > 0) {
         while (pid != wait(&i))
             /* nothing */;
     }
 
+    /* init 进程是个死循环, 永不退出 */
     while (1) {
         if ((pid = fork()) < 0) {
             printf("Fork failed in init\r\n");
@@ -278,6 +289,8 @@ void init(void)
         }
 
         if (!pid) {
+            /* 子进程 */
+
             close(0);
             close(1);
             close(2);
@@ -290,6 +303,7 @@ void init(void)
             _exit(execve("/bin/sh", argv, envp));
         }
 
+        /* 父进程, 子进程没机会执行到这里 */
         while (1) {
             if (pid == wait(&i)) {
                 break;

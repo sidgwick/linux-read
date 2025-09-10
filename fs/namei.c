@@ -88,7 +88,8 @@ static int permission(struct m_inode *inode, int mask)
  *
  * NOTE! unlike strncmp, match returns 1 for success, 0 for failure.
  *
- * TODO: 目录项里面的 `.`, `..` 是怎么写进去的?
+ * TODO-DONE: 目录项里面的 `.`, `..` 是怎么写进去的?
+ * 答: 参考 sys_mkdir 里面的逻辑
  *
  * @param len 比较长度
  * @param name 文件名字符串
@@ -135,7 +136,10 @@ static int match(int len, const char *name, struct dir_entry *de)
  * This also takes care of the few special cases due to '..'-traversal
  * over a pseudo-root and a mount point.
  *
- * @param dir 代表目录的 inode, TODO: 为啥给个二级指针?
+ * TODO-DONE: 为啥给个 dir 二级指针?
+ * 答: 主要是用于在跨设备 mount 的时候, 确保 dir 能跟踪到最新的设备
+ *
+ * @param dir 代表目录的 inode
  * @param name 目录中的文件名
  * @param namelen 文件名的长度
  * @param res_dir 接受搜索结果的 dir_entry 结构指针
@@ -161,8 +165,10 @@ static struct buffer_head *find_entry(struct m_inode **dir, const char *name, in
     /* 目录是一种特殊的文件, 它的文件内容是一系列的 dir_entry */
     entries = (*dir)->i_size / (sizeof(struct dir_entry));
     *res_dir = NULL;
+
     /* check for '..', as we might have to do some "magic" for it
-     * name == '..' 的时候, 这里做一些特别的处理 */
+     * name == '..' 的时候, 这里做一些特别的处理
+     * 主要是处理目录是根目录和挂载点的情况 */
     if (namelen == 2 && get_fs_byte(name) == '.' && get_fs_byte(name + 1) == '.') {
         /* '..' in a pseudo-root results in a faked '.' (just change namelen)
          * 在 dir 是当前进程 root 目录的情况下, `..` 被视作 `.` 处理 */
@@ -265,6 +271,7 @@ static struct buffer_head *add_entry(struct m_inode *dir, const char *name, int 
         return NULL;
     }
 
+    /* 第一个区块读入内存 */
     if (!(block = dir->i_zone[0])) {
         return NULL;
     }
@@ -273,6 +280,7 @@ static struct buffer_head *add_entry(struct m_inode *dir, const char *name, int 
         return NULL;
     }
 
+    /* 检查目录的 entry, 找到闲置的 entry 之后, 把这个选定为后续的操作对象 */
     i = 0;
     de = (struct dir_entry *)bh->b_data;
     while (1) {
@@ -287,7 +295,13 @@ static struct buffer_head *add_entry(struct m_inode *dir, const char *name, int 
             }
 
             /* 区块读入内存
-             * TODO: 读取的缓冲块指针为空, 说明逻辑块可能是因为不存在而新创建的空块??? */
+             * TODO-DONE: 读取的缓冲块指针为空, 说明逻辑块可能是因为不存在而新创建的空块???
+             * 答: 这里的空只会出现在读取过程中, 读到的数据马上被修改的情况. 因为本函数的目的是在目录中
+             *     追加内容, 只需要找到一个空闲的 entry 项就行, 不要求在用的 entry 和空闲的 entry 之
+             *     间必须是连续的, 因此这里可以放心的跳过读取失败的内容, 直接处理下一个数据区块.
+             *
+             *     此处最坏的影响是, 目录还能放得下内容, 但是因为这里的跳过, 本函数报告无法容纳
+             *     但是这里 bh = NULL, 会在 if 条件里面造成解引用 NULL 地址, 这个行为应该是个 BUG */
             if (!(bh = bread(dir->i_dev, block))) {
                 i += DIR_ENTRIES_PER_BLOCK;
                 continue;
@@ -699,7 +713,7 @@ int open_namei(const char *pathname, int flag, int mode, struct m_inode **res_in
     }
 
     /* 目录不支持读操作, 或者操作权限不够
-     * TODO: flag 具体是怎么组成的?
+     * TODO-DONE: flag 具体是怎么组成的?
      * 答: flag 的低 2 位是控制读写的, 可以是 O_RDONLY/O_WRONLY/O_RDWR 的位与组合
      *     ACC_MODE(flag) 可以取到一个对应的读写权限判断 mode:
      *          flag = 0 --> mode = 004
@@ -739,7 +753,7 @@ int sys_mknod(const char *filename, int mode, int dev)
 
     /* pathname 是以 `/` 结尾的字符串
      * TODO-DONE: 为什么不支持? - 是目录不支持 mknod 操作?
-     * 答: 目录应该使用 sys_mkdir 创建 */
+     * 答: 目录应该使用 sys_mkdir 创建, 一般 mknod 是用来创建设备文件的 */
     if (!namelen) {
         iput(dir);
         return -ENOENT;
@@ -1002,7 +1016,8 @@ int sys_rmdir(const char *name)
     }
 
     /* dir 和 inode 属于不同的设备, 这说明
-     * TODO: 再看一下挂载点的内容 */
+     * TODO-DONE: 再看一下挂载点的内容
+     * 答: 挂载之后, 在超级块里面登记挂载目录的 inode, 在被挂在目录的 inode 登记被挂载标记 */
     if (inode->i_dev != dir->i_dev || inode->i_count > 1) {
         iput(dir);
         iput(inode);
@@ -1197,7 +1212,7 @@ int sys_symlink(const char *oldname, const char *newname)
     inode->i_size = i;
     inode->i_dirt = 1;
 
-    /* 确保 basename 不存在 */
+    /* 确保 basename 不存在(同目录下面不能有一样的名字) */
     bh = find_entry(&dir, basename, namelen, &de);
     if (bh) {
         inode->i_nlinks--;

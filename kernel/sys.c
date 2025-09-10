@@ -283,8 +283,10 @@ int sys_times(struct tms *tbuf)
  * 该函数并不被用户直接调用, 而由 libc 库函数进行包装, 并且返回值也不一样 */
 int sys_brk(unsigned long end_data_seg)
 {
-    if (end_data_seg >= current->end_code && end_data_seg < current->start_stack - 16384)
+    if (end_data_seg >= current->end_code && end_data_seg < current->start_stack - 16384) {
         current->brk = end_data_seg;
+    }
+
     return current->brk; /* 返回进程当前的数据段结尾值 */
 }
 

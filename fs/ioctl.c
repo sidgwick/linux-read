@@ -26,22 +26,42 @@ static ioctl_ptr ioctl_table[] = {NULL,      /* nodev */
                                   NULL,      /* /dev/lp */
                                   NULL};     /* named pipes */
 
+/**
+ * @brief ioctl 系统调用
+ *
+ * @param fd
+ * @param cmd
+ * @param arg
+ * @return int
+ */
 int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
     struct file *filp;
     int dev, mode;
 
-    if (fd >= NR_OPEN || !(filp = current->filp[fd]))
+    if (fd >= NR_OPEN || !(filp = current->filp[fd])) {
         return -EBADF;
-    if (filp->f_inode->i_pipe)
-        return (filp->f_mode & 1) ? pipe_ioctl(filp->f_inode, cmd, arg) : -EBADF;
+    }
+
+    if (filp->f_inode->i_pipe) {
+        /* 仅有读管道允许执行 ioctl 操作 */
+        return (filp->f_mode & S_PIPE_READ) ? pipe_ioctl(filp->f_inode, cmd, arg) : -EBADF;
+    }
+
+    /* 仅有字符设备和块设备允许执行 ioctl */
     mode = filp->f_inode->i_mode;
-    if (!S_ISCHR(mode) && !S_ISBLK(mode))
+    if (!S_ISCHR(mode) && !S_ISBLK(mode)) {
         return -EINVAL;
+    }
+
     dev = filp->f_inode->i_zone[0];
-    if (MAJOR(dev) >= NRDEVS)
+    if (MAJOR(dev) >= NRDEVS) {
         return -ENODEV;
-    if (!ioctl_table[MAJOR(dev)])
+    }
+
+    if (!ioctl_table[MAJOR(dev)]) {
         return -ENOTTY;
+    }
+
     return ioctl_table[MAJOR(dev)](dev, cmd, arg);
 }

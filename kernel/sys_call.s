@@ -285,8 +285,10 @@ timer_interrupt:
     movb $0x20,%al  # EOI to interrupt controller #1
     outb %al,$0x20
 
+    # 程序运行到此处的时候, 栈的状态
     # CS = 0x24 = 36
     # stack = (EAX, EBX, ECX, EDX, -1, FS, ES, DS, EIP, CS, EFLAGS, ESP*, SS*, ...)
+
     movl CS(%esp), %eax
     andl $3, %eax        # (0011 & %eax) is CPL (0 or 3, 0=supervisor)
     pushl %eax
@@ -296,11 +298,11 @@ timer_interrupt:
 
 # 这是 sys_execve 系统调用.
 # 取中断调用程序的代码指针作为参数调用 C 函数 do_execve (在 fs/exec.c)
-# stack = (EIP0, EBX, ECX, EDX, ORIGI_EAX, FS, ES, DS, EIP, CS, EFLAGS, ESP, SS, ...)
-#          ^     ^                                     ^
-#          |     sys_call ---------------------------- int0x80
+# 调用到本函数的时候, 栈的状态:
+# stack = (EIP, EBX, ECX, EDX, ORIGI_EAX, FS, ES, DS, EIP, CS, EFLAGS, ESP, SS, ...)
+#          ^    ^                                     ^
+#          |    sys_call --------------------------<| int0x80
 #          sys_execve
-# TODO: EIP(%esp) 到底是如何运作的???
 .align 2
 sys_execve:
     lea EIP(%esp), %eax # eax 指向的是堆栈中保存用户程序 eip 指针处

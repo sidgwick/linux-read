@@ -98,7 +98,7 @@ int sys_sync(void)
         wait_on_buffer(bh);
 
         /* 如果缓冲块是脏的, 就把缓冲块写到磁盘里面. 注意这里没有考虑 bh 的
-         * b_count 之类的东西, 只要它脏, 就需要 suny 到磁盘设备 */
+         * b_count 之类的东西, 只要它脏, 就需要 sync 到磁盘设备 */
         if (bh->b_dirt) {
             ll_rw_block(WRITE, bh);
         }
@@ -110,7 +110,7 @@ int sys_sync(void)
 /**
  * @brief 对指定设备进行高速缓冲数据与设备上数据的同步操作
  *
- * TODO: 弄清楚为什么需要两个 for 循环??
+ * TODO-DONE: 弄清楚为什么需要两个 for 循环??
  * 答: 这里采用两遍同步操作是为了提高内核执行效率
  *     第一遍缓冲区同步操作可以让内核中许多 '脏块' 变干净, 使得 inode 的同步操作能够高效执行.
  *     第二次缓冲区同步操作则把那些由于 inode 同步操作而又变脏的缓冲块与设备中数据同步
@@ -134,7 +134,7 @@ int sync_dev(int dev)
 
         wait_on_buffer(bh);
         if (bh->b_dev == dev && bh->b_dirt) {
-            ll_rw_block(WRITE, bh); /* 写操作会清楚 b_dirt */
+            ll_rw_block(WRITE, bh); /* 写操作会清除 b_dirt */
         }
     }
 

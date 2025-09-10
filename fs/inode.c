@@ -126,10 +126,10 @@ void sync_inodes(void)
 }
 
 /**
- * @brief 查询或者建立 inode 和 block 之间的关系
+ * @brief 查询或者建立文件 inode 和文件内区块编号之间的关系
  *
  * @param inode 文件的 inode 指针
- * @param block 文件对应的 block 序号
+ * @param block 文件内区块号
  * @param create 创建还是查询
  * @return int 返回 block 对应的设备逻辑 block 编号
  */
@@ -259,9 +259,7 @@ static int _bmap(struct m_inode *inode, int block, int create)
 }
 
 /**
- * @brief 取文件数据块block在设备上对应的逻辑块号
- *
- * TODO: 内存缺页那个地方有调用, 回过头去品味相关逻辑
+ * @brief 文件内部的区块编号转化为设备上的逻辑区块编号
  *
  * @param inode 文件的内存 inode 指针
  * @param block 文件中的数据块号
@@ -292,9 +290,7 @@ int create_block(struct m_inode *inode, int block)
  * 该函数主要用于把 inode 引用计数值递减 1, 并且若是管道 inode, 则唤醒等待的进程
  * 若是块设备文件 inode 则刷新设备. 并且若 inode 的链接计数为0, 则释放该 inode 占用
  * 的所有磁盘逻辑块, 并释放该 inode
- *
- * TODO: exit 的时候用到了, 回过头来看看
- *
+ * *
  * @param inode
  */
 void iput(struct m_inode *inode)
@@ -338,8 +334,10 @@ void iput(struct m_inode *inode)
     }
 
     /* 块设备文件的 i 节点, 此时逻辑块字段 i_zone[0] 中是设备号, 刷新该设备
-     * TODO: 找一下这个 i_zone[0] 保存设备号, 是在哪里操作的
-     * TODO: 为啥不直接用 inode->i_dev ??? */
+     * TODO-DONE: 找一下这个 i_zone[0] 保存设备号, 是在哪里操作的
+     * 答: mknod 的时候操作的. 这个 i_zone[0] 是 FS 的标准约定, 只要是设备文件, 就要这么处理
+     * TODO-DONE: 为啥不直接用 inode->i_dev ???
+     * 答: i_dev 是 inode 所在的磁盘设备, zone[0] 指的是 inode 对应的文件代表的那个设备 */
     if (S_ISBLK(inode->i_mode)) {
         sync_dev(inode->i_zone[0]);
         wait_on_inode(inode);

@@ -123,8 +123,11 @@ void rd_load(void)
         return;
     }
 
-    /* TODO: 了解一下磁盘超级块 */
-    /* 从文件系统基本参数中获取磁盘超级块(d_super_block 是磁盘超级块结构) */
+    /* TODO-DONE: 了解一下磁盘超级块
+     * 答: Minix 文件系统的设计有超级块的概念, 超级块里面记录了分区的节点数/块数
+     *    imap 区块数/inode 区块数以及首个数据区块等内容. 这个区块放在第二个逻辑区块位置
+     *
+     * 从文件系统基本参数中获取磁盘超级块(d_super_block 是磁盘超级块结构) */
     *((struct d_super_block *)&s) = *((struct d_super_block *)bh->b_data);
     brelse(bh);
 
