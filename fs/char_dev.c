@@ -68,6 +68,8 @@ static int rw_tty(int rw, unsigned minor, char *buf, int count, off_t *pos)
  */
 static int rw_ram(int rw, char *buf, int count, off_t *pos)
 {
+    // printk("rw_ram, rw=%d, buf=%p, count=%d, pos=%p\n", rw, buf, count, pos);
+
     return -EIO;
 }
 
@@ -82,6 +84,8 @@ static int rw_ram(int rw, char *buf, int count, off_t *pos)
  */
 static int rw_mem(int rw, char *buf, int count, off_t *pos)
 {
+    // printk("rw_mem, rw=%d, buf=%p, count=%d, pos=%p\n", rw, buf, count, pos);
+
     return -EIO;
 }
 
@@ -96,6 +100,20 @@ static int rw_mem(int rw, char *buf, int count, off_t *pos)
  */
 static int rw_kmem(int rw, char *buf, int count, off_t *pos)
 {
+    // printk("rw_kmem, rw=%d, buf=%p, count=%d, pos=%p\n", rw, buf, count, pos);
+
+    /* NOTICE: 这个 if 是我自己的修改, 不是 linux 0.12 里面的代码
+     * 主要是为了测试 ps 命令, 需要用到这里 */
+    if (rw == READ) {
+        int i = 0;
+
+        for (i = 0; i < count; i++) {
+            put_fs_byte(*(pos + i), buf);
+        }
+
+        return i;
+    }
+
     return -EIO;
 }
 

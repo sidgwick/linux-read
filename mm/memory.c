@@ -224,7 +224,7 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
 
             /* 页面清理掉写标记, 主要是如果有页面是公用的, 就可以实现
              * copy-on-write 操作 */
-            this_page &= ~PAGE_USER; /* 清理掉 RW 属性 */
+            this_page &= ~PAGE_RW; /* 清理掉 RW 属性 */
             *to_page_table = this_page;
             /* 位于主内存区域的页面, 需要追加引用计数 */
             if (this_page > LOW_MEM) {

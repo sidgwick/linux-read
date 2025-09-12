@@ -28,7 +28,7 @@
 
 
  */
-#define KBD_FINNISH
+#define KBD_US
 
 .text
 
