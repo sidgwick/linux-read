@@ -245,17 +245,17 @@ int do_signal(long signr, long eax, long ebx, long ecx, long edx, long orig_eax,
              * 则修改系统调用的返回值为 eax = -EINTR, 即被信号中断的系统调用 */
             *(&eax) = -EINTR;
         else {
-            /* 否则就恢复进程寄存器 eax 在调用系统调用之前的值,
-             * 并且把原程序指令指针回 调 2 字节, 即当返回用户程序时,
-             * 让程序重新启动执行被信号中断的系统调用 */
+            /* 否则就恢复进程寄存器 eax 在调用系统调用之前的值, 并且把原程序指令指针回
+             * 调 2 字节, 即当返回用户程序时, 让程序重新启动执行被信号中断的系统调用 */
             *(&eax) = orig_eax;
             *(&eip) = old_eip -= 2;
         }
     }
 
     sa_handler = (unsigned long)sa->sa_handler;
-    if (sa_handler == 1) /* 忽略处理 SIG_IGN = 1 */
-        return (1);      /* Ignore, see if there are more signals... */
+    if (sa_handler == 1) { /* 忽略处理 SIG_IGN = 1 */
+        return (1);        /* Ignore, see if there are more signals... */
+    }
 
     if (!sa_handler) { /* 默认处理 SIG_DFL = 0 */
         switch (signr) {
@@ -280,8 +280,7 @@ int do_signal(long signr, long eax, long ebx, long ecx, long edx, long orig_eax,
         case SIGFPE:
         case SIGSEGV:
             if (core_dump(signr))
-                /* TODO: 0x80 和 WIFSTOPPED 等 waitpid 函数返回的状态字有关系
-                         可以仔细研究下 */
+                /* TODO: 0x80 和 WIFSTOPPED 等 waitpid 函数返回的状态字有关系, 可以仔细研究下 */
                 do_exit(signr | 0x80); /* fall through */
         default:
             do_exit(signr);

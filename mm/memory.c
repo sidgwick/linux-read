@@ -241,16 +241,18 @@ int copy_page_tables(unsigned long from, unsigned long to, long size)
     return 0;
 }
 
-/*
+/**
+ * @brief 把物理内存页面映射到线性地址空间指定处
+ *
  * This function puts a page in memory at the wanted address.
  * It returns the physical address of the page gotten, 0 if
  * out of memory (either when trying to access page-table or
  * page.)
  *
- * 把物理内存页面映射到线性地址空间指定处
- *
- * 参数 page 是分配的主内存区中某一页面(页帧/页框)的指针, address
- * 是对应的线性地址 */
+ * @param page 页面的物理地址
+ * @param address 页面的线性地址
+ * @return unsigned long
+ */
 static unsigned long put_page(unsigned long page, unsigned long address)
 {
     unsigned long tmp, *page_table;
@@ -273,12 +275,16 @@ static unsigned long put_page(unsigned long page, unsigned long address)
             return 0;
         }
 
-        *page_table = tmp | 7;             // PTE
-        page_table = (unsigned long *)tmp; // page table 只想最新分配的页面
+        *page_table = tmp | PRESENT_RW_USER; // PTE
+        page_table = (unsigned long *)tmp;   // page table 只想最新分配的页面
     }
 
-    page_table[(address >> 12) & 0x3ff] = page | 7;
-    /* no need for invalidate */
+    page_table[(address >> 12) & 0x3ff] = page | PRESENT_RW_USER;
+
+    /* no need for invalidate
+     * put_page 的调用方只会是 do_no_page 中断处理函数,
+     * 因此这里始终都是插入新页面, 不需要失效 TLB 里面的条目 */
+
     return page;
 }
 
@@ -427,7 +433,11 @@ void write_verify(unsigned long address)
     return;
 }
 
-/* 分配一个空白页面, 并将线性地址 address 和这个页面对应起来 */
+/**
+ * @brief 分配一个空白页面, 并将线性地址 address 和这个页面对应起来
+ *
+ * @param address 新页面对应的线性地址
+ */
 void get_empty_page(unsigned long address)
 {
     unsigned long tmp;
@@ -490,7 +500,7 @@ static int try_to_share(unsigned long address, struct task_struct *p)
     phys_addr = *(unsigned long *)from_page;      /* 取出来 PTE 内容 */
 
     /* is the page clean and present? */
-    if ((phys_addr & (PAGE_DIRTY || PAGE_PRESENT)) != PAGE_PRESENT) {
+    if ((phys_addr & (PAGE_DIRTY | PAGE_PRESENT)) != PAGE_PRESENT) {
         return 0;
     }
 
@@ -506,7 +516,7 @@ static int try_to_share(unsigned long address, struct task_struct *p)
     if (!(to & 1)) {
         if ((to = get_free_page())) {
             /* 页表属性: 存在,可读写,超级用户权限 */
-            *(unsigned long *)to_page = to | (PAGE_PRESENT | PAGE_USER | PAGE_RW);
+            *(unsigned long *)to_page = to | (PRESENT_RW_USER);
         } else {
             oom();
         }
@@ -690,10 +700,9 @@ void do_no_page(unsigned long error_code, unsigned long address)
         oom();
     }
 
-    /* TODO: 下面和文件系统相关,
-     * 根据这个块号和执行文件的 i 节点,
-     * 我们就可以从映射位图中找到对应块设备中对应的设备 逻辑块号(保存在 nr[]
-     * 数组中), 利用 bread_page 即可把这 4 个逻辑块读入到 物理页面 page 中 */
+    /* 根据这个块号和执行文件的 i 节点, 我们就可以从映射位图中找到对应块设备中
+     * 对应的设备逻辑块号(保存在 nr[] 数组中), 利用 bread_page 即可把这 4
+     * 个逻辑块读入到物理页面 page 中 */
 
     /* remember that 1 block is used for header
      * 程序头要使用 1 个数据块(1024B) */
@@ -702,29 +711,21 @@ void do_no_page(unsigned long error_code, unsigned long address)
 
     bread_page(page, inode->i_dev, nr); /* 把磁盘上的数据读取到内存里 */
 
-    /**
-     * tmp 是 address 在进程内部的相对位置
+    /* TODO-DONE: 没看懂这里.
+     * tmp 是 address 向下对齐 4KB 页面后在进程内存布局内部的相对位置
+     * `tmp + 4096` 计算的是 address 所在页面的结束位置
+     * `tmp + 4096 - current->end_data` 计算的是, 页面结束位置和数据段结束位置的距离
      *
-     * 在读设备逻辑块操作时, 可能会出现这样一种情况,
-     * 即在执行文件中的读取页面位置可能离 文件尾不到 1 个页面的长度,
-     * 因此可能读入一些无用的信息. 下面的操作就是把这部分超 出执行文件 end_data
-     * 以后的部分进行清零处理. 当然, 若该页面离末端超过 1 页,
-     * 说明不是从执行文件映像中读取的页面, 而是从库文件中读取的
-     * 因此不用执行清零操作
+     * 如果这个距离小于 4095, 说明 address 所在页面, 是在数据段内部的.
+     * 如果这个距离值再大于 0, 说明 address 所在的页面, 是数据段的最后一个页面
      *
-     * tmp 表示从进程代码段起始地址到发生缺页地址的偏移量, current->end_data
-     * 则是 进程数据段的结束地址, 这里加 4096 是因为一个内存页的大小是 4096
-     * 字节, 所以 `tmp + 4096` 计算的是从缺页地址开始的整个页面的结束位置
-     * TODO: 没看懂这里和 4095 比较是啥意思, 先接受结果: i
-     * 算出来是多读进来的数据
-     */
+     * 我们需要把数据段的最后一个页面超出二进制映像的部分, 填充为 0 值 */
     i = tmp + 4096 - current->end_data;
     if (i > 4095) {
         i = 0;
     }
 
-    /* page + 4096 表示的是 page 末尾地址
-     * 下面的 for 循环, 从页面的结束为止开始, 擦除 i 字节数据 */
+    /* 下面的 for 循环, 从页面的结束为止开始, 擦除 i 字节数据 */
     tmp = page + 4096;
     while (i-- > 0) {
         tmp--;
@@ -732,8 +733,9 @@ void do_no_page(unsigned long error_code, unsigned long address)
     }
 
     /* 新页和线性地址关联起来 */
-    if (put_page(page, address))
+    if (put_page(page, address)) {
         return;
+    }
 
     free_page(page);
     oom();
@@ -749,8 +751,9 @@ void mem_init(long start_mem, long end_mem)
     HIGH_MEMORY = end_mem;
 
     // 这里吧全部的内存都标记为占用状态
-    for (i = 0; i < PAGING_PAGES; i++)
+    for (i = 0; i < PAGING_PAGES; i++) {
         mem_map[i] = USED;
+    }
 
     /* 找到 start_mem 所属的页面编号 */
     i = MAP_NR(start_mem);
@@ -762,10 +765,12 @@ void mem_init(long start_mem, long end_mem)
     /* 再把主内存区域所属的页面置为空闲
      * 请注意这里的处理主内存区域不是从 1M 开始的
      * Linux 主内存区域只是 **最多** 能管理 15MB 主内存区域 */
-    while (end_mem-- > 0)
+    while (end_mem-- > 0) {
         mem_map[i++] = 0;
+    }
 }
 
+/* TODO: 重新看看 */
 void show_mem(void)
 {
     int i, j, k, free = 0, total = 0;
@@ -774,21 +779,25 @@ void show_mem(void)
 
     printk("Mem-info:\n\r");
     for (i = 0; i < PAGING_PAGES; i++) {
-        if (mem_map[i] == USED) /* 参看 mem_init, 如果内存不属于主存储区,
-                                   它们的标记就是 USED */
+        /* 参看 mem_init, 如果内存不属于主存储区, 它们的标记就是 USED */
+        if (mem_map[i] == USED) {
             continue;
+        }
 
         total++; /* 主存储区的页面数量 */
-        if (!mem_map[i])
+
+        if (!mem_map[i]) {
             free++; /* 主存储区的空闲页面数量 */
-        else
+        } else {
             shared += mem_map[i] - 1; /* 主存储区的页面共享数量(自己用不算共享) */
+        }
     }
 
     printk("%d free pages of %d\n\r", free, total);
     printk("%d pages shared\n\r", shared);
 
     /* 下面遍历页目录项 */
+
     k = 0; /* 一个进程占用页面统计值 */
     for (i = 4; i < 1024;) {
         /* 页目录项标记的页表页存在的话, 处理页表页的统计信息 */
@@ -799,15 +808,8 @@ void show_mem(void)
                 continue;
             }
 
-            /*
-             * 如果页目录项对应二级页表的'地址'大于 LOW_MEM(即1MB),
-             * 则把一个进程占用的物理内存页统计值 k 增 1.
-             * 把系统占用的所有物理内存页 统计值 free 增 1. 然后取对应页表地址
-             * pg_tbl, 并对该页表中所有页表项进行统计.
-             *
-             * 如果当前页表项所指物理页面存在并且该物理页面 '地址' 大于 LOW_MEM,
-             * 那么就将页表项对应页面纳入统计值
-             * TODO: LOW_MEM 似乎没有约束主内存区域起始位置? */
+            /* 如果当前页表项所指物理页面存在并且该物理页面 '地址' 大于 LOW_MEM,
+             * 那么就将页表项对应页面纳入统计值 */
             if (pg_dir[i] > LOW_MEM) {
                 free++, k++;
             }

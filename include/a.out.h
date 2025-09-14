@@ -3,8 +3,6 @@
 
 #define __GNU_EXEC_MACROS__
 
-// TODO: 这个文件没太看懂, 等最后要运行程序的时候在回过头来看吧
-
 // 第 1 部分
 // 定义目标文件执行结构和相关的宏操作
 
@@ -12,11 +10,14 @@
 struct exec {
     unsigned long a_magic; /* Use macros N_MAGIC, etc for access,
                               执行文件魔数。使用N_MAGIC等宏访问 */
-    unsigned a_text;       /* length of text, in bytes, 代码长度，字节数 */
-    unsigned a_data;       /* length of data, in bytes, 数据长度，字节数 */
-    unsigned a_bss;        /* length of uninitialized data area for file, in bytes,
-                              文件中的未初始化数据区长度，字节数 */
+
+    unsigned a_text; /* length of text, in bytes, 代码长度，字节数 */
+    unsigned a_data; /* length of data, in bytes, 数据长度，字节数 */
+    unsigned a_bss;  /* length of uninitialized data area for file, in bytes,
+                        文件中的未初始化数据区长度，字节数 */
+
     // TODO: 符号表是什么, 调试用吗?
+
     unsigned a_syms;   /* length of symbol table data in file, in bytes,
                           文件中的符号表长度，字节数 */
     unsigned a_entry;  /* start address, 执行开始地址 */
@@ -167,7 +168,8 @@ struct exec {
 
 #ifndef N_NLIST_DECLARED
 // a.out 目标文件中符号表项结构(符号表记录结构)
-// TODO: 研究一下这个结构在哪里用了
+// TODO-DONE: 研究一下这个结构在哪里用了
+// 答: 本版本里面并未使用
 struct nlist {
     union {
         char *n_name;

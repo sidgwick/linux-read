@@ -98,6 +98,9 @@ static int free_dind(int dev, int block)
 /**
  * @brief 将文件内容清空
  *
+ * 所谓清空, 实际上就是把文件所属的数据块, 返回给磁盘, 解除 inode 和数据块的关联关系
+ * 注意这里不允许直接将文件大小设置为 0, 必须要维护 block 的位图, 让 block 也空闲
+ *
  * @param inode
  */
 void truncate(struct m_inode *inode)

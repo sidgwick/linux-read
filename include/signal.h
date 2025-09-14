@@ -71,12 +71,12 @@ typedef unsigned int sigset_t; /* 32 bits, 定义信号集类型 */
 #endif
 
 /**
- * TODO: 没看懂怎么用的, 结合后续信息在阅读
- * sa_handler 是对应某信号指定要采取的行动, 可以用上面的 SIG_DFL/SIG_IGN
- * 来忽略该信号, 也可以是指向处理该信号函数的一个指针 sa_mask
- * 给出了对信号的屏蔽码, 在信号程序执行时将阻塞对这些信号的处理 sa_flags
- * 指定改变信号处理过程的信号集 sa_restorer 是恢复函数指针, 由函数库 libc 提供,
- * 用于清理用户态堆栈. 参见 signal.c
+ * sa_handler 是对应某信号指定要采取的行动, 可以用上面的 SIG_DFL/SIG_IGN 来忽略该信号, 也可以是
+ *            指向处理该信号函数的一个指针.
+ * sa_mask 给出了对信号的屏蔽码, 在信号程序执行时将阻塞对这些信号的处理
+ * sa_flags 指定改变信号处理过程的信号集
+ * sa_restorer 是恢复函数指针, 由函数库 libc 提供, 用于清理用户态堆栈. 参见 signal.c
+ *
  * 另外，引起触发信号处理的信号也将被阻塞，除非使用了SA_NOMASK标志 */
 struct sigaction {
     void (*sa_handler)(int);

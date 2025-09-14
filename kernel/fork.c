@@ -138,15 +138,19 @@ int copy_process(int nr, long ebp, long edi, long esi,
     /* 将新任务结构指针放入任务数组 */
     task[nr] = p;
 
-    /* 接着把当前进程任务结构内容复制到刚申请到的内存页面p开始处 */
-    // TODO: 这个拷贝语句不好使, 换成 memcpy
-    // *p = *current; /* NOTE! this doesn't copy the supervisor stack */
+    /* 接着把当前进程任务结构内容复制到刚申请到的内存页面p开始处
+     * WARNING: 这个拷贝语句不好使, 换成 memcpy, 原始代码: `*p = *current;`
+     */
     memcpy((void *)p, (void *)current, sizeof(struct task_struct));
 
     /* 修改新任务的参数 */
     p->state = TASK_UNINTERRUPTIBLE; /* 新进程状态置为不可中断等待状态, 以防止内核调度其执行 */
     p->pid = last_pid;
-    p->counter = p->priority;  /* 运行时间片(嘀嗒数), TODO: p->priority 最开始在哪里设置的? */
+
+    /* TODO-DONE: p->priority 最开始在哪里设置的?
+     * 答: 所有的进程网源头追, 都是拷贝的 INIT_TASK, 那里面 priority 默认设置的是 15 */
+
+    p->counter = p->priority;  /* 运行时间片(嘀嗒数) */
     p->signal = 0;             /* 信号位图 */
     p->alarm = 0;              /* 报警定时值(嘀嗒数) */
     p->leader = 0;             /* process leadership doesn't inherit, 进程的领导权是不能继承的 */
@@ -176,7 +180,7 @@ int copy_process(int nr, long ebp, long edi, long esi,
     p->tss.fs = fs & 0xffff;
     p->tss.gs = gs & 0xffff;
     p->tss.ldt = _LDT(nr);            /* LDT 选择子 */
-    p->tss.trace_bitmap = 0x80000000; /* TODO: 是否在 trace 置 1 ??? */
+    p->tss.trace_bitmap = 0x80000000; /* TODO: DEBUG: 是否在 trace 置 1 ??? */
 
     /* 如果当前任务使用了协处理器, 就保存其上下文
      * 汇编指令 clts 用于清除控制寄存器 CR0 中的任务已交换(TS)标志.
@@ -203,8 +207,7 @@ int copy_process(int nr, long ebp, long edi, long esi,
     }
 
     /* 如果父进程中有文件是打开的, 则将对应文件的打开次数增 1
-     * 因为这里创建的子进程会与父进程共享这些打开的文件
-     * TODO: 学完文件系统, 再回来看看这里的计数操作 */
+     * 因为这里创建的子进程会与父进程共享这些打开的文件 */
     for (i = 0; i < NR_OPEN; i++) {
         if ((f = p->filp[i])) {
             f->f_count++;

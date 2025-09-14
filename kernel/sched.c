@@ -128,8 +128,7 @@ struct {
 /* 'math_state_restore()' saves the current math information in the
  * old math state array, and gets the new ones from the current task
  *
- * 当任务被调度交换过以后,
- * 该函数用以保存原任务的协处理器状态(上下文)并恢复新调度进
+ * 当任务被调度交换过以后, 该函数用以保存原任务的协处理器状态(上下文)并恢复新调度进
  * 来的当前任务的协处理器执行状态 */
 void math_state_restore()
 {
@@ -387,7 +386,7 @@ void wake_up(struct task_struct **p)
             printk("wake_up: TASK_ZOMBIE");
         }
 
-        /* 置为就绪状态 0, 也即 TASK_RUNNING */
+        /* 置为就绪状态 0, 也即 TASK_RUNNING, 此状态允许调度器调度 */
         (**p).state = TASK_RUNNING;
     }
 }

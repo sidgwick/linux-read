@@ -308,8 +308,8 @@ repeat:
     req->dev = dev;
     req->cmd = rw;
     req->errors = 0;
-    req->sector = page << 3;
-    req->nr_sectors = 8;
+    req->sector = page << 3; /* 一个 page 是 8 个扇区 */
+    req->nr_sectors = 8;     /* 512B * 8 = 4KB */
     req->buffer = buffer;
     req->waiting = current;
     req->bh = NULL; /* 注意这个 NULL */

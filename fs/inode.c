@@ -351,8 +351,7 @@ repeat:
 
     /* 到这里一定有 inode->i_count == 1 */
 
-    /* 已经没有文件目录引用这个文件了, 应该将 inode 删除掉
-     * TODO: 回头再看 truncate, free_node 操作 */
+    /* 已经没有文件目录引用这个文件了, 应该将 inode 删除掉  */
     if (!inode->i_nlinks) {
         truncate(inode);
 
@@ -459,7 +458,9 @@ struct m_inode *get_pipe_inode(void)
         return NULL;
     }
 
-    /* 把 pipe 对应的物理页的地址, 保存在 i_size 里面  */
+    /* 把 pipe 对应的物理页的地址, 保存在 i_size 里面
+     * TODO-DONE: 删除 inode 的时候页面没有释放?
+     * 答: iput 操作里面有内存的释放, pipe 也是使用 sys_close 关闭的. */
     if (!(inode->i_size = get_free_page())) {
         inode->i_count = 0;
         return NULL;
@@ -475,9 +476,13 @@ struct m_inode *get_pipe_inode(void)
 }
 
 /**
- * @brief 从设备上读取指定节点号的 inode 结构内容到内存 inode 表中, 并且返回该 inode 指针
+ * @brief 获取指定设备上编号为 nr 的 inode
  *
- * TODO: 确认是不是, iget 引用加一, iput 引用减一
+ * 如果这个 inode 已经在 inode_table, 直接返回内存中结果
+ * 如果不在内存中, 将它从磁盘上读取出来, 并保存在 inode_table
+ *
+ * TODO-DONE: 确认是不是, iget 引用加一, iput 引用减一
+ * 答: 简单理解是这样的. 不过他们还兼具读写磁盘的能力
  *
  * @param dev 设备号
  * @param nr  inode 号
@@ -579,7 +584,8 @@ static void read_inode(struct m_inode *inode)
         panic("trying to read inode without dev");
     }
 
-    /* 计算出 inode 对应的具体的逻辑块, 然后把它读入到内存里面 */
+    /* 计算出 inode 对应的具体的逻辑块, 然后把它读入到内存里面
+     * NOTICE: 这里的计算再次表明, i_num 是从 1 开始计数的, 而且 block 也是从 1 开始计数的 */
     block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks + (inode->i_num - 1) / INODES_PER_BLOCK;
     if (!(bh = bread(inode->i_dev, block))) {
         panic("unable to read i-node block");

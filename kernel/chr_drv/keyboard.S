@@ -100,19 +100,19 @@ keyboard_interrupt:
     pushl %edx
     push %ds
     push %es
-    movl $0x10,%eax # 内核数据段
-    mov %ax,%ds
-    mov %ax,%es
+    movl $0x10, %eax # 内核数据段
+    mov %ax, %ds
+    mov %ax, %es
     movl blankinterval, %eax # 屏幕黑屏间隔时间
     movl %eax, blankcount  # 预置黑屏时间计数值为 blankinterval (滴答数)
-    xorl %eax,%eax        /* %eax is scan code, EAX 用来装键盘输入码值 */
+    xorl %eax, %eax        /* %eax is scan code, EAX 用来装键盘输入码值 */
     inb $0x60, %al # 读键盘输入, 得到键盘扫描码
 
     # 判断该扫描码是否是 0xe0 或 0xe1, 是的话就立刻对键盘控制器作出应答
     # 并向中断控制器发送 EOI 信号, 以允许键盘控制器能继续产生中断信号, 从而接收后续的字符
-    cmpb $0xe0,%al # al = 0xe0
+    cmpb $0xe0, %al # al = 0xe0
     je set_e0
-    cmpb $0xe1,%al
+    cmpb $0xe1, %al
     je set_e1
 
     # 不是 0xe0, 0xe1, 正常执行字符处理程序, 然后复位 e0 标志
@@ -125,21 +125,21 @@ e0_e1:
     inb $0x61, %al # 取 PPI 端口 B 状态, 其位 7 用于 0-允许/1-禁止键盘
     jmp 1f
 1:  jmp 1f
-1:  orb $0x80,%al
+1:  orb $0x80, %al
     jmp 1f
 1:  jmp 1f
-1:  outb %al,$0x61 # 禁止键盘工作
+1:  outb %al, $0x61 # 禁止键盘工作
     jmp 1f
 1:  jmp 1f
-1:  andb $0x7F,%al
-    outb %al,$0x61 # 复位 PPI PB7, 恢复键盘工作
+1:  andb $0x7F, %al
+    outb %al, $0x61 # 复位 PPI PB7, 恢复键盘工作
 
-    movb $0x20,%al
-    outb %al,$0x20 # 给 8259A 主片发送 EOI 信号
+    movb $0x20, %al
+    outb %al, $0x20 # 给 8259A 主片发送 EOI 信号
 
     pushl $0 # 没有指定 tty, 默认使用 fg_console
     call do_tty_interrupt # 将收到数据转换成规范模式并存放在辅助队列中
-    addl $4,%esp
+    addl $4, %esp
     pop %es
     pop %ds
     popl %edx

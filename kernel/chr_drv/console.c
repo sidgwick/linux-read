@@ -352,7 +352,7 @@ static void scrdown(int currcons)
             "movl video_num_columns, %%ecx\n\t"
             "rep stosw"
             :
-            : "a"(video_erase_char),                            /*擦除*/
+            : "a"(video_erase_char),                            /* 擦除 */
               "c"((bottom - top - 1) * video_num_columns >> 1), /* 一屏少一行 */
               "D"(origin + video_size_row * bottom - 4),        /* 到: 窗口右下角最后一个长字 */
               "S"(origin + video_size_row * (bottom - 1) - 4)); /* 从: 窗口倒数第2行最后一个长字 */

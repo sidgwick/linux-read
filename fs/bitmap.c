@@ -39,7 +39,7 @@
     ({                                                                                             \
         register int res __asm__("ax");                                                            \
         __asm__ __volatile__("btrl %2, %3\n\t"                                                     \
-                             "setnb %%al"                                                          \
+                             "setnb %%al" /* set if not blow, if(CF == 0) %al=1 */                 \
                              : "=a"(res)                                                           \
                              : "0"(0), "r"(nr), "m"(*(addr)));                                     \
         res;                                                                                       \
@@ -125,10 +125,8 @@ int free_block(int dev, int block)
     // 因此 block/8192 即可计算出指定块 block 在逻辑位图中的哪个块上. 而 block&8191 可
     // 以得到block在逻辑块位图当前块中的比特偏移位置.
 
-    /* 计算数据区块索引(从 0 开始计数, 但是 0 不用)
-     * TODO: DEBUG: 确认清楚 inode/zone 位图, 区块之间的计数关系
-     * NOTICE: linux 系统中, 约定第 0 个 inode, 第 0 个 zone, 都不使用 */
-    block -= sb->s_firstdatazone - 1;
+    /* 计算数据区块索引 */
+    block -= sb->s_firstdatazone - 1; /* block >= 1 */
     if (clear_bit(block & 8191, sb->s_zmap[block / 8192]->b_data)) {
         printk("block (%04x:%d) ", dev, block + sb->s_firstdatazone - 1);
         printk("free_block: bit already cleared\n");
@@ -222,7 +220,8 @@ void free_inode(struct m_inode *inode)
     }
 
     /* inode 没有设备号(pipe或者没有使用), 清零 inode 数据, 返回即可
-     * TODO: 确认是不是 pipe 的 dev == 0? */
+     * TODO-DONE: 确认是不是 pipe 的 dev == 0?
+     * 答: 是的, 管道 inode 只存在于内存中, 不会落盘, 它的 dev 是 0 */
     if (!inode->i_dev) {
         memset(inode, 0, sizeof(*inode));
         return;
@@ -322,7 +321,12 @@ struct m_inode *new_inode(int dev)
     inode->i_uid = current->euid;
     inode->i_gid = current->egid;
     inode->i_dirt = 1;
-    inode->i_num = j + i * 8192; /* TODO: 这里看 i_num 是从 0 开始的?? */
+
+    /* TODO-DONE: 这里看 i_num 是从 0 开始的??
+     * 答: 单看这里的赋值代码是这样的. 但因为 imap 第 0 个 bit 保留(始终置位为 1)的原因,
+     *     在 i=0 的时候 j 不可能也等于 0, 因此 i_num 不会是 0 */
+    inode->i_num = j + i * 8192;
+
     inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
     return inode;
 }

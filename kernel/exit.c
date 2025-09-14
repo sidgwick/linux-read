@@ -64,8 +64,7 @@ void release(struct task_struct *p)
             else
                 p->p_pptr->p_cptr = p->p_osptr;
 
-            /* 注意这里只是释放了 p 结构占用的内存页面
-             * TODO: 这里为啥要触发一次调度? */
+            /* 注意这里只是释放了 p 结构占用的内存页面 */
             free_page((long)p);
             schedule();
             return;
@@ -302,7 +301,8 @@ int kill_proc(int pid, int sig, int priv)
  * 如果 pid < -1, 则信号 sig 将发送给进程组 -pid 的所有进程
  * 如果信号 sig = 0, 则不发送信号, 但仍会进行错误检查. 如果成功则返回 0
  *
- * TODO: send_sig 对 sig=0 如何处理?
+ * TODO-DONE: send_sig 对 sig=0 如何处理?
+ * 答: 没有 0 号信号
  *
  * 该函数扫描任务数组表, 并根据 pid 对满足条件的进程发送指定信号 sig.
  * 若 pid 等于 0 表明当前进程是进程组组长, 需要向所有组内的进程强制发送信号

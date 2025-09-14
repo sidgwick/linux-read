@@ -129,6 +129,10 @@ struct buffer_head {
  * 因此使用二次间接盘块可以寻址 512*512 个盘块.
  *
  * 因此对于 minix 文件系统来说, 一个文件最大是 (7+512+512*512)*1024 = 256MB
+ *
+ * TODO-DONE: 确认清楚 inode/zone 位图, 区块之间的计数关系
+ * 答: zmap 里面的 0 号 bit, 表示的是第 0 个 block, 这个 block 保留不用(位图置 1)
+ *     imap 里面的 0 号 bit, 表示的是第 0 个 inode, 这个 inode 保留不用(位图置 1)
  */
 struct d_inode {
     unsigned short i_mode;    // 文件类型和属性(rwx位)
@@ -156,7 +160,7 @@ struct m_inode {
     unsigned long i_atime;       // 最后访问时间
     unsigned long i_ctime;       // inode 自身修改时间
     unsigned short i_dev;        // inode 所在的设备号
-    unsigned short i_num;        // inode 号, TODO: 从 1 开始计数? - 从 0 开始计数的
+    unsigned short i_num;        // inode 号
     unsigned short i_count;      // inode 被使用的次数, 0 表示空闲
     unsigned char i_lock;        // 锁定标志
     unsigned char i_dirt;        // 已修改(脏)标志

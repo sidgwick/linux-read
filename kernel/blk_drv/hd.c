@@ -702,8 +702,8 @@ void do_hd_request(void)
         /* 循环读取状态寄存器信息并判断请求服务标志 DRQ_STAT 是否置位
          * DRQ_STAT 是硬盘状态寄存器的请求服务位, 表示驱动器已经准备好
          * 在主机和数据端口之间传输一个字或一个字节的数据*/
-        for (i = 0; i < 10000 && !(r = inb_p(HD_STATUS) & DRQ_STAT); i++) { /* do nothing */
-        }
+        for (i = 0; i < 10000 && !(r = inb_p(HD_STATUS) & DRQ_STAT); i++)
+            /* do nothing */;
 
         if (!r) {
             bad_rw_intr();

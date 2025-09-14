@@ -51,8 +51,11 @@ int SWAP_DEV = 0;
  * We page all other pages.
  *
  * task-0 的页面不做交换, 因为它在内核内存范围
+ *
+ * 第一个虚拟页面号, 在 LOW_MEMORY + TASK_SIZE 处, 也就是从 idle 进程(不含)之后的内存空间
+ * 对应的页面都可以做交换
  */
-#define FIRST_VM_PAGE (TASK_SIZE >> 12)         /* 所有任务的 第一个虚拟页面号 */
+#define FIRST_VM_PAGE (TASK_SIZE >> 12)         /* 第一个虚拟页面号*/
 #define LAST_VM_PAGE (1024 * 1024)              /* 最后一个虚拟页面号 */
 #define VM_PAGES (LAST_VM_PAGE - FIRST_VM_PAGE) /* 虚拟页面数量 */
 
@@ -62,12 +65,15 @@ static int get_swap_page(void)
 {
     int nr;
 
-    if (!swap_bitmap)
+    if (!swap_bitmap) {
         return 0;
+    }
 
-    for (nr = 1; nr < 32768; nr++)
-        if (clrbit(swap_bitmap, nr))
+    for (nr = 1; nr < 32768; nr++) {
+        if (clrbit(swap_bitmap, nr)) { /* bit 1 => 0 */
             return nr;
+        }
+    }
 
     return 0;
 }
@@ -115,10 +121,12 @@ void swap_in(unsigned long *table_ptr)
         oom();
 
     read_swap_page(swap_nr, (char *)page);
-    if (setbit(swap_bitmap, swap_nr))
+    if (setbit(swap_bitmap, swap_nr)) { /* bitmap 0 => 1 */
         printk("swapping in multiply from same page\n\r");
+    }
 
-    /* TODO: 这里为啥要把页面置为脏页? */
+    /* TODO: 这里为啥要把页面置为脏页?
+     * 答: 不标记为脏的话, 可能这个页面很快又被 swap out 了 */
     *table_ptr = page | (PAGE_DIRTY | 7);
 }
 
@@ -138,36 +146,42 @@ int try_to_swap_out(unsigned long *table_ptr)
     unsigned long swap_nr;
 
     page = *table_ptr; /* PTE 内容 = 页地址 + 属性 */
-    if (!(PAGE_PRESENT & page))
+    if (!(PAGE_PRESENT & page)) {
         return 0;
+    }
 
     /* 最多支持到 16M 内存, 去掉 1M 内核使用还剩余 15M 可供分页使用 */
-    if (page - LOW_MEM > PAGING_MEMORY)
+    if (page - LOW_MEM > PAGING_MEMORY) {
         return 0;
+    }
 
     /* 脏页? */
     if (PAGE_DIRTY & page) {
-        page &= 0xfffff000; /* 页基地址 */
-        if (mem_map[MAP_NR(page)] != 1)
-            /* 共享页面, 不能换出 */
+        page &= 0xfffff000;               /* 页基地址 */
+        if (mem_map[MAP_NR(page)] != 1) { /* 共享页面, 不能换出 */
             return 0;
+        }
 
-        /* 找到页面即将被换出到那个 SWAP 页面去 */
-        if (!(swap_nr = get_swap_page()))
+        /* 找到页面即将被换出到的那个 SWAP 分区页面 */
+        if (!(swap_nr = get_swap_page())) {
             return 0;
+        }
 
-        /* 页表项里面保存的事 swap_nr << 1, 这样 PTE 的 P 位还是 0 */
+        /* 被换出的页面, 页表项里面保存 swap_nr << 1
+         * 这样 PTE 的 P 位还可以设置 0, 表示他不在内存里 */
         *table_ptr = swap_nr << 1;
         invalidate();
 
-        /* 将页面正式写到 SWAP 里面
-         * TODO: ll_rw_page 在块设备部分定义, 等学完那边再回来理解这部分 */
+        /* 将页面正式写到 SWAP 里面  */
         write_swap_page(swap_nr, (char *)page);
-        free_page(page); /* 释放页面所占用的物理内存 */
+
+        /* 释放页面所占用的物理内存 */
+        free_page(page);
+
         return 1;
     }
 
-    /* 不是脏页直接抹掉? */
+    /* 不是脏页直接抹掉, 被抹掉的页面, 有需要的话, 会以缺页中断的方式重新被加载回来 */
     *table_ptr = 0;
     invalidate();
     free_page(page);
@@ -180,7 +194,6 @@ int try_to_swap_out(unsigned long *table_ptr)
  * be easier.
  *
  * 把某个页, 交换到 SWAP 设备
- * TODO: 重新看, 没看懂
  */
 int swap_out(void)
 {
@@ -189,23 +202,25 @@ int swap_out(void)
     int counter = VM_PAGES;
     int pg_table;
 
-    /* 首先搜索页目录表, 查找存在二级页表页的页目录项,
-     * 这个二级页表页里面的页表项的某一个项, 就是我们这次希望 swap 的对象
+    /* 首先搜索页目录表, 查找存在二级页表页的页目录项, 这个二级页表页里面的页表项的某一个项,
+     * 就是我们这次希望 swap 的对象
      *
-     * 找到直接退出循环, 否则调整页目录项数对应剩余二级页表项数 counter,
-     * 然后继续检测下一页目录项. 若全部搜索完还没有找到适合的(存在的)页目录项,
-     * 就重新继续搜索
-     * TODO: 这里重新搜索的意义是什么? 不是已经找不到了吗?
-     *       重新扫描的原因是希望在第一个 while 里面把 counter 消耗完??? */
+     * 找到直接退出循环, 否则调整页目录项数对应剩余二级页表项数 counter, 然后继续检测下一页目录项.
+     * 若全部搜索完还没有找到适合的(存在的)页目录项, 就重新继续搜索
+     *
+     * TODO-DONE: 这里重新搜索的意义是什么? 不是已经找不到了吗?
+     * 答: counter 是最差的情况下要迭代的次数, 只要找不到符合交换条件的页面就需要一直找下去, 一直到 counter 消耗完毕 */
     while (counter > 0) {
         pg_table = pg_dir[dir_entry];
-        if (pg_table & 1)
+        if (pg_table & 1) {
             break;
+        }
 
         counter -= 1024; /* 一个 PDT 已经检查完, 相当于一次性查找了 1024 个 PTE */
         dir_entry++;
-        if (dir_entry >= 1024) /* 避免越界 */
+        if (dir_entry >= 1024) { /* 避免越界 */
             dir_entry = FIRST_VM_PAGE >> 10;
+        }
     }
 
     /* 在取得二级页表页地址之后, 针对该页表页中的所有 1024 个页面,
@@ -221,11 +236,12 @@ int swap_out(void)
 
         repeat:
             dir_entry++;
-            if (dir_entry >= 1024)
+            if (dir_entry >= 1024) {
                 dir_entry = FIRST_VM_PAGE >> 10;
+            }
 
             pg_table = pg_dir[dir_entry];
-            if (!(pg_table & 1)) { /* page 在内存里 */
+            if (!(pg_table & 1)) { /* page 不在内存里 */
                 if ((counter -= 1024) > 0) {
                     goto repeat;
                 } else {
@@ -246,12 +262,12 @@ int swap_out(void)
 }
 
 /**
- * @brief Get the free page object
+ * @brief 分配一个空闲的物理页面
  *
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
  *
- * @return unsigned long
+ * @return unsigned long 返回页面的物理地址
  */
 unsigned long get_free_page(void)
 {
@@ -290,8 +306,30 @@ repeat:
 }
 
 /**
- * 初始化交换分区
- * TODO: 初始完之后所有的 swap 页面都是不可用的? 在哪里变成了可用的呢? */
+ * @brief 初始化交换分区
+ *
+ * swap_bitmap 首尾部分的 bits 应该是 0, 其他部分的 bits 是 1
+ * bits=1 表示这个分页是可以用的, bits=0 表示对应的交换区分页不可用
+ *
+ *  - 第一个 bit 是 0 的原因是, 第一个 page 被用作了 swap_bitmap, 不做普通的交换功能使用
+ *  - swap_size 之后的 bits 置 0 的原因是, 这些位置不是合法的 swap 交换分区范围, 因此不可用
+ *
+ * 比方说像下面这个 swap 分区:
+ *
+ *  00000000  fe ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+ *  00000010  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+ *  *
+ *  000003e0  ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00  |................|
+ *  000003f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+ *  *
+ *  00000ff0  00 00 00 00 00 00 53 57  41 50 2d 53 50 41 43 45  |......SWAP-SPACE|
+ *  00001000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+ *
+ * 可以看到第一个 bit=0, 第 ((0x3e0 + 8) * 8 + 1) 位置开始的 bits 也是 0, 在靠近页面结束
+ * 的地方, 有 `SWAP-SPACE` 文本标记.
+ *
+ * 这个例子里面, swap 分区的大小是 ((0x3e0 + 8) * 8) = 8000 个页面, 也就是 8000 * 4KB = 32M 字节
+ */
 void init_swapping(void)
 {
     /* blk_size[] 指向指定主设备号的块设备块数数组.
@@ -324,11 +362,10 @@ void init_swapping(void)
     }
 
     /* 交换数据块总数转换成对应可交换页面总数, 该值不能大于 SWAP_BITS
-     * 所能表示的页面数 即交换页面总数不得大于 32768.
+     * 所能表示的页面数即交换页面总数不得大于 32768.
      * 然后申请一页物理内存用来存放交换页面位映射数组 swap_bitmap, 其中每 1
-     * 比特代表 1 页交换页面
-     * TODO: 这里 >> 2 是什么?? */
-    swap_size >>= 2;
+     * 比特代表 1 页交换页面 */
+    swap_size >>= 2; /* swap_size KB / 4KB = swap page number */
     if (swap_size > SWAP_BITS) {
         swap_size = SWAP_BITS;
     }
@@ -340,12 +377,8 @@ void init_swapping(void)
         return;
     }
 
-    /**
-     * 从 SWAP 分区读取 0 号页面对应的数据页面, 这个页面是交换区管理页面
-     * 管理页面需要以字符 `SWAP-SPACE` 结束, 这是 SWAP 区域的特征
-     *
-     * TODO: ll_rw_page 在块设备部分定义, 等学完那边再回来理解这部分
-     */
+    /* 从 SWAP 分区读取 0 号页面对应的数据页面, 这个页面是交换区管理页面
+     * 管理页面需要以字符 `SWAP-SPACE` 结束, 这是 SWAP 区域的特征 */
     read_swap_page(0, swap_bitmap);
     if (strncmp("SWAP-SPACE", swap_bitmap + 4086, 10)) {
         printk("Unable to find swap-space signature\n\r");
@@ -354,19 +387,15 @@ void init_swapping(void)
         return;
     }
 
-    /* 把 `SWAP-SPACE` 标记位置, 清零 */
+    /* 把 `SWAP-SPACE` 标记位置, 清零
+     * NOTICE: 这些位置不能用于正常的交换位图信息 */
     memset(swap_bitmap + 4086, 0, 10);
 
-    /* 然后检查读入的交换位映射图
-     * 位图应该 32768 个比特位全为 0, 若位图中有置位的比特位 0,
-     * 则表示位图有问题, 此时显示出错信息释放位图占用的页面并退出函数.
-     *
-     * 为了加快检查速度, 这里首先仅挑选查看位图中位 0 和最后一个交换
-     * 页面对应的比特位, 即 swap_size 交换页面对应的比特位, 以及
-     * 随后到 SWAP_BITS 的比特位 */
+    /* 然后检查读入的交换位映射图 */
     for (i = 0; i < SWAP_BITS; i++) {
-        if (i == 1)
+        if (i == 1) {
             i = swap_size; /* 跳过中间的部分 */
+        }
 
         /* 对应的 bit 位置不是 0? */
         if (bit(swap_bitmap, i)) {
@@ -377,13 +406,14 @@ void init_swapping(void)
         }
     }
 
-    /* 然后再仔细地检测位 1 到位 swap_size 所有比特位是否为 0, 若有
-     * 不是 0 的比特位存在, 则表示位图有问题, 于是释放位图占用的页面并
-     * 退出函数. 否则显示交换设备工作正常以及交换页面数和交换空间总字节数 */
+    /* 检查 swap_bitmap 的 [1, swap_size) 区间, 应该有最起码一个 bit 的值是 1
+     * 否则的话, 这就不是一个正常的 swap 分区了 */
     j = 0;
-    for (i = 1; i < swap_size; i++)
-        if (bit(swap_bitmap, i))
+    for (i = 1; i < swap_size; i++) {
+        if (bit(swap_bitmap, i)) {
             j++;
+        }
+    }
 
     if (!j) {
         free_page((long)swap_bitmap);

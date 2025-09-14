@@ -332,8 +332,6 @@ int sys_umount(char *dev_name)
      * 参考 namei.c#sys_mknod */
     dev = inode->i_zone[0];
 
-    /* TODO: 了解一下 iput 是干什么的? */
-
     /* dev_name 对应的一定是个块设备文件 inode */
     if (!S_ISBLK(inode->i_mode)) {
         iput(inode);
@@ -452,8 +450,6 @@ int sys_mount(char *dev_name, char *dir_name, int rw_flag)
  * @brief 安装根文件系统
  *
  * 该函数属于系统初始化操作的一部分, 在系统开机进行初始化设置时调用(hd.c#sys_setup)
- *
- * TODO: 在块设备 hd.c 里面有使用, 联系起来看看
  */
 void mount_root(void)
 {

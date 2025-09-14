@@ -130,7 +130,7 @@ struct tss_struct {
     long fs;           /* 16 high bits zero */
     long gs;           /* 16 high bits zero */
     long ldt;          /* 16 high bits zero */
-    long trace_bitmap; /* bits: trace 0, bitmap 16-31 */
+    long trace_bitmap; /* bits: trace 0, I/O bitmap 16-31 */
     struct i387_struct i387;
 };
 
@@ -157,8 +157,8 @@ struct task_struct {
      * 值等于 0 表示进程的停止状态并非由信号触发​​, 或者​​停止状态已被处理并重置 */
     int exit_code;
 
-    unsigned long start_code; // 代码段开始地址(任务在 4GB 线性空间的线性地址,
-                              // 在 64M 边界上)
+    /* 只有 start_code 是 4GB 空间的绝对地址, 后面三个都是相对于 start_code 的相对地址 */
+    unsigned long start_code; // 代码段开始地址(任务在 4GB 线性空间的线性地址, 在 64M 边界上)
     unsigned long end_code;   // 代码长度(字节数)
     unsigned long end_data;   // 代码长度 + 数据长度(字节数)
     unsigned long brk;        // 程序总长度(字节数 code+data+bss)
@@ -439,16 +439,20 @@ extern int in_group_p(gid_t grp);
  * tha math co-processor latest.
  *
  * TODO: 思考
- *          1. TSS 里面为啥不保存 CR0 ?
- *          2. _crrrent 哪里来的?
+ *  1. TSS 里面为啥不保存 CR0 ?
+ *  2. _crrrent 哪里来的?
  *
  * 梳理一下结构体在内存中的布局(小端序)
- * struct {long a, b} X = {.a = 0xABCDEFGH, .b=012345678}
+ * struct {long a, b}
+ * X = {.a = 0xABCDEFGH, .b=12345678}
  * 内存中存储为: GH EF CD AB 78 56 34 12
- * 因此 ljmp X.a 可以实现跳转到 5678 表示的 TSS 任务
+ * 因此 ljmp X.a 可以实现跳转到 0xABCDEFGH:0x12345678 表示的 TSS 任务(实际上只用 0x5678 这 16bit)
  *
- * TODO: 研究一下为啥任务切换回来之后, %ecx 里面是什么, 以及它和
- * last_task_used_math 的关系
+ * TODO-DONE: 研究一下任务切换回来之后, %ecx 里面是什么, 以及它和 last_task_used_math 的关系
+ * 答: 在任务切换之前, 利用 xchg 把 %ecx=current, current=%ecx=task[n], 接下来执行 task[n]
+ *     因为 last_task_used_math 是个全局变量, 如果 task[n] 用到了数学协处理器, 就会设置这个字段
+ *     为自己的 PCB 地址, 稍后任务继续回到当前任务的时候, 检查这个全局变量就知道 task[n] 有没有使用
+ *     过协处理器了
  *
  * 任务切换回来之后, 在判断原任务上次执行是否使用过协处理器时, 是通过
  * 将原任务指针与保存在 last_task_used_math
@@ -458,23 +462,23 @@ extern int in_group_p(gid_t grp);
  * switch_to(n)将切换当前任务到任务nr, 即n. 首先检测任务n不是当前任务,
  * 如果是则什么也不做退出. 如果我们切换到的任务最近(上次运行)使用过数学
  * 协处理器的话, 则还需复位控制寄存器 cr0 中的 TS 标志 */
-#define switch_to(n)                                                                                             \
-    {                                                                                                            \
-        struct {                                                                                                 \
-            long a, b;                                                                                           \
-        } __tmp;                                                                                                 \
-        __asm__(                                                                                                 \
-            "cmpl %%ecx,current\n\t" /* 检查任务 n 是不是当前任务, 是直接退出 */                                 \
-            "je 1f\n\t"                                                                                          \
-            "movw %%dx,%1\n\t" /* 将任务的 TSS 描述符指针, 移动到 __tmp.b */                                     \
-            "xchgl %%ecx,current\n\t" /* 交换 %ecx 和 current, 这样 current 里面就是任务 n 的 task 结构指针了 */ \
-            "ljmp %0\n\t" /* 跳转到新任务执行, 这里主要用 TSS 描述符, 因此上面只填充了 b 字段 */                 \
-            "cmpl %%ecx,last_task_used_math\n\t" /* 任取切换回来之后, 从这里继续, 检查数学协处理器的情况 */      \
-            "jne 1f\n\t"                                                                                         \
-            "clts\n" /* 如果本任务之前用到了协处理器, 需要清空 TS 标记 */                                        \
-            "1:"                                                                                                 \
-            :                                                                                                    \
-            : "m"(*&__tmp.a), "m"(*&__tmp.b), "d"(_TSS(n)), "c"((long)task[n]));                                 \
+#define switch_to(n)                                                                                              \
+    {                                                                                                             \
+        struct {                                                                                                  \
+            long a, b;                                                                                            \
+        } __tmp;                                                                                                  \
+        __asm__(                                                                                                  \
+            "cmpl %%ecx, current\n\t" /* 检查任务 n 是不是当前任务, 是无需在切换, 直接退出 */                     \
+            "je 1f\n\t"                                                                                           \
+            "movw %%dx, %1\n\t" /* 将任务的 TSS 描述符指针, 移动到 __tmp.b */                                     \
+            "xchgl %%ecx, current\n\t" /* 交换 %ecx 和 current, 这样 current 里面就是任务 n 的 task 结构指针了 */ \
+            "ljmp %0\n\t" /* 跳转到新任务执行, 这里主要用 TSS 描述符, 因此上面只填充了 b 字段 */                  \
+            "cmpl %%ecx, last_task_used_math\n\t" /* 任取切换回来之后, 从这里继续, 检查数学协处理器的情况 */      \
+            "jne 1f\n\t"                                                                                          \
+            "clts\n" /* 如果本任务之前用到了协处理器, 需要清空 TS 标记 */                                         \
+            "1:"                                                                                                  \
+            :                                                                                                     \
+            : "m"(*&__tmp.a), "m"(*&__tmp.b), "d"(_TSS(n)), "c"((long)task[n]));                                  \
     }
 
 // 4Kb 对齐

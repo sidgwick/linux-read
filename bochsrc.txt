@@ -45,5 +45,5 @@ keyboard: keymap=#$BXSHARE/keymaps/x11-pc-us.map
 megs: 128
 
 # debug
-gdbstub: enabled=0, port=1234
+gdbstub: enabled=1, port=1234
 iodebug: all_rings=1

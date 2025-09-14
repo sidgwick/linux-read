@@ -46,7 +46,6 @@ double difftime(time_t time2, time_t time1);
 time_t mktime(struct tm *tp);
 
 // 将 tm 结构表示的时间转换成一个字符串, 返回指向该串的指针
-// TODO: 怎么处理内存问题的?
 char *asctime(const struct tm *tp);
 // 将日历时间转换成一个字符串形式
 char *ctime(const time_t *tp);

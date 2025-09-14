@@ -73,6 +73,7 @@ typedef unsigned long fd_set;
 typedef struct {
     int quot, rem;
 } div_t;
+
 // 用于长 DIV 操作
 typedef struct {
     long quot, rem;

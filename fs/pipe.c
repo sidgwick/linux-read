@@ -13,6 +13,8 @@
 #include <linux/mm.h> /* for get_free_page */
 #include <linux/sched.h>
 
+/* pipe 是一种纯存在于内存里面的东西, 不会被保存到磁盘上 */
+
 /**
  * @brief 从管道读取数据
  *

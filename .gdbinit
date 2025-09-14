@@ -8,4 +8,4 @@ set disassemble-next-line on
 break page_fault
 ignore 1 100000
 
-b main.c:258
+b keyboard_interrupt

@@ -39,7 +39,7 @@ struct request {
     int cmd;    /* READ=0 or WRITE=1 */
     int errors; /* 操作时产生的错误次数 */
 
-    unsigned long sector;     /* 起始扇区 */
+    unsigned long sector;     /* 起始扇区(相对于当前分区) */
     unsigned long nr_sectors; /* 读/写扇区数 */
 
     /* TODO: buffer 和 bh 的区别是什么?
