@@ -338,11 +338,12 @@ static unsigned long change_ldt(unsigned long text_size, unsigned long *page)
  * library.
  *
  * 调用本函数的时候, 栈的状态如下:
- * stack = (EIP, EIP0, EIP, EBX, ECX, EDX, ORIGI_EAX, FS, ES, DS, EIP, CS, EFLAGS, ESP, SS, ...)
- *          ^    ^          ^                                     ^
- *          |    |          sys_call --------------------------<| int0x80
- *          |    sys_execve
- *          do_execve
+ * S = (EIP, EIP0, EIP, EBX, ECX, EDX, ORIGI_EAX, FS, ES, DS, EIP, CS, EFLAGS, ESP, SS, ...)
+ *      ^    ^     ^    ^                                     ^
+ *      |    |     |    sys_call                              int(0x80)
+ *      |    |     call(sys_execve)
+ *      |    sys_execve
+ *      call(do_execve)
  *
  * @param eip 调用系统中断(int0x80)时的程序代码指针
  * @param tmp 系统中断中在调用 sys_execve 时的返回地址, 此处不关注

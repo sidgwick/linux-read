@@ -112,18 +112,18 @@ system_call:
 
     # EBX, ECX, EDX 是给系统调用的参数, 这里入栈了
     pushl %edx
-    pushl %ecx        # push %ebx,%ecx,%edx as parameters
+    pushl %ecx        # push %ebx, %ecx, %edx as parameters
     pushl %ebx        # to the system call
 
-    movl $0x10,%edx        # set up ds,es to kernel space
-    mov %dx,%ds
-    mov %dx,%es
-    movl $0x17,%edx        # fs points to local data space
-    mov %dx,%fs
+    movl $0x10, %edx        # set up ds,es to kernel space
+    mov %dx, %ds
+    mov %dx, %es
+    movl $0x17, %edx        # fs points to local data space
+    mov %dx, %fs
 
-    cmpl NR_syscalls,%eax # %eax - NR_syscalls, cmp 指令影响 CF
+    cmpl NR_syscalls, %eax # %eax - NR_syscalls, cmp 指令影响 CF
     jae bad_sys_call # jmp above or equal 要求 `CF > 0`, 这说明 %eax 里面的功能号太大了, 处理不了
-    call sys_call_table(,%eax,4) # 执行系统调用
+    call sys_call_table(, %eax,4) # 执行系统调用
     pushl %eax # 系统调用结果
 2:
     movl current, %eax  # 当前任务
@@ -139,8 +139,7 @@ system_call:
 ret_from_sys_call:
     # task0 不处理信号
     movl current, %eax
-    cmpl task, %eax    # task[0] cannot have signals
-                        # task 数组在 sched.c 文件定义
+    cmpl task, %eax    # task[0] cannot have signals, task 数组在 sched.c 文件定义
     je 3f
 
     # 因为任务在内核态执行时不可抢占, 所以这里通过对原调用程序代码选择符的检查来判断调用程
@@ -171,13 +170,20 @@ ret_from_sys_call:
     call do_signal
     popl %ecx
 
+    # do_signal 会控制, 如果能继续处理下一个信号, 它会返回 1, 如果不能继续处理下一个信号(比如要去执行自定义 handler), 它会返回 0
+    # TODO-DONE: 如果几个信号都要求重新发起系统调用(这些调用还不相同)怎么办?
+    # 答: 似乎不会出现这样的情况, 进程睡眠的时候, 可能会有多个信号到来, 但是大家打断的其实是同一个系统调用.
+
     # 循环, eax & eax != 0 的时候跳转
     #
-    # 这里有多个信号的时候, 一次系统调用只处理一个信号
+    # 在有自定义 handler 的情况下, 如果这里有多个信号, 一次系统调用只处理一个信号
+    # 一次处理一个的原因是, 如果是自定义的信号处理函数, 要借助 iret 才能执行到
     testl %eax, %eax
     jne 2b        # see if we need to switch tasks, or do more signals
 
-3:    popl %eax
+    # 下面将寄存器恢复成 int0x80 之前的状态, 这样即便 do_signal 里面有需要重启
+    # 的系统调用或者自定义 sig handler, 恢复寄存器内容确保他们都可以正常执行
+3:  popl %eax
     popl %ebx
     popl %ecx
     popl %edx
@@ -201,11 +207,11 @@ coprocessor_error:
     pushl %ecx
     pushl %ebx
     pushl %eax
-    movl $0x10,%eax # 10-0-00 内核数据段
-    mov %ax,%ds
-    mov %ax,%es
-    movl $0x17,%eax # 10-1-11 局部数据段
-    mov %ax,%fs
+    movl $0x10, %eax # 10-0-00 内核数据段
+    mov %ax, %ds
+    mov %ax, %es
+    movl $0x17, %eax # 10-1-11 局部数据段
+    mov %ax, %fs
     pushl $ret_from_sys_call # 手动给 math_error 设置好返回地址
     jmp math_error
 
@@ -233,11 +239,11 @@ device_not_available:
     pushl %ebx
     pushl %eax
 
-    movl $0x10,%eax
-    mov %ax,%ds
-    mov %ax,%es
-    movl $0x17,%eax
-    mov %ax,%fs
+    movl $0x10, %eax
+    mov %ax, %ds
+    mov %ax, %es
+    movl $0x17, %eax
+    mov %ax, %fs
 
     pushl $ret_from_sys_call
     clts                    # clear TS so that we can use math
@@ -268,22 +274,22 @@ timer_interrupt:
     push %es        # into them. %fs is used by system_call
     push %fs
     pushl $-1        # fill in -1 for orig_eax
-    pushl %edx        # we save %eax,%ecx,%edx as gcc doesn't
+    pushl %edx        # we save %eax, %ecx, %edx as gcc doesn't
     pushl %ecx        # save those across function calls. %ebx
     pushl %ebx        # is saved as we use that in ret_sys_call
     pushl %eax
 
-    movl $0x10,%eax # ds, es 现在保存的是内核数据段
-    mov %ax,%ds
-    mov %ax,%es
-    movl $0x17,%eax # fs 保存的是任务的数据段
-    mov %ax,%fs
+    movl $0x10, %eax # ds, es 现在保存的是内核数据段
+    mov %ax, %ds
+    mov %ax, %es
+    movl $0x17, %eax # fs 保存的是任务的数据段
+    mov %ax, %fs
     incl jiffies   # 增加系统滴答数
 
     # 通知 8259A 中断处理完成, 以继续中断
     # 由于初始化中断控制芯片时没有采用自动 EOI, 所以这里需要发指令结束该硬件中断
-    movb $0x20,%al  # EOI to interrupt controller #1
-    outb %al,$0x20
+    movb $0x20, %al  # EOI to interrupt controller #1
+    outb %al, $0x20
 
     # 程序运行到此处的时候, 栈的状态
     # CS = 0x24 = 36
@@ -293,7 +299,7 @@ timer_interrupt:
     andl $3, %eax        # (0011 & %eax) is CPL (0 or 3, 0=supervisor)
     pushl %eax
     call do_timer        # 'do_timer(long CPL)' does everything from
-    addl $4,%esp        # task switching to accounting ...
+    addl $4, %esp        # task switching to accounting ...
     jmp ret_from_sys_call
 
 # 这是 sys_execve 系统调用.
@@ -317,7 +323,7 @@ sys_execve:
 .align 2
 sys_fork:
     call find_empty_process    # 准备 pid
-    testl %eax,%eax
+    testl %eax, %eax
     js 1f
     push %gs
     pushl %esi
@@ -325,8 +331,8 @@ sys_fork:
     pushl %ebp
     pushl %eax
     call copy_process
-    addl $20,%esp
-1:    ret
+    addl $20, %esp
+1:  ret
 
 hd_interrupt:
     pushl %eax
@@ -335,30 +341,30 @@ hd_interrupt:
     push %ds
     push %es
     push %fs
-    movl $0x10,%eax
-    mov %ax,%ds
-    mov %ax,%es
-    movl $0x17,%eax
-    mov %ax,%fs
+    movl $0x10, %eax
+    mov %ax, %ds
+    mov %ax, %es
+    movl $0x17, %eax
+    mov %ax, %fs
 
     # EOI to interrupt controller #1
     # 由于初始化中断控制芯片时没有采用自动 EOI, 所以这里需要发指令结束该硬件中断
-    movb $0x20,%al
-    outb %al,$0xA0
+    movb $0x20, %al
+    outb %al, $0xA0
     jmp 1f            # give port chance to breathe
-1:    jmp 1f
+1:  jmp 1f
 
 # do_hd 定义为一个函数指针, 将被赋值 read_intr 或 write_intr 函数地址
 # 放到 edx 寄存器后就将 do_hd 指针变量置为 NULL. 然后测试得到的函数指针,
 # 若该指针为空, 则赋予该指针指向 C 函数 unexpected_hd_interrupt, 以处理未知硬盘中断
 # 每次 hd_interrupt 之前都应该重新设置 do_hd
-1:    xorl %edx, %edx
+1:  xorl %edx, %edx
     movl %edx, hd_timeout # hd_timeout 置为 0, 表示控制器已在规定时间内产生了中断
     xchgl do_hd, %edx
     testl %edx, %edx
     jne 1f
     movl $unexpected_hd_interrupt, %edx # 默认的中断处理函数
-1:    outb %al, $0x20 # EOI
+1:  outb %al, $0x20 # EOI
     call *%edx        # "interesting" way of handling intr.
     pop %fs
     pop %es
@@ -386,14 +392,14 @@ floppy_interrupt:
     push %es
     push %fs
 
-    movl $0x10,%eax
-    mov %ax,%ds
-    mov %ax,%es
-    movl $0x17,%eax
-    mov %ax,%fs
+    movl $0x10, %eax
+    mov %ax, %ds
+    mov %ax, %es
+    movl $0x17, %eax
+    mov %ax, %fs
 
-    movb $0x20,%al
-    outb %al,$0x20        # EOI to interrupt controller #1
+    movb $0x20, %al
+    outb %al, $0x20        # EOI to interrupt controller #1
 
     # do_floppy = NULL
     # 每次 floppy_interrupt 之前都应该重新设置 do_floppy
@@ -416,8 +422,8 @@ floppy_interrupt:
 parallel_interrupt:
     pushl %eax
 
-    movb $0x20,%al
-    outb %al,$0x20
+    movb $0x20, %al
+    outb %al, $0x20
 
     popl %eax
     iret

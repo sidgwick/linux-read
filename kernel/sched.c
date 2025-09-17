@@ -173,7 +173,7 @@ void schedule(void)
 
     /* check alarm, wake up any interruptible tasks that have got a signal
      * 从最后一个 task 开始检查 task 的信号情况 */
-    for (p = &LAST_TASK; p > &FIRST_TASK; --p)
+    for (p = &LAST_TASK; p > &FIRST_TASK; --p) {
         if (*p) {
             /* 如果设置过任务超时定时 timeout, 并且已经超时, 则复位超时定时值
              * 并且如果任务处于可中断睡眠状态下, 将其置为就绪状态(TASK_RUNNING)
@@ -203,6 +203,7 @@ void schedule(void)
                 (*p)->state = TASK_RUNNING;
             }
         }
+    }
 
     /* this is the scheduler proper:
      * 这里是调度程序的主要部分 */

@@ -170,8 +170,7 @@ static void sleep_if_empty(struct tty_queue *queue)
     cli();
 
     /* 如果当前进程没有信号要处理, 并且指定的队列缓冲区空, 则让进程进入可中断睡眠状态
-     * 注意这里的 queue->proc_list 在 sched.c 里面被赋值为 current, 相当于记录
-     * 了是那个任务被 sleep 了 */
+     * 注意这里退出 sleep 的时候, 不一定是 queue 非空了, 也可能是收到了信号退出 */
     while (!(current->signal & ~current->blocked) && EMPTY(queue)) {
         interruptible_sleep_on(&queue->proc_list);
     }
