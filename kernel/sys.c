@@ -373,7 +373,7 @@ int sys_setsid(void)
 
     current->leader = 1;
     current->session = current->pgrp = current->pid;
-    current->tty = -1;
+    current->tty = -1; /* 解除会话和控制台的关联 */
 
     return current->pgrp;
 }
