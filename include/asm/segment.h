@@ -68,8 +68,7 @@ static inline void __generic_memcpy_tofs(void *to, const void *from, unsigned lo
             "rep ; movsl\n\t"
             "pop %%es"
             : /* no outputs */
-            : "c"(n), "D"((long)to), "S"((long)from)
-            : "cx", "di", "si");
+            : "c"(n), "D"((long)to), "S"((long)from));
 }
 
 static inline void __constant_memcpy_tofs(void *to, const void *from, unsigned long n)
@@ -98,8 +97,7 @@ static inline void __constant_memcpy_tofs(void *to, const void *from, unsigned l
             "pop %%es\n\t"                                                                         \
             "rep ; movsl\n\t" x "pop %%es"                                                         \
             : /* no outputs */                                                                     \
-            : "c"(n / 4), "D"((long)to), "S"((long)from)                                           \
-            : "cx", "di", "si")
+            : "c"(n / 4), "D"((long)to), "S"((long)from))
 
     switch (n % 4) {
     case 0:
@@ -131,7 +129,7 @@ static inline void __generic_memcpy_fromfs(void *to, const void *from, unsigned 
             "rep ; fs ; movsl"
             : /* no outputs */
             : "c"(n), "D"((long)to), "S"((long)from)
-            : "cx", "di", "si", "memory");
+            : "memory");
 }
 
 static inline void __constant_memcpy_fromfs(void *to, const void *from, unsigned long n)
@@ -158,7 +156,7 @@ static inline void __constant_memcpy_fromfs(void *to, const void *from, unsigned
             "rep ; fs ; movsl\n\t" x                                                               \
             : /* no outputs */                                                                     \
             : "c"(n / 4), "D"((long)to), "S"((long)from)                                           \
-            : "cx", "di", "si", "memory")
+            : "memory")
 
     switch (n % 4) {
     case 0:

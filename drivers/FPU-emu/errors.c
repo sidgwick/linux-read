@@ -130,7 +130,7 @@ void emu_printall()
         printk("SW: denormalized operand\n");
     if (partial_status & SW_Invalid)
         printk("SW: invalid operation\n");
-#endif DEBUGGING
+#endif /* DEBUGGING */
 
     printk(" SW: b=%d st=%ld es=%d sf=%d cc=%d%d%d%d ef=%d%d%d%d%d%d\n",
            partial_status & 0x8000 ? 1 : 0, /* busy */
@@ -295,7 +295,7 @@ void exception(int n)
         /* My message from the sponsor */
         printk(FPU_VERSION " "__DATE__
                            " (C) W. Metzenthen.\n");
-#endif PRINT_MESSAGES
+#endif /* PRINT_MESSAGES */
 
         /* Get a name string for error reporting */
         for (i = 0; exception_names[i].type; i++)
@@ -305,7 +305,7 @@ void exception(int n)
         if (exception_names[i].type) {
 #ifdef PRINT_MESSAGES
             printk("FP Exception: %s!\n", exception_names[i].name);
-#endif PRINT_MESSAGES
+#endif /* PRINT_MESSAGES */
         } else
             printk("FPU emulator: Unknown Exception: 0x%04x!\n", n);
 
@@ -316,7 +316,7 @@ void exception(int n)
 #ifdef PRINT_MESSAGES
         else
             emu_printall();
-#endif PRINT_MESSAGES
+#endif /* PRINT_MESSAGES */
 
         /*
        * The 80486 generates an interrupt on the next non-control FPU
@@ -332,7 +332,7 @@ void exception(int n)
 
 #ifdef __DEBUG__
     math_abort(FPU_info, SIGFPE);
-#endif __DEBUG__
+#endif /* __DEBUG__ */
 }
 
 /* Real operation attempted on two operands, one a NaN. */
@@ -358,7 +358,7 @@ asmlinkage int real_2op_NaN(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest)
     } else
 #ifdef PARANOID
         if (b->tag == TW_NaN)
-#endif PARANOID
+#endif /* PARANOID */
     {
         signalling = !(b->sigh & 0x40000000);
         x = b;
@@ -369,7 +369,7 @@ asmlinkage int real_2op_NaN(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest)
         EXCEPTION(EX_INTERNAL | 0x113);
         x = &CONST_QNaN;
     }
-#endif PARANOID
+#endif /* PARANOID */
 
     if (!signalling) {
         if (!(x->sigh & 0x80000000)) /* pseudo-NaN ? */

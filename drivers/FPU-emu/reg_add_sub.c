@@ -59,7 +59,7 @@ int reg_add(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
             if ((b->tag == TW_Valid) && (b->exp <= EXP_UNDER) && denormal_operand())
                 return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
             reg_move(&CONST_Z, dest);
             /* sign depends upon rounding mode */
             dest->sign = ((control_w & CW_RC) != RC_DOWN) ? SIGN_POS : SIGN_NEG;
@@ -88,7 +88,7 @@ int reg_add(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
                 if ((b->tag == TW_Valid) && (b->exp <= EXP_UNDER) && denormal_operand())
                     return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
                 reg_move(b, dest);
             }
             return 0;
@@ -96,7 +96,7 @@ int reg_add(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
             if ((a->tag == TW_Valid) && (a->exp <= EXP_UNDER) && denormal_operand())
                 return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
             reg_move(a, dest);
             return 0;
         } else if (a->tag == TW_Infinity) {
@@ -104,7 +104,7 @@ int reg_add(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
                 if ((b->tag == TW_Valid) && (b->exp <= EXP_UNDER) && denormal_operand())
                     return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
                 reg_move(a, dest);
                 return 0;
             }
@@ -118,7 +118,7 @@ int reg_add(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
             if ((a->tag == TW_Valid) && (a->exp <= EXP_UNDER) && denormal_operand())
                 return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
             reg_move(b, dest);
             return 0;
         }
@@ -162,7 +162,7 @@ int reg_sub(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
                 if ((b->tag == TW_Valid) && (b->exp <= EXP_UNDER) && denormal_operand())
                     return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
                 reg_move(&CONST_Z, dest);
                 /* sign depends upon rounding mode */
                 dest->sign = ((control_w & CW_RC) != RC_DOWN) ? SIGN_POS : SIGN_NEG;
@@ -206,7 +206,7 @@ int reg_sub(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
                 if ((a->tag == TW_Valid) && (a->exp <= EXP_UNDER) && denormal_operand())
                     return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
                 reg_move(a, dest);
             }
             return 0;
@@ -214,7 +214,7 @@ int reg_sub(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
             if ((b->tag == TW_Valid) && (b->exp <= EXP_UNDER) && denormal_operand())
                 return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
             reg_move(b, dest);
             dest->sign ^= SIGN_POS ^ SIGN_NEG;
             return 0;
@@ -223,7 +223,7 @@ int reg_sub(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
                 if ((b->tag == TW_Valid) && (b->exp <= EXP_UNDER) && denormal_operand())
                     return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
                 reg_move(a, dest);
                 return 0;
             }
@@ -238,7 +238,7 @@ int reg_sub(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w)
 #ifdef DENORM_OPERAND
             if ((a->tag == TW_Valid) && (a->exp <= EXP_UNDER) && denormal_operand())
                 return 1;
-#endif DENORM_OPERAND
+#endif /* DENORM_OPERAND */
             reg_move(b, dest);
             dest->sign ^= SIGN_POS ^ SIGN_NEG;
             return 0;

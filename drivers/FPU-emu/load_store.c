@@ -73,7 +73,7 @@ void load_store_instr(char type, fpu_addr_modes addr_modes)
     default:
         EXCEPTION(EX_INTERNAL);
         return;
-#endif PARANOID
+#endif /* PARANOID */
     }
 
     switch (type) {
@@ -169,7 +169,7 @@ void load_store_instr(char type, fpu_addr_modes addr_modes)
             partial_status &= ~(SW_Summary | SW_Backward);
 #ifdef PECULIAR_486
         control_word |= 0x40; /* An 80486 appears to always set this bit */
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
         NO_NET_DATA_EFFECT;
         NO_NET_INSTR_EFFECT;
         break;

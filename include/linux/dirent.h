@@ -2,6 +2,7 @@
 #define _LINUX_DIRENT_H
 
 #include <linux/limits.h>
+#include <linux/types.h>
 
 struct dirent {
     long d_ino;

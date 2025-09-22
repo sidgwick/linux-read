@@ -62,8 +62,8 @@
     }
 #else
 #define clear_C1()
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 
-#endif __ASSEMBLER__
+#endif /* __ASSEMBLER__ */
 
-#endif _STATUS_H_
+#endif /* _STATUS_H_ */

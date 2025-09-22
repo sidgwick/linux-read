@@ -19,7 +19,7 @@
  *        Copyright (C) 1991, 1992 Linus Torvalds
  */
 
-extern inline char *strcpy(char *dest, const char *src)
+static inline char *strcpy(char *dest, const char *src)
 {
     __asm__("cld\n"
             "1:\tlodsb\n\t"
@@ -28,11 +28,11 @@ extern inline char *strcpy(char *dest, const char *src)
             "jne 1b"
             : /* no output */
             : "S"(src), "D"(dest)
-            : "si", "di", "ax", "memory");
+            : "memory");
     return dest;
 }
 
-extern inline char *strncpy(char *dest, const char *src, size_t count)
+static inline char *strncpy(char *dest, const char *src, size_t count)
 {
     __asm__("cld\n"
             "1:\tdecl %2\n\t"
@@ -46,11 +46,11 @@ extern inline char *strncpy(char *dest, const char *src, size_t count)
             "2:"
             : /* no output */
             : "S"(src), "D"(dest), "c"(count)
-            : "si", "di", "ax", "cx", "memory");
+            : "memory");
     return dest;
 }
 
-extern inline char *strcat(char *dest, const char *src)
+static inline char *strcat(char *dest, const char *src)
 {
     __asm__("cld\n\t"
             "repne\n\t"
@@ -62,11 +62,11 @@ extern inline char *strcat(char *dest, const char *src)
             "jne 1b"
             : /* no output */
             : "S"(src), "D"(dest), "a"(0), "c"(0xffffffff)
-            : "si", "di", "ax", "cx");
+            :);
     return dest;
 }
 
-extern inline char *strncat(char *dest, const char *src, size_t count)
+static inline char *strncat(char *dest, const char *src, size_t count)
 {
     __asm__("cld\n\t"
             "repne\n\t"
@@ -83,11 +83,11 @@ extern inline char *strncat(char *dest, const char *src, size_t count)
             "stosb"
             : /* no output */
             : "S"(src), "D"(dest), "a"(0), "c"(0xffffffff), "g"(count)
-            : "si", "di", "ax", "cx", "memory");
+            : "memory");
     return dest;
 }
 
-extern inline int strcmp(const char *cs, const char *ct)
+static inline int strcmp(const char *cs, const char *ct)
 {
     register int __res __asm__("ax");
     __asm__("cld\n"
@@ -104,11 +104,11 @@ extern inline int strcmp(const char *cs, const char *ct)
             "3:"
             : "=a"(__res)
             : "D"(cs), "S"(ct)
-            : "si", "di");
+            :);
     return __res;
 }
 
-extern inline int strncmp(const char *cs, const char *ct, size_t count)
+static inline int strncmp(const char *cs, const char *ct, size_t count)
 {
     register int __res __asm__("ax");
     __asm__("cld\n"
@@ -127,11 +127,11 @@ extern inline int strncmp(const char *cs, const char *ct, size_t count)
             "4:"
             : "=a"(__res)
             : "D"(cs), "S"(ct), "c"(count)
-            : "si", "di", "cx");
+            :);
     return __res;
 }
 
-extern inline char *strchr(const char *s, char c)
+static inline char *strchr(const char *s, char c)
 {
     register char *__res __asm__("ax");
     __asm__("cld\n\t"
@@ -146,11 +146,11 @@ extern inline char *strchr(const char *s, char c)
             "decl %0"
             : "=a"(__res)
             : "S"(s), "0"(c)
-            : "si");
+            :);
     return __res;
 }
 
-extern inline char *strrchr(const char *s, char c)
+static inline char *strrchr(const char *s, char c)
 {
     register char *__res __asm__("dx");
     __asm__("cld\n\t"
@@ -164,11 +164,11 @@ extern inline char *strrchr(const char *s, char c)
             "jne 1b"
             : "=d"(__res)
             : "0"(0), "S"(s), "a"(c)
-            : "ax", "si");
+            :);
     return __res;
 }
 
-extern inline size_t strspn(const char *cs, const char *ct)
+static inline size_t strspn(const char *cs, const char *ct)
 {
     register char *__res __asm__("si");
     __asm__("cld\n\t"
@@ -189,11 +189,11 @@ extern inline size_t strspn(const char *cs, const char *ct)
             "2:\tdecl %0"
             : "=S"(__res)
             : "a"(0), "c"(0xffffffff), "0"(cs), "g"(ct)
-            : "ax", "cx", "dx", "di");
+            :);
     return __res - cs;
 }
 
-extern inline size_t strcspn(const char *cs, const char *ct)
+static inline size_t strcspn(const char *cs, const char *ct)
 {
     register char *__res __asm__("si");
     __asm__("cld\n\t"
@@ -214,11 +214,11 @@ extern inline size_t strcspn(const char *cs, const char *ct)
             "2:\tdecl %0"
             : "=S"(__res)
             : "a"(0), "c"(0xffffffff), "0"(cs), "g"(ct)
-            : "ax", "cx", "dx", "di");
+            :);
     return __res - cs;
 }
 
-extern inline char *strpbrk(const char *cs, const char *ct)
+static inline char *strpbrk(const char *cs, const char *ct)
 {
     register char *__res __asm__("si");
     __asm__("cld\n\t"
@@ -242,11 +242,11 @@ extern inline char *strpbrk(const char *cs, const char *ct)
             "3:"
             : "=S"(__res)
             : "a"(0), "c"(0xffffffff), "0"(cs), "g"(ct)
-            : "ax", "cx", "dx", "di");
+            :);
     return __res;
 }
 
-extern inline char *strstr(const char *cs, const char *ct)
+static inline char *strstr(const char *cs, const char *ct)
 {
     register char *__res __asm__("ax");
     __asm__("cld\n\t"
@@ -270,11 +270,11 @@ extern inline char *strstr(const char *cs, const char *ct)
             "2:"
             : "=a"(__res)
             : "0"(0), "c"(0xffffffff), "S"(cs), "g"(ct)
-            : "cx", "dx", "di", "si");
+            :);
     return __res;
 }
 
-extern inline size_t strlen(const char *s)
+static inline size_t strlen(const char *s)
 {
     register int __res __asm__("cx");
     __asm__("cld\n\t"
@@ -284,13 +284,13 @@ extern inline size_t strlen(const char *s)
             "decl %0"
             : "=c"(__res)
             : "D"(s), "a"(0), "0"(0xffffffff)
-            : "di");
+            :);
     return __res;
 }
 
 extern char *___strtok;
 
-extern inline char *strtok(char *s, const char *ct)
+static inline char *strtok(char *s, const char *ct)
 {
     register char *__res;
     __asm__("testl %1,%1\n\t"
@@ -345,11 +345,11 @@ extern inline char *strtok(char *s, const char *ct)
             "8:"
             : "=b"(__res), "=S"(___strtok)
             : "0"(___strtok), "1"(s), "g"(ct)
-            : "ax", "cx", "dx", "di", "memory");
+            :);
     return __res;
 }
 
-extern inline void *memcpy(void *to, const void *from, size_t n)
+static inline void *memcpy(void *to, const void *from, size_t n)
 {
     __asm__("cld\n\t"
             "movl %%edx, %%ecx\n\t"
@@ -364,11 +364,11 @@ extern inline void *memcpy(void *to, const void *from, size_t n)
             "2:\n"
             : /* no output */
             : "d"(n), "D"((long)to), "S"((long)from)
-            : "cx", "di", "si", "memory");
+            :);
     return (to);
 }
 
-extern inline void *memmove(void *dest, const void *src, size_t n)
+static inline void *memmove(void *dest, const void *src, size_t n)
 {
     if (dest < src)
         __asm__("cld\n\t"
@@ -376,7 +376,7 @@ extern inline void *memmove(void *dest, const void *src, size_t n)
                 "movsb"
                 : /* no output */
                 : "c"(n), "S"(src), "D"(dest)
-                : "cx", "si", "di");
+                :);
     else
         __asm__("std\n\t"
                 "rep\n\t"
@@ -384,11 +384,11 @@ extern inline void *memmove(void *dest, const void *src, size_t n)
                 "cld"
                 : /* no output */
                 : "c"(n), "S"(n - 1 + (const char *)src), "D"(n - 1 + (char *)dest)
-                : "cx", "si", "di", "memory");
+                :);
     return dest;
 }
 
-extern inline int memcmp(const void *cs, const void *ct, size_t count)
+static inline int memcmp(const void *cs, const void *ct, size_t count)
 {
     register int __res __asm__("ax");
     __asm__("cld\n\t"
@@ -401,11 +401,11 @@ extern inline int memcmp(const void *cs, const void *ct, size_t count)
             "1:"
             : "=a"(__res)
             : "0"(0), "D"(cs), "S"(ct), "c"(count)
-            : "si", "di", "cx");
+            :);
     return __res;
 }
 
-extern inline void *memchr(const void *cs, char c, size_t count)
+static inline void *memchr(const void *cs, char c, size_t count)
 {
     register void *__res __asm__("di");
     if (!count)
@@ -418,18 +418,18 @@ extern inline void *memchr(const void *cs, char c, size_t count)
             "1:\tdecl %0"
             : "=D"(__res)
             : "a"(c), "D"(cs), "c"(count)
-            : "cx");
+            :);
     return __res;
 }
 
-extern inline void *memset(void *s, char c, size_t count)
+static inline void *memset(void *s, char c, size_t count)
 {
     __asm__("cld\n\t"
             "rep\n\t"
             "stosb"
             : /* no output */
             : "a"(c), "D"(s), "c"(count)
-            : "cx", "di", "memory");
+            :);
     return s;
 }
 

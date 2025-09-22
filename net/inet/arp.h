@@ -18,6 +18,8 @@
 #ifndef _ARP_H
 #define _ARP_H
 
+#include "dev.h"
+
 #define ARP_TABLE_SIZE 16 /* size of ARP table        */
 #define ARP_TIMEOUT 30000 /* five minutes            */
 #define ARP_RES_TIME 250  /* 2.5 seconds            */

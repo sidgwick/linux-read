@@ -50,7 +50,7 @@ void poly_tan(FPU_REG const *arg, FPU_REG *result, int invert)
         arith_invalid(result);
         return;
     } /* Need a positive number */
-#endif PARANOID
+#endif /* PARANOID */
 
     arg_signif = significand(arg);
     if (exponent < -1) {

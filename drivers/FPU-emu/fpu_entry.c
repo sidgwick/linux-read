@@ -75,7 +75,7 @@ static FUNC const st_instr_table[64] = {
     fdiv_i,  __BAD__, fdivp_,  __BAD__,
 };
 
-#endif NO_UNDOC_CODE
+#endif /* NO_UNDOC_CODE */
 
 #define _NONE_ 0 /* Take no special action */
 #define _REG0_ 1 /* Need to check for not empty st(0) */
@@ -110,7 +110,7 @@ static unsigned char const type_table[64] = {
     _REGIi, _REGIc, _REGIp, _null_, _REGI_, _NONE_, _null_, _null_, _REGIi, _null_, _REGIp,
     _null_, _REGI_, _NONE_, _null_, _null_, _REGIi, _null_, _REGIp, _null_};
 
-#endif NO_UNDOC_CODE
+#endif /* NO_UNDOC_CODE */
 
 /* Be careful when using any of these global variables...
    they might change if swapping is triggered */
@@ -124,7 +124,7 @@ unsigned short FPU_data_selector;
 
 #ifdef PARANOID
 char emulating = 0;
-#endif PARANOID
+#endif /* PARANOID */
 
 static int valid_prefix(unsigned char *Byte, unsigned char **fpu_eip, overrides *override);
 
@@ -140,7 +140,7 @@ asmlinkage void math_emulate(long arg)
         printk("ERROR: wm-FPU-emu is not RE-ENTRANT!\n");
     }
     RE_ENTRANT_CHECK_ON;
-#endif PARANOID
+#endif /* PARANOID */
 
     if (!current->used_math) {
         int i;
@@ -199,7 +199,7 @@ do_another_FPU_instruction:
      but although it is supposed to be undefined for many fpu
      instructions, an 80486 behaves as if this were done here: */
     FPU_data_selector = FPU_DS;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 
     if ((byte1 & 0xf8) != 0xd8) {
         if (byte1 == FWAIT_OPCODE) {
@@ -211,7 +211,7 @@ do_another_FPU_instruction:
 #ifdef PARANOID
         EXCEPTION(EX_INTERNAL | 0x128);
         math_abort(FPU_info, SIGILL);
-#endif PARANOID
+#endif /* PARANOID */
     }
 
     RE_ENTRANT_CHECK_OFF;
@@ -322,7 +322,7 @@ do_another_FPU_instruction:
                             /* fdiv or fsub */
                             real_2op_NaN(&FPU_loaded_data, FPU_st0_ptr, FPU_st0_ptr);
                         else
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
                             /* fadd, fdivr, fmul, or fsubr */
                             real_2op_NaN(FPU_st0_ptr, &FPU_loaded_data, FPU_st0_ptr);
                     }
@@ -401,7 +401,7 @@ do_another_FPU_instruction:
 
 #ifndef PECULIAR_486
         *(unsigned short *)&operand_selector = FPU_data_selector;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
         ;
     } else {
         /* None of these instructions access user memory */
@@ -411,7 +411,7 @@ do_another_FPU_instruction:
         /* This is supposed to be undefined, but a real 80486 seems
      to do this: */
         FPU_data_address = 0;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 
         FPU_st0_ptr = &st(0);
         FPU_st0_tag = FPU_st0_ptr->tag;
@@ -461,7 +461,7 @@ FPU_instruction_done:
     data_operand_offset = (unsigned long)FPU_data_address;
 #ifdef PECULIAR_486
     *(unsigned short *)&operand_selector = FPU_data_selector;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 
 FPU_fwait_done:
 
@@ -469,7 +469,7 @@ FPU_fwait_done:
     RE_ENTRANT_CHECK_OFF;
     emu_printall();
     RE_ENTRANT_CHECK_ON;
-#endif DEBUG
+#endif /* DEBUG */
 
     if (FPU_lookahead && !need_resched) {
         FPU_ORIG_EIP = FPU_EIP;
@@ -571,5 +571,5 @@ void math_abort(struct info *info, unsigned int signal)
     __asm__("movl %0,%%esp ; ret" : : "g"(((long)info) - 4));
 #ifdef PARANOID
     printk("ERROR: wm-FPU-emu math_abort failed!\n");
-#endif PARANOID
+#endif /* PARANOID */
 }

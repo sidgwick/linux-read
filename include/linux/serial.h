@@ -18,6 +18,8 @@
 #ifndef _LINUX_SERIAL_H
 #define _LINUX_SERIAL_H
 
+#include <linux/termios.h>
+
 struct async_struct {
     int baud_base;
     int port;

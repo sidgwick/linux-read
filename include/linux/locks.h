@@ -1,6 +1,8 @@
 #ifndef _LINUX_LOCKS_H
 #define _LINUX_LOCKS_H
 
+#include <linux/fs.h>
+
 /*
  * Buffer cache locking - note that interrupts may only unlock, not
  * lock buffers.

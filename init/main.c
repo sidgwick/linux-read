@@ -44,24 +44,22 @@ struct desc_struct default_ldt;
  * some others too.
  */
 #define __NR__exit __NR_exit
-static inline _syscall0(int, idle) static inline _syscall0(int, fork) static inline _syscall0(int,
-                                                                                              pause) static inline _syscall1(int, setup, void *, BIOS) static inline _syscall0(int, sync) static inline _syscall0(pid_t, setsid) static inline _syscall3(int, write, int, fd, const char *, buf, off_t, count) static inline _syscall1(int,
-                                                                                                                                                                                                                                                                                                                                       dup,
-                                                                                                                                                                                                                                                                                                                                       int,
-                                                                                                                                                                                                                                                                                                                                       fd) static inline _syscall3(int,
-                                                                                                                                                                                                                                                                                                                                                                   execve, const char *, file, char **, argv, char **, envp) static inline _syscall3(int,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                     open,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                     const char *, file, int,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                     flag,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                     int, mode) static inline _syscall1(int,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        close,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        int, fd) static inline _syscall1(int, _exit, int, exitcode) static inline _syscall3(pid_t, waitpid, pid_t, pid,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            int *,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            wait_stat,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            int,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            options)
 
-    static inline pid_t wait(int *wait_stat)
+static inline _syscall0(int, idle);
+static inline _syscall0(int, fork);
+static inline _syscall0(int, pause);
+static inline _syscall1(int, setup, void *, BIOS);
+static inline _syscall0(int, sync);
+static inline _syscall0(pid_t, setsid);
+static inline _syscall3(int, write, int, fd, const char *, buf, off_t, count);
+static inline _syscall1(int, dup, int, fd);
+static inline _syscall3(int, execve, const char *, file, char **, argv, char **, envp);
+static inline _syscall3(int, open, const char *, file, int, flag, int, mode);
+static inline _syscall1(int, close, int, fd);
+static inline _syscall1(int, _exit, int, exitcode);
+static inline _syscall3(pid_t, waitpid, pid_t, pid, int *, wait_stat, int, options);
+
+static inline pid_t wait(int *wait_stat)
 {
     return waitpid(-1, wait_stat, 0);
 }
@@ -94,13 +92,15 @@ extern void t128_setup(char *str, int *ints);
 extern void generic_NCR5380_setup(char *str, int *intr);
 extern void aha152x_setup(char *str, int *ints);
 extern void sound_setup(char *str, int *ints);
+
 #ifdef CONFIG_SBPCD
 extern void sbpcd_setup(char *str, int *ints);
-#endif CONFIG_SBPCD
+#endif /* CONFIG_SBPCD */
 
 #ifdef CONFIG_SYSVIPC
 extern void ipc_init(void);
 #endif
+
 #ifdef CONFIG_SCSI
 extern unsigned long scsi_dev_init(unsigned long, unsigned long);
 #endif
@@ -216,7 +216,7 @@ struct {
 #endif
 #ifdef CONFIG_SBPCD
                   {"sbpcd=", sbpcd_setup},
-#endif CONFIG_SBPCD
+#endif /* CONFIG_SBPCD */
                   {0, 0}};
 
 int checksetup(char *line)
@@ -249,8 +249,7 @@ static void calibrate_delay(void)
         if (ticks >= HZ) {
             __asm__("mull %1 ; divl %2"
                     : "=a"(loops_per_sec)
-                    : "d"(HZ), "r"(ticks), "0"(loops_per_sec)
-                    : "dx");
+                    : "d"(HZ), "r"(ticks), "0"(loops_per_sec));
             printk("ok - %lu.%02lu BogoMips\n", loops_per_sec / 500000,
                    (loops_per_sec / 5000) % 100);
             return;

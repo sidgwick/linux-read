@@ -45,7 +45,7 @@ void poly_atan(FPU_REG *arg)
         arith_invalid(arg);
         return;
     } /* Need a positive number */
-#endif PARANOID
+#endif /* PARANOID */
 
     exponent = arg->exp - EXP_BIAS;
 
@@ -60,7 +60,7 @@ void poly_atan(FPU_REG *arg)
         if (exponent >= 0) {
 #ifdef PARANOID
             if ((exponent == 0) && (arg->sigl == 0) && (arg->sigh == 0x80000000))
-#endif PARANOID
+#endif /* PARANOID */
             {
                 reg_move(&CONST_PI4, arg);
                 return;
@@ -68,7 +68,7 @@ void poly_atan(FPU_REG *arg)
 #ifdef PARANOID
             EXCEPTION(EX_INTERNAL | 0x104); /* There must be a logic error */
             return;
-#endif PARANOID
+#endif /* PARANOID */
         }
 
         /* If the argument is greater than sqrt(2)-1 (=0.414213562...) */
@@ -107,7 +107,7 @@ void poly_atan(FPU_REG *arg)
     if (exponent >= -1) {
         EXCEPTION(EX_INTERNAL | 0x120); /* There must be a logic error */
     }
-#endif PARANOID
+#endif /* PARANOID */
 
     /* shift the argument right by the required places */
     if (shrx(&arg_signif, -1 - exponent) >= 0x80000000U)
@@ -168,14 +168,14 @@ void poly_add_1(FPU_REG *src)
 
 #ifdef OBSOLETE
     char round = (src->sigl & 3) == 3;
-#endif OBSOLETE
+#endif /* OBSOLETE */
 
     shrx(&src->sigl, 1);
 
 #ifdef OBSOLETE
     if (round)
         significand(src)++; /* Round to even */
-#endif OBSOLETE
+#endif /* OBSOLETE */
 
     src->sigh |= 0x80000000;
 

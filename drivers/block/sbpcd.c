@@ -107,7 +107,7 @@
 
 #if SBPCD_USE_IRQ
 #include <linux/signal.h>
-#endif SBPCD_USE_IRQ
+#endif /* SBPCD_USE_IRQ */
 
 #include <linux/ddi.h>
 #include <linux/major.h>
@@ -239,7 +239,7 @@ char *type;
 
 #if FUTURE
 static struct wait_queue *sbp_waitq = NULL;
-#endif FUTURE
+#endif /* FUTURE */
 
 /*==========================================================================*/
 
@@ -266,7 +266,7 @@ static u_int maxtim_8 = 30000;
 static u_int maxtim_data = 9000;
 #else
 static u_int maxtim_data = 3000;
-#endif MANY_SESSION
+#endif /* MANY_SESSION */
 
 /*==========================================================================*/
 
@@ -319,7 +319,7 @@ static struct {
     u_char vol_ctrl2;
     char vol_chan3;
     u_char vol_ctrl3;
-#endif 000
+#endif /* 000 */
 
     u_char SubQ_audio;
     u_char SubQ_ctl_adr;
@@ -391,7 +391,7 @@ void sbpcd_dprintf(int level, char *fmt, ...)
 #else
 #define DPRINTF(x) /* nothing */
 
-#endif SBPCD_DEBUG
+#endif /* SBPCD_DEBUG */
 
 /*
  * maintain trace bit pattern
@@ -565,7 +565,7 @@ static void flush_status(void)
     } while (!timed_out);
     CLEAR_TIMER;
     inb(CDi_status);
-#endif CDMKE
+#endif /* CDMKE */
 }
 /*==========================================================================*/
 static int CDi_stat_loop(void)
@@ -721,13 +721,13 @@ static void xx_ReadStatus(void)
     else {
 #if SBPCD_DIS_IRQ
         cli();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
         OUT(CDo_command, 0x05);
         for (i = 0; i < 6; i++)
             OUT(CDo_command, 0);
 #if SBPCD_DIS_IRQ
         sti();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
     }
 }
 /*==========================================================================*/
@@ -775,12 +775,12 @@ int cmd_out(void)
 
 #if SBPCD_DIS_IRQ
         cli();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
         for (i = 0; i < 7; i++)
             OUT(CDo_command, drvcmd[i]);
 #if SBPCD_DIS_IRQ
         sti();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
     }
     if (response_count != 0) {
         if (cmd_type != 0) {
@@ -1150,7 +1150,7 @@ static int yy_LockDoor(char lock)
     i = cmd_out();
     return (i);
 }
-#endif 000
+#endif /* 000 */
 /*==========================================================================*/
 static int xx_ReadSubQ(void)
 {
@@ -1512,7 +1512,7 @@ static void check_datarate(void)
 #if 00000
         if (datarate > 0x0FFFFFFF)
             break;
-#endif 00000
+#endif /* 00000 */
 
     } while (!timed_out); /* originally looping for 1.1 seconds */
     CLEAR_TIMER;
@@ -1528,9 +1528,9 @@ static void check_datarate(void)
     maxtim_data = datarate / 100;
 #else
     maxtim_data = datarate / 300;
-#endif MANY_SESSION
+#endif /* MANY_SESSION */
     DPRINTF((DBG_TIM, "SBPCD: maxtim_8 %d, maxtim_data %d.\n", maxtim_8, maxtim_data));
-#endif CDMKE
+#endif /* CDMKE */
 }
 /*==========================================================================*/
 static int check_version(void)
@@ -1659,7 +1659,7 @@ static void timewait(void)
     for (i = 0; i < 65500; i++)
         ;
 }
-#endif 000
+#endif /* 000 */
 /*==========================================================================*/
 #if FUTURE
 /*
@@ -1701,7 +1701,7 @@ static int obey_audio_state(u_char audio_state, u_char func, u_char subfunc)
         return (2);
     }
 }
-#endif FUTURE
+#endif /* FUTURE */
 /*==========================================================================*/
 /* allowed is only
  * ioctl_o, flush_input, open_device, close_device,
@@ -1744,7 +1744,7 @@ static int check_allowed1(u_char func1, u_char func2)
         return (-1);
 #else
     return (0);
-#endif 000
+#endif /* 000 */
 }
 /*==========================================================================*/
 static int check_allowed2(u_char func1, u_char func2)
@@ -1768,7 +1768,7 @@ static int check_allowed2(u_char func1, u_char func2)
     }
 #else
     return (0);
-#endif 000
+#endif /* 000 */
 }
 /*==========================================================================*/
 static int check_allowed3(u_char func1, u_char func2)
@@ -1815,7 +1815,7 @@ static int check_allowed3(u_char func1, u_char func2)
         return (-1);
 #else
     return (0);
-#endif 000
+#endif /* 000 */
 }
 /*==========================================================================*/
 static int seek_pos_audio_end(void)
@@ -1935,7 +1935,7 @@ static int prepare(u_char func, u_char subfunc)
 #if MANY_SESSION
 #else
         DS[d].diskstate_flags = 0;
-#endif MANY_SESSION
+#endif /* MANY_SESSION */
         DS[d].audio_state = 0;
         if (!st_diskok) {
             i = check_allowed1(func, subfunc);
@@ -1953,7 +1953,7 @@ static int prepare(u_char func, u_char subfunc)
 #if MANY_SESSION
 #else
             DS[d].diskstate_flags = 0;
-#endif MANY_SESSION
+#endif /* MANY_SESSION */
             DS[d].audio_state = 0;
             i = check_allowed1(func, subfunc);
             if (i < 0)
@@ -1976,7 +1976,7 @@ static int prepare(u_char func, u_char subfunc)
 #if MANY_SESSION
 #else
                     DS[d].diskstate_flags = 0;
-#endif MANY_SESSION
+#endif /* MANY_SESSION */
                     DS[d].audio_state = 0;
                     i = check_allowed1(func, subfunc);
                     if (i < 0)
@@ -2120,7 +2120,7 @@ static int sbpcd_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long
         DPRINTF((DBG_IOC, "SBPCD: ioctl: xx_PlayAudioMSF returns %d\n", i));
 #if 0
       if (i<0) return (-EIO);
-#endif 0
+#endif /* 0 */
         DS[d].audio_state = audio_playing;
         return (0);
 
@@ -2152,7 +2152,7 @@ static int sbpcd_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long
         i = xx_PlayAudioMSF(DS[d].pos_audio_start, DS[d].pos_audio_end);
 #if 0
       if (i<0) return (-EIO);
-#endif 0
+#endif /* 0 */
         DS[d].audio_state = audio_playing;
         return (0);
 
@@ -2201,7 +2201,7 @@ static int sbpcd_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long
 #if WORKMAN
         DS[d].CD_changed = 0xFF;
         DS[d].diskstate_flags = 0;
-#endif WORKMAN
+#endif /* WORKMAN */
         DPRINTF((DBG_IOC, "SBPCD: ioctl: DriveReset returns %d\n", i));
         DS[d].audio_state = 0;
         i = DiskInfo();
@@ -2220,7 +2220,7 @@ static int sbpcd_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long
 #if WORKMAN
         DS[d].CD_changed = 0xFF;
         DS[d].diskstate_flags = 0;
-#endif WORKMAN
+#endif /* WORKMAN */
         i = yy_SpinDown();
         if (i < 0)
             return (-EIO);
@@ -2330,7 +2330,7 @@ static void sbpcd_interrupt(int unused)
     st = inb(CDi_status) & 0xFF;
     DPRINTF((DBG_IRQ, "SBPCD: INTERRUPT received - CDi_status=%02X\n", st));
 }
-#endif SBPCD_USE_IRQ
+#endif /* SBPCD_USE_IRQ */
 /*==========================================================================*/
 /*
  * Called from the timer to check the results of the get-status cmd.
@@ -2476,7 +2476,7 @@ static void sbp_read_cmd(void)
                      blk2msf(DS[d].lba_multi + 16), blk2msf(block)));
             block = DS[d].lba_multi + 16;
         }
-#endif MANY_SESSION
+#endif /* MANY_SESSION */
     }
 
     if (block + SBP_BUFFER_FRAMES <= DS[d].CDsize_frm)
@@ -2520,12 +2520,12 @@ static void sbp_read_cmd(void)
     }
 #if SBPCD_DIS_IRQ
     cli();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
     for (i = 0; i < 7; i++)
         OUT(CDo_command, drvcmd[i]);
 #if SBPCD_DIS_IRQ
     sti();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
 
     return;
 }
@@ -2550,7 +2550,7 @@ static int sbp_data(void)
     for (frame = DS[d].sbp_current; frame < DS[d].sbp_read_frames && !error_flag; frame++) {
 #if SBPCD_DIS_IRQ
         cli();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
         try = maxtim_data;
         for (timeout = jiffies + 100;;) {
             for (; try != 0; try--) {
@@ -2588,7 +2588,7 @@ static int sbp_data(void)
 
 #if SBPCD_DIS_IRQ
         sti();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
 
         CLEAR_TIMER;
         error_flag = 0;
@@ -2610,7 +2610,7 @@ static int sbp_data(void)
     }
 #if SBPCD_DIS_IRQ
     sti();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
 
     if (error_flag) /* must have been spurious D_RDY or (ATTN&&!D_RDY) */
     {
@@ -2622,7 +2622,7 @@ static int sbp_data(void)
     if (!new_drive) {
 #if SBPCD_DIS_IRQ
         cli();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
         i = maxtim_data;
         for (timeout = jiffies + 100; timeout > jiffies; timeout--) {
             for (; i != 0; i--) {
@@ -2647,12 +2647,12 @@ static int sbp_data(void)
             i = DriveReset(); /* ugly fix to prevent a hang */
 #if SBPCD_DIS_IRQ
             sti();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
             return (0);
         }
 #if SBPCD_DIS_IRQ
         sti();
-#endif SBPCD_DIS_IRQ
+#endif /* SBPCD_DIS_IRQ */
     }
 
     do {
@@ -2769,7 +2769,7 @@ static struct file_operations sbpcd_fops = {
  */
 #if SBPCD_USE_IRQ
 static struct sigaction sbpcd_sigaction = {sbpcd_interrupt, 0, SA_INTERRUPT, NULL};
-#endif SBPCD_USE_IRQ
+#endif /* SBPCD_USE_IRQ */
 /*==========================================================================*/
 /*
  * accept "kernel command line" parameters
@@ -2944,7 +2944,7 @@ u_long sbpcd_init(u_long mem_start, u_long mem_end)
         printk("SBPCD: Can't get IRQ%d for sbpcd driver\n", SBPCD_INTR_NR);
         sti(); /* to avoid possible "printk" bug */
     }
-#endif SBPCD_USE_IRQ
+#endif /* SBPCD_USE_IRQ */
 
     /*
  * allocate memory for the frame buffers
@@ -3003,7 +3003,7 @@ int check_sbpcd_media_change(int full_dev, int unused_minor)
         DS[d].CD_changed = 1;
         return (1); /* driver had a change detected before */
     }
-#endif 0000 /* seems to give additional errors at the moment */
+#endif /* 0000 */ /* seems to give additional errors at the moment */
 
     if (!st_diskok)
         return (1); /* disk not o.k. */

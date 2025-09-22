@@ -432,8 +432,7 @@ static void scrup(int currcons, unsigned int t, unsigned int b)
                     "stosw"
                     : /* no output */
                     : "a"(video_erase_char), "c"((video_num_lines - 1) * video_num_columns >> 1),
-                      "D"(video_mem_start), "S"(origin)
-                    : "cx", "di", "si");
+                      "D"(video_mem_start), "S"(origin));
             scr_end -= origin - video_mem_start;
             pos -= origin - video_mem_start;
             origin = video_mem_start;
@@ -442,8 +441,7 @@ static void scrup(int currcons, unsigned int t, unsigned int b)
                     "rep\n\t"
                     "stosw"
                     : /* no output */
-                    : "a"(video_erase_char), "c"(video_num_columns), "D"(scr_end - video_size_row)
-                    : "cx", "di");
+                    : "a"(video_erase_char), "c"(video_num_columns), "D"(scr_end - video_size_row));
         }
         set_origin(currcons);
     } else {
@@ -455,8 +453,7 @@ static void scrup(int currcons, unsigned int t, unsigned int b)
                 "stosw"
                 : /* no output */
                 : "a"(video_erase_char), "c"((b - t - 1) * video_num_columns >> 1),
-                  "D"(origin + video_size_row * t), "S"(origin + video_size_row * (t + 1))
-                : "cx", "di", "si");
+                  "D"(origin + video_size_row * t), "S"(origin + video_size_row * (t + 1)));
     }
 }
 
@@ -474,8 +471,7 @@ static void scrdown(int currcons, unsigned int t, unsigned int b)
             "cld"
             : /* no output */
             : "a"(video_erase_char), "c"((b - t - 1) * video_num_columns >> 1),
-              "D"(origin + video_size_row * b - 4), "S"(origin + video_size_row * (b - 1) - 4)
-            : "ax", "cx", "di", "si");
+              "D"(origin + video_size_row * b - 4), "S"(origin + video_size_row * (b - 1) - 4));
 }
 
 static void lf(int currcons)
@@ -554,8 +550,7 @@ static void csi_J(int currcons, int vpar)
             "rep\n\t"
             "stosw\n\t"
             : /* no output */
-            : "c"(count), "D"(start), "a"(video_erase_char)
-            : "cx", "di");
+            : "c"(count), "D"(start), "a"(video_erase_char));
     need_wrap = 0;
 }
 
@@ -584,8 +579,7 @@ static void csi_K(int currcons, int vpar)
             "rep\n\t"
             "stosw\n\t"
             : /* no output */
-            : "c"(count), "D"(start), "a"(video_erase_char)
-            : "cx", "di");
+            : "c"(count), "D"(start), "a"(video_erase_char));
     need_wrap = 0;
 }
 
@@ -1340,8 +1334,7 @@ void *memsetw(void *s, unsigned short c, int count)
             "rep\n\t"
             "stosw"
             : /* no output */
-            : "a"(c), "D"(s), "c"(count)
-            : "cx", "di");
+            : "a"(c), "D"(s), "c"(count));
     return s;
 }
 
@@ -1527,7 +1520,7 @@ static void set_scrmem(int currcons)
         /* Make sure that the hardware is not blanked */
         outb_p(HGA_BLINKER_ON | HGA_SCREEN_ON, 0x3b8);
     }
-#endif CONFIG_HGA
+#endif /* CONFIG_HGA */
 
     video_mem_start = video_mem_base;
     video_mem_end = video_mem_term;

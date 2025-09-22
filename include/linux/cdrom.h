@@ -280,7 +280,7 @@ struct cdrom_read {
 #define CDROM_MODE1_SIZE 512
 #else
 #define CDROM_MODE1_SIZE 2048
-#endif FIVETWELVE
+#endif /* FIVETWELVE */
 #define CDROM_MODE2_SIZE 2336
 
 /*
@@ -318,4 +318,4 @@ struct cdrom_read {
 #define CDROMREADMODE1 0x530d /* (struct cdrom_read)        */
                               /* read type-1 data         */
 
-#endif _LINUX_CDROM_H
+#endif /* _LINUX_CDROM_H */

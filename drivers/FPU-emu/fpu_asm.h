@@ -26,4 +26,4 @@
 #define SIGL(x) SIGL_OFFSET##(x)
 #define SIGH(x) 12(x)
 
-#endif _FPU_ASM_H_
+#endif /* _FPU_ASM_H_ */

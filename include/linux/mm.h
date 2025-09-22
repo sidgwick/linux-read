@@ -11,7 +11,7 @@
 
 int __verify_write(unsigned long addr, unsigned long count);
 
-extern inline int verify_area(int type, const void *addr, unsigned long size)
+static inline int verify_area(int type, const void *addr, unsigned long size)
 {
     if (TASK_SIZE <= (unsigned long)addr)
         return -EFAULT;
@@ -88,7 +88,7 @@ extern unsigned long secondary_page_list;
  * overhead, just use __get_free_page() directly..
  */
 extern unsigned long __get_free_page(int priority);
-extern inline unsigned long get_free_page(int priority)
+static inline unsigned long get_free_page(int priority)
 {
     unsigned long page;
 
@@ -96,8 +96,7 @@ extern inline unsigned long get_free_page(int priority)
     if (page)
         __asm__ __volatile__("rep ; stosl"
                              : /* no outputs */
-                             : "a"(0), "c"(1024), "D"(page)
-                             : "di", "cx");
+                             : "a"(0), "c"(1024), "D"(page));
     return page;
 }
 

@@ -30,6 +30,7 @@ extern int EISA_bus;
 
 #include <asm/system.h>
 #include <linux/tasks.h>
+#include <linux/timex.h>
 
 /*
  * User space process size: 3GB. This is hardcoded into a few places,
@@ -229,13 +230,17 @@ struct task_struct {
     struct desc_struct *ldt;
     /* tss for this task */
     struct tss_struct tss;
+
 #ifdef NEW_SWAP
+
     unsigned long old_maj_flt; /* old value of maj_flt */
     unsigned long dec_flt;     /* page fault count of the last time */
     unsigned long swap_cnt;    /* number of pages to swap on next pass */
     short swap_table;          /* current page table */
     short swap_page;           /* current page */
-#endif NEW_SWAP
+
+#endif /* NEW_SWAP */
+
     struct vm_area_struct *stk_vma;
 };
 
@@ -313,7 +318,6 @@ extern struct task_struct *current;
 extern unsigned long volatile jiffies;
 extern unsigned long itimer_ticks;
 extern unsigned long itimer_next;
-extern struct timeval xtime;
 extern int need_resched;
 
 #define CURRENT_TIME (xtime.tv_sec)
@@ -374,8 +378,7 @@ extern int irqaction(unsigned int irq, struct sigaction *sa);
             "clts\n"                                                                               \
             "1:"                                                                                   \
             : /* no output */                                                                      \
-            : "m"(*(((char *)&tsk->tss.tr) - 4)), "c"(tsk)                                         \
-            : "cx")
+            : "m"(*(((char *)&tsk->tss.tr) - 4)), "c"(tsk))
 
 #define _set_base(addr, base)                                                                      \
     __asm__("movw %%dx,%0\n\t"                                                                     \
@@ -383,8 +386,7 @@ extern int irqaction(unsigned int irq, struct sigaction *sa);
             "movb %%dl,%1\n\t"                                                                     \
             "movb %%dh,%2"                                                                         \
             : /* no output */                                                                      \
-            : "m"(*((addr) + 2)), "m"(*((addr) + 4)), "m"(*((addr) + 7)), "d"(base)                \
-            : "dx")
+            : "m"(*((addr) + 2)), "m"(*((addr) + 4)), "m"(*((addr) + 7)), "d"(base))
 
 #define _set_limit(addr, limit)                                                                    \
     __asm__("movw %%dx,%0\n\t"                                                                     \
@@ -394,8 +396,7 @@ extern int irqaction(unsigned int irq, struct sigaction *sa);
             "orb %%dh,%%dl\n\t"                                                                    \
             "movb %%dl,%1"                                                                         \
             : /* no output */                                                                      \
-            : "m"(*(addr)), "m"(*((addr) + 6)), "d"(limit)                                         \
-            : "dx")
+            : "m"(*(addr)), "m"(*((addr) + 6)), "d"(limit))
 
 #define set_base(ldt, base) _set_base(((char *)&(ldt)), base)
 #define set_limit(ldt, limit) _set_limit(((char *)&(ldt)), (limit - 1) >> 12)
@@ -405,7 +406,7 @@ extern int irqaction(unsigned int irq, struct sigaction *sa);
  * to keep them correct. Use only these two functions to add/remove
  * entries in the queues.
  */
-extern inline void add_wait_queue(struct wait_queue **p, struct wait_queue *wait)
+static inline void add_wait_queue(struct wait_queue **p, struct wait_queue *wait)
 {
     unsigned long flags;
 
@@ -430,7 +431,7 @@ extern inline void add_wait_queue(struct wait_queue **p, struct wait_queue *wait
     restore_flags(flags);
 }
 
-extern inline void remove_wait_queue(struct wait_queue **p, struct wait_queue *wait)
+static inline void remove_wait_queue(struct wait_queue **p, struct wait_queue *wait)
 {
     unsigned long flags;
     struct wait_queue *tmp;
@@ -469,7 +470,7 @@ extern inline void remove_wait_queue(struct wait_queue **p, struct wait_queue *w
 #endif
 }
 
-extern inline void select_wait(struct wait_queue **wait_address, select_table *p)
+static inline void select_wait(struct wait_queue **wait_address, select_table *p)
 {
     struct select_table_entry *entry;
 
@@ -487,14 +488,14 @@ extern inline void select_wait(struct wait_queue **wait_address, select_table *p
 
 extern void __down(struct semaphore *sem);
 
-extern inline void down(struct semaphore *sem)
+static inline void down(struct semaphore *sem)
 {
     if (sem->count <= 0)
         __down(sem);
     sem->count--;
 }
 
-extern inline void up(struct semaphore *sem)
+static inline void up(struct semaphore *sem)
 {
     sem->count++;
     wake_up(&sem->wait);

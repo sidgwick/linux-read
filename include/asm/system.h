@@ -36,7 +36,7 @@
                          : /* no inputs */                                                         \
                          : "ax")
 
-extern inline int tas(char *m)
+static inline int tas(char *m)
 {
     char res;
 
@@ -59,7 +59,7 @@ extern inline int tas(char *m)
                          : "=m"(*((long *)(gate_addr))), "=m"(*(1 + (long *)(gate_addr)))          \
                          : "i"((short)(0x8000 + (dpl << 13) + (type << 8))), "d"((char *)(addr)),  \
                            "a"(KERNEL_CS << 16)                                                    \
-                         : "ax", "dx")
+                         :)
 
 #define set_intr_gate(n, addr) _set_gate(&idt[n], 14, 0, addr)
 

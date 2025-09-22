@@ -24,6 +24,7 @@
 
 #include <asm/segment.h>
 #include <asm/system.h>
+#include <linux/string.h>
 
 asmlinkage void ret_from_sys_call(void) __asm__("ret_from_sys_call");
 

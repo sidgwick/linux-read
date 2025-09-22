@@ -50,14 +50,17 @@ SVGA_MODE=	-DSVGA_MODE=NORMAL_VGA
 # standard CFLAGS
 #
 
-CFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -pipe
+# -m32 -g -fno-builtin -fno-stack-protector -fno-pie
+
+CFLAGS = -m32 -g -nostdinc -fno-builtin -fno-stack-protector -fno-pie -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -pipe
 
 ifdef CONFIG_CPP
 CFLAGS := $(CFLAGS) -x c++
 endif
 
 ifdef CONFIG_M486
-CFLAGS := $(CFLAGS) -m486
+# CFLAGS := $(CFLAGS) -m486
+CFLAGS := $(CFLAGS) -mtune=i486
 else
 CFLAGS := $(CFLAGS) -m386
 endif
@@ -72,12 +75,14 @@ endif
 AS86	=as86 -0 -a
 LD86	=ld86 -0
 
-AS	=as
-LD	=ld
+# LDFLAGS = -M -x -Ttext 0 -e startup_32 -z noexecstack
+
+AS	=as -g --32
+LD	=ld -m elf_i386 -z noexecstack
 HOSTCC	=gcc
-CC	=gcc -D__KERNEL__
+CC	=gcc -D__KERNEL__ -I/app/linux-read/include -I/app/xroot/usr/include/ -I/app/xroot/usr/lib/gcc-lib/i486-linux/2.7.2/include/
 MAKE	=make
-CPP	=$(CC) -E
+CPP	=$(CC) $(CFLAGS) -E
 AR	=ar
 STRIP	=strip
 

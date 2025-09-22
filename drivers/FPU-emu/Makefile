@@ -12,10 +12,10 @@ CFLAGS	:= $(CFLAGS) $(PARANOID) $(DEBUG) -fno-builtin
 	$(CC) $(CFLAGS) $(MATH_EMULATION) -c $<
 
 .S.o:
-	$(CC) -D__ASSEMBLER__ $(PARANOID) $(REENTRANT) -c $<
+	$(CPP) -traditional $< -o $*.s
 
 .s.o:
-	$(CC) -c $<
+	$(CC) $(CFLAGS) -c $<
 
 OBJS =	fpu_entry.o div_small.o errors.o \
 	fpu_arith.o fpu_aux.o fpu_etc.o fpu_trig.o \

@@ -62,7 +62,7 @@ void poly_sine(FPU_REG const *arg, FPU_REG *result)
         reg_move(&CONST_QNaN, result);
         return;
     }
-#endif PARANOID
+#endif /* PARANOID */
 
     fixed_arg.sigl = arg->sigl;
     fixed_arg.sigh = arg->sigh;
@@ -113,7 +113,7 @@ void poly_sine(FPU_REG const *arg, FPU_REG *result)
             RE_ENTRANT_CHECK_OFF;
             printk("\nEXP=%d, MS=%08x, LS=%08x\n", result->exp, result->sigh, result->sigl);
             RE_ENTRANT_CHECK_ON;
-#endif DEBUGGING
+#endif /* DEBUGGING */
             EXCEPTION(EX_INTERNAL | 0x103);
         }
 
@@ -122,7 +122,7 @@ void poly_sine(FPU_REG const *arg, FPU_REG *result)
         printk("\n***CORRECTING ILLEGAL RESULT*** in poly_sin() computation\n");
         printk("EXP=%d, MS=%08x, LS=%08x\n", result->exp, result->sigh, result->sigl);
         RE_ENTRANT_CHECK_ON;
-#endif DEBUGGING
+#endif /* DEBUGGING */
 
         result->sigl = 0; /* Truncate the result to 1.00 */
     }
