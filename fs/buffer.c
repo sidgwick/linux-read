@@ -1,189 +1,209 @@
 /*
  *  linux/fs/buffer.c
  *
- *  (C) 1991  Linus Torvalds
+ *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
 /*
  *  'buffer.c' implements the buffer-cache functions. Race-conditions have
- * been avoided by NEVER letting a interrupt change a buffer (except for the
- * data, of course), but instead letting the caller do it. NOTE! As interrupts
- * can wake up a caller, some cli-sti sequences are needed to check for
- * sleep-on-calls. These should be extremely quick, though (I hope).
+ * been avoided by NEVER letting an interrupt change a buffer (except for the
+ * data, of course), but instead letting the caller do it.
  */
 
 /*
  * NOTE! There is one discordant note here: checking floppies for
  * disk change. This is where it fits best, I think, as it should
  * invalidate changed floppy-disk-caches.
- *
- * 注意！有一个程序应不属于这里: 检测软盘是否更换. 但我想这里是放置
- * 该程序最好的地方了, 因为它需要使已更换软盘缓冲失效.
  */
 
 #include <stdarg.h>
-
-#include <asm/io.h>
-#include <asm/system.h>
+ 
 #include <linux/config.h>
-#include <linux/kernel.h>
+#include <linux/errno.h>
 #include <linux/sched.h>
+#include <linux/kernel.h>
+#include <linux/major.h>
+#include <linux/string.h>
+#include <linux/locks.h>
+#include <linux/errno.h>
 
-extern void put_super(int dev);
-extern void invalidate_inodes(int dev);
+#include <asm/system.h>
+#include <asm/io.h>
 
-extern int end; /* 内核在内存中的末端位置 */
-struct buffer_head *start_buffer = (struct buffer_head *)&end;
+#ifdef CONFIG_SCSI
+#ifdef CONFIG_BLK_DEV_SR
+extern int check_cdrom_media_change(int, int);
+#endif
+#ifdef CONFIG_BLK_DEV_SD
+extern int check_scsidisk_media_change(int, int);
+extern int revalidate_scsidisk(int, int);
+#endif
+#endif
+#ifdef CONFIG_CDU31A
+extern int check_cdu31a_media_change(int, int);
+#endif
+#ifdef CONFIG_MCD
+extern int check_mcd_media_change(int, int);
+#endif
 
-/* 这个哈希表是用来记录 (dev, block) 对应的缓冲块的
- * 里面的缓冲块可能有数据也可能没数据 NR_HASH = 307 项 */
-struct buffer_head *hash_table[NR_HASH];
-static struct buffer_head *free_list; /* 空闲缓冲块链表头指针 */
+static int grow_buffers(int pri, int size);
 
-/* 等待空闲缓冲块而睡眠的任务队列头指针, 它与缓冲块头部结构中 b_wait
- * 指针的作用不同. 当任务申请一个缓冲块而正好遇到系统缺乏可用空闲缓
- * 冲块时, 当前任务就会被添加到 buffer_wait 睡眠等待队列中. 而 b_wait
- * 则是专门供等待指定缓冲块(即 b_wait 对应的缓冲块)的任务使用的等待队列头指针 */
-static struct task_struct *buffer_wait = NULL;
+static struct buffer_head * hash_table[NR_HASH];
+static struct buffer_head * free_list = NULL;
+static struct buffer_head * unused_list = NULL;
+static struct wait_queue * buffer_wait = NULL;
 
-/* 下面定义系统缓冲区中含有的缓冲块个数. 这里, NR_BUFFERS 是一个定义在 linux/fs.h 头
- * 文件的宏, 其值即是全局变量名 nr_buffers. 大写名称通常都是一个宏名称, Linus 这样编写
- * 代码是为了利用这个大写名称来隐含地表示 nr_buffers 是一个在内核初始化之后不再改变的'常量' */
-int NR_BUFFERS = 0; /* 总共可用的 buffer_head 数量 */
+int nr_buffers = 0;
+int buffermem = 0;
+int nr_buffer_heads = 0;
+static int min_free_pages = 20;	/* nr free pages needed before buffer grows */
+extern int *blksize_size[];
 
-/**
- * @brief 等待指定缓冲块解锁
+/*
+ * Rewrote the wait-routines to use the "new" wait-queue functionality,
+ * and getting rid of the cli-sti pairs. The wait-queue routines still
+ * need cli-sti, but now it's just a couple of 386 instructions or so.
  *
- * 如果指定的缓冲块 bh 已经上锁就让进程不可中断地睡眠在该缓冲块的等待队列 b_wait 中.
- * 在缓冲块解锁时, 其等待队列上的所有进程将被唤醒
- *
- * 虽然是在关闭中断(cli)之后去睡眠的, 但这样做并不会影响在其他进程上下文中响应中断.
- * 因为每个进程都在自己的 TSS 段中保存了标志寄存器 EFLAGS 的值, 所以在进程切换时
- * CPU 中当前 EFLAGS 的值也随之改变
- *
- * 使用 sleep_on 进入睡眠状态的进程需要用 wake_up 明确地唤醒
- *
- * @param bh 指定的缓冲块
+ * Note that the real wait_on_buffer() is an inline function that checks
+ * if 'b_wait' is set before calling this, so that the queues aren't set
+ * up unnecessarily.
  */
-static inline void wait_on_buffer(struct buffer_head *bh)
+void __wait_on_buffer(struct buffer_head * bh)
 {
-    cli();
+	struct wait_queue wait = { current, NULL };
 
-    while (bh->b_lock) {
-        sleep_on(&bh->b_wait);
-    }
-
-    sti();
+	bh->b_count++;
+	add_wait_queue(&bh->b_wait, &wait);
+repeat:
+	current->state = TASK_UNINTERRUPTIBLE;
+	if (bh->b_lock) {
+		schedule();
+		goto repeat;
+	}
+	remove_wait_queue(&bh->b_wait, &wait);
+	bh->b_count--;
+	current->state = TASK_RUNNING;
 }
 
-/**
- * @brief 缓冲区同步到磁盘
- *
- * 这个函数是 sync 系统调用的实现
- *
- * @return int
- */
-int sys_sync(void)
+/* Call sync_buffers with wait!=0 to ensure that the call does not
+   return until all buffer writes have completed.  Sync() may return
+   before the writes have finished; fsync() may not. */
+
+static int sync_buffers(dev_t dev, int wait)
 {
-    int i;
-    struct buffer_head *bh;
+	int i, retry, pass = 0, err = 0;
+	struct buffer_head * bh;
 
-    /* 首先调用 inode 同步函数, 把内存 inode 表中所有修改过的 inode 写入高速缓冲中 */
-    sync_inodes(); /* write out inodes into buffers */
-
-    bh = start_buffer; /* bh 指向缓冲区开始处 */
-
-    for (i = 0; i < NR_BUFFERS; i++, bh++) {
-        /* 等 bh 解锁 */
-        wait_on_buffer(bh);
-
-        /* 如果缓冲块是脏的, 就把缓冲块写到磁盘里面. 注意这里没有考虑 bh 的
-         * b_count 之类的东西, 只要它脏, 就需要 sync 到磁盘设备 */
-        if (bh->b_dirt) {
-            ll_rw_block(WRITE, bh);
-        }
-    }
-
-    return 0;
+	/* One pass for no-wait, three for wait:
+	   0) write out all dirty, unlocked buffers;
+	   1) write out all dirty buffers, waiting if locked;
+	   2) wait for completion by waiting for all buffers to unlock.
+	 */
+repeat:
+	retry = 0;
+	bh = free_list;
+	for (i = nr_buffers*2 ; i-- > 0 ; bh = bh->b_next_free) {
+		if (dev && bh->b_dev != dev)
+			continue;
+#ifdef 0 /* Disable bad-block debugging code */
+		if (bh->b_req && !bh->b_lock &&
+		    !bh->b_dirt && !bh->b_uptodate)
+			printk ("Warning (IO error) - orphaned block %08x on %04x\n",
+				bh->b_blocknr, bh->b_dev);
+#endif
+		if (bh->b_lock)
+		{
+			/* Buffer is locked; skip it unless wait is
+			   requested AND pass > 0. */
+			if (!wait || !pass) {
+				retry = 1;
+				continue;
+			}
+			wait_on_buffer (bh);
+		}
+		/* If an unlocked buffer is not uptodate, there has been 
+		   an IO error. Skip it. */
+		if (wait && bh->b_req && !bh->b_lock &&
+		    !bh->b_dirt && !bh->b_uptodate)
+		{
+			err = 1;
+			continue;
+		}
+		/* Don't write clean buffers.  Don't write ANY buffers
+		   on the third pass. */
+		if (!bh->b_dirt || pass>=2)
+			continue;
+		bh->b_count++;
+		ll_rw_block(WRITE, 1, &bh);
+		bh->b_count--;
+		retry = 1;
+	}
+	/* If we are waiting for the sync to succeed, and if any dirty
+	   blocks were written, then repeat; on the second pass, only
+	   wait for buffers being written (do not pass to write any
+	   more buffers on the second pass). */
+	if (wait && retry && ++pass<=2)
+		goto repeat;
+	return err;
 }
 
-/**
- * @brief 对指定设备进行高速缓冲数据与设备上数据的同步操作
- *
- * TODO-DONE: 弄清楚为什么需要两个 for 循环??
- * 答: 这里采用两遍同步操作是为了提高内核执行效率
- *     第一遍缓冲区同步操作可以让内核中许多 '脏块' 变干净, 使得 inode 的同步操作能够高效执行.
- *     第二次缓冲区同步操作则把那些由于 inode 同步操作而又变脏的缓冲块与设备中数据同步
- *
- * @param dev 设备号
- * @return int
- */
-int sync_dev(int dev)
+void sync_dev(dev_t dev)
 {
-    int i;
-    struct buffer_head *bh;
-
-    bh = start_buffer; /* bh 指向缓冲区开始处 */
-
-    /* 搜索高速缓冲区中所有缓冲块, 对于指定设备 dev 的缓冲块
-     * 若其数据已被修改过就写入盘中(同步操作) */
-    for (i = 0; i < NR_BUFFERS; i++, bh++) {
-        if (bh->b_dev != dev) {
-            continue;
-        }
-
-        wait_on_buffer(bh);
-        if (bh->b_dev == dev && bh->b_dirt) {
-            ll_rw_block(WRITE, bh); /* 写操作会清除 b_dirt */
-        }
-    }
-
-    sync_inodes(); /* 然后把内存中 inode 表数据写入高速缓冲中 */
-    bh = start_buffer;
-
-    /* 再对指定设备 dev 执行一次与上述相同的写盘操作 */
-    for (i = 0; i < NR_BUFFERS; i++, bh++) {
-        if (bh->b_dev != dev) {
-            continue;
-        }
-
-        wait_on_buffer(bh);
-        if (bh->b_dev == dev && bh->b_dirt) {
-            ll_rw_block(WRITE, bh);
-        }
-    }
-
-    return 0;
+	sync_buffers(dev, 0);
+	sync_supers(dev);
+	sync_inodes(dev);
+	sync_buffers(dev, 0);
 }
 
-/**
- * @brief 使指定设备在高速缓冲区中的数据无效
- *
- * 扫描高速缓冲区中所有缓冲块, 对指定设备的缓冲块复位其有效(更新)标志和已修改标志
- *
- * @param dev
- */
-void invalidate_buffers(int dev)
+int fsync_dev(dev_t dev)
 {
-    int i;
-    struct buffer_head *bh;
-
-    bh = start_buffer;
-    for (i = 0; i < NR_BUFFERS; i++, bh++) {
-        if (bh->b_dev != dev) {
-            continue;
-        }
-
-        wait_on_buffer(bh);
-        if (bh->b_dev == dev) {
-            bh->b_uptodate = bh->b_dirt = 0;
-        }
-    }
+	sync_buffers(dev, 0);
+	sync_supers(dev);
+	sync_inodes(dev);
+	return sync_buffers(dev, 1);
 }
 
-/**
- * @brief 检查磁盘是否更换, 如果已更换就使对应高速缓冲区无效
- *
+asmlinkage int sys_sync(void)
+{
+	sync_dev(0);
+	return 0;
+}
+
+int file_fsync (struct inode *inode, struct file *filp)
+{
+	return fsync_dev(inode->i_dev);
+}
+
+asmlinkage int sys_fsync(unsigned int fd)
+{
+	struct file * file;
+	struct inode * inode;
+
+	if (fd>=NR_OPEN || !(file=current->filp[fd]) || !(inode=file->f_inode))
+		return -EBADF;
+	if (!file->f_op || !file->f_op->fsync)
+		return -EINVAL;
+	if (file->f_op->fsync(inode,file))
+		return -EIO;
+	return 0;
+}
+
+void invalidate_buffers(dev_t dev)
+{
+	int i;
+	struct buffer_head * bh;
+
+	bh = free_list;
+	for (i = nr_buffers*2 ; --i > 0 ; bh = bh->b_next_free) {
+		if (bh->b_dev != dev)
+			continue;
+		wait_on_buffer(bh);
+		if (bh->b_dev == dev)
+			bh->b_uptodate = bh->b_dirt = bh->b_req = 0;
+	}
+}
+
+/*
  * This routine checks whether a floppy has been changed, and
  * invalidates all buffer-cache-entries in that case. This
  * is a relatively slow routine, so we have to try to minimize using
@@ -196,541 +216,810 @@ void invalidate_buffers(int dev)
  * that any additional removable block-device will use this routine,
  * and that mount/open needn't know that floppies/whatever are
  * special.
- *
- * @param dev 设备号
  */
-void check_disk_change(int dev)
+void check_disk_change(dev_t dev)
 {
-    int i;
+	int i;
+	struct buffer_head * bh;
 
-    if (MAJOR(dev) != 2) {
-        return;
-    }
+	switch(MAJOR(dev)){
+	case FLOPPY_MAJOR:
+		if (!(bh = getblk(dev,0,1024)))
+			return;
+		i = floppy_change(bh);
+		brelse(bh);
+		break;
 
-    /* 如果没有更换, 直接退出函数执行 */
-    if (!floppy_change(dev & 0x03)) {
-        return;
-    }
+#if defined(CONFIG_BLK_DEV_SD) && defined(CONFIG_SCSI)
+         case SCSI_DISK_MAJOR:
+		i = check_scsidisk_media_change(dev, 0);
+		break;
+#endif
 
-    /* 软盘已经更换, 所以释放对应设备的 inode 位图和逻辑块位图所占的高速缓冲区,
-     * 并使该设备的 inode 和数据块信息所占踞的高速缓冲块无效 */
-    for (i = 0; i < NR_SUPER; i++) {
-        if (super_block[i].s_dev == dev) {
-            put_super(super_block[i].s_dev); /* 这里释放对应的超级块 */
-        }
-    }
+#if defined(CONFIG_BLK_DEV_SR) && defined(CONFIG_SCSI)
+	 case SCSI_CDROM_MAJOR:
+		i = check_cdrom_media_change(dev, 0);
+		break;
+#endif
 
-    invalidate_inodes(dev);
-    invalidate_buffers(dev);
+#if defined(CONFIG_CDU31A)
+         case CDU31A_CDROM_MAJOR:
+		i = check_cdu31a_media_change(dev, 0);
+		break;
+#endif
+
+#if defined(CONFIG_MCD)
+         case MITSUMI_CDROM_MAJOR:
+		i = check_mcd_media_change(dev, 0);
+		break;
+#endif
+
+         default:
+		return;
+	};
+
+	if (!i)	return;
+
+	printk("VFS: Disk change detected on device %d/%d\n",
+					MAJOR(dev), MINOR(dev));
+	for (i=0 ; i<NR_SUPER ; i++)
+		if (super_blocks[i].s_dev == dev)
+			put_super(super_blocks[i].s_dev);
+	invalidate_inodes(dev);
+	invalidate_buffers(dev);
+
+#if defined(CONFIG_BLK_DEV_SD) && defined(CONFIG_SCSI)
+/* This is trickier for a removable hardisk, because we have to invalidate
+   all of the partitions that lie on the disk. */
+	if (MAJOR(dev) == SCSI_DISK_MAJOR)
+		revalidate_scsidisk(dev, 0);
+#endif
 }
 
-/**
- * @brief 哈希函数
- *
- * 用 dev 异或上 block 编号, 然后对 NR_HASH 取余
- *
- * 建立 hash 函数的指导条件主要是尽量确保散列到任何数组项的概率基本相等, 建立函数
- * 的方法有多种, 这里 Linux 0.12 主要采用了关键字除留余数法, 因为我们寻找的缓冲块
- * 有两个条件, 即设备号 dev 和缓冲块号 block, 因此设计的 hash 函数肯定需要包含这
- * 两个关键值, 这里两个关键字的异或操作只是计算关键值的一种方法, 再对关键值进行 MOD
- * 运算就可以保证函数所计算得到的值都处于函数数组项范围内
- *
- * TODO: 这个哈希函数设计有没有什么讲究(更多考虑??) ?
- */
-#define _hashfn(dev, block) (((unsigned)(dev ^ block)) % NR_HASH)
-#define hash(dev, block) hash_table[_hashfn(dev, block)]
+#define _hashfn(dev,block) (((unsigned)(dev^block))%NR_HASH)
+#define hash(dev,block) hash_table[_hashfn(dev,block)]
 
-/**
- * @brief 从 hash 队列和空闲缓冲队列中移走缓冲块
- *
- * hash 队列是双向链表结构, 空闲缓冲块队列是双向循环链表结构
- *
- * @param bh
- */
-static inline void remove_from_queues(struct buffer_head *bh)
+static inline void remove_from_hash_queue(struct buffer_head * bh)
 {
-    /* remove from hash-queue */
-    if (bh->b_next) {
-        bh->b_next->b_prev = bh->b_prev;
-    }
-
-    if (bh->b_prev) {
-        bh->b_prev->b_next = bh->b_next;
-    }
-
-    /* 如果 bh 是哈希桶里面的头结点, 需要从桶里面挪走, 桶里放置下一个元素 */
-    if (hash(bh->b_dev, bh->b_blocknr) == bh) {
-        hash(bh->b_dev, bh->b_blocknr) = bh->b_next;
-    }
-
-    /* remove from free list */
-
-    /* free_list 是循环双向链表, 出现前 free 或者后 free,
-     * 说明链表结构被破坏了, 这时候要 panic */
-    if (!(bh->b_prev_free) || !(bh->b_next_free)) {
-        panic("Free block list corrupted");
-    }
-
-    bh->b_prev_free->b_next_free = bh->b_next_free;
-    bh->b_next_free->b_prev_free = bh->b_prev_free;
-    if (free_list == bh) {
-        free_list = bh->b_next_free;
-    }
+	if (bh->b_next)
+		bh->b_next->b_prev = bh->b_prev;
+	if (bh->b_prev)
+		bh->b_prev->b_next = bh->b_next;
+	if (hash(bh->b_dev,bh->b_blocknr) == bh)
+		hash(bh->b_dev,bh->b_blocknr) = bh->b_next;
+	bh->b_next = bh->b_prev = NULL;
 }
 
-/**
- * @brief 插入缓冲块
- *
- * 缓冲块一定会插入 free_list, 当缓冲块有关联设备号的时候, 也会插入对应的哈希桶
- *
- * @param bh
- */
-static inline void insert_into_queues(struct buffer_head *bh)
+static inline void remove_from_free_list(struct buffer_head * bh)
 {
-    /* put at end of free list */
-    bh->b_next_free = free_list;
-    bh->b_prev_free = free_list->b_prev_free;
-    free_list->b_prev_free->b_next_free = bh;
-    free_list->b_prev_free = bh;
-
-    /* put the buffer in new hash-queue if it has a device */
-    bh->b_prev = NULL;
-    bh->b_next = NULL;
-    if (!bh->b_dev) {
-        return;
-    }
-
-    /* 放在哈希桶头部位置 */
-    bh->b_next = hash(bh->b_dev, bh->b_blocknr);
-    hash(bh->b_dev, bh->b_blocknr) = bh;
-    bh->b_next->b_prev = bh;
+	if (!(bh->b_prev_free) || !(bh->b_next_free))
+		panic("VFS: Free block list corrupted");
+	bh->b_prev_free->b_next_free = bh->b_next_free;
+	bh->b_next_free->b_prev_free = bh->b_prev_free;
+	if (free_list == bh)
+		free_list = bh->b_next_free;
+	bh->b_next_free = bh->b_prev_free = NULL;
 }
 
-/**
- * @brief 寻找 (dev, buffer) 对应的那个缓存区快
- *
- * @param dev 设备号
- * @param block 区块号
- * @return struct buffer_head* 返回对应的缓冲区块或者 NULL
- */
-static struct buffer_head *find_buffer(int dev, int block)
+static inline void remove_from_queues(struct buffer_head * bh)
 {
-    struct buffer_head *tmp;
-
-    for (tmp = hash(dev, block); tmp != NULL; tmp = tmp->b_next) {
-        if (tmp->b_dev == dev && tmp->b_blocknr == block) {
-            return tmp;
-        }
-    }
-
-    return NULL;
+	remove_from_hash_queue(bh);
+	remove_from_free_list(bh);
 }
 
-/**
- * @brief 高速缓冲区中寻找指定的缓冲块
- *
- * 若找到则对该缓冲块上锁并返回块头指针
- *
+static inline void put_first_free(struct buffer_head * bh)
+{
+	if (!bh || (bh == free_list))
+		return;
+	remove_from_free_list(bh);
+/* add to front of free list */
+	bh->b_next_free = free_list;
+	bh->b_prev_free = free_list->b_prev_free;
+	free_list->b_prev_free->b_next_free = bh;
+	free_list->b_prev_free = bh;
+	free_list = bh;
+}
+
+static inline void put_last_free(struct buffer_head * bh)
+{
+	if (!bh)
+		return;
+	if (bh == free_list) {
+		free_list = bh->b_next_free;
+		return;
+	}
+	remove_from_free_list(bh);
+/* add to back of free list */
+	bh->b_next_free = free_list;
+	bh->b_prev_free = free_list->b_prev_free;
+	free_list->b_prev_free->b_next_free = bh;
+	free_list->b_prev_free = bh;
+}
+
+static inline void insert_into_queues(struct buffer_head * bh)
+{
+/* put at end of free list */
+	bh->b_next_free = free_list;
+	bh->b_prev_free = free_list->b_prev_free;
+	free_list->b_prev_free->b_next_free = bh;
+	free_list->b_prev_free = bh;
+/* put the buffer in new hash-queue if it has a device */
+	bh->b_prev = NULL;
+	bh->b_next = NULL;
+	if (!bh->b_dev)
+		return;
+	bh->b_next = hash(bh->b_dev,bh->b_blocknr);
+	hash(bh->b_dev,bh->b_blocknr) = bh;
+	if (bh->b_next)
+		bh->b_next->b_prev = bh;
+}
+
+static struct buffer_head * find_buffer(dev_t dev, int block, int size)
+{		
+	struct buffer_head * tmp;
+
+	for (tmp = hash(dev,block) ; tmp != NULL ; tmp = tmp->b_next)
+		if (tmp->b_dev==dev && tmp->b_blocknr==block)
+			if (tmp->b_size == size)
+				return tmp;
+			else {
+				printk("VFS: Wrong blocksize on device %d/%d\n",
+							MAJOR(dev), MINOR(dev));
+				return NULL;
+			}
+	return NULL;
+}
+
+/*
  * Why like this, I hear you say... The reason is race-conditions.
  * As we don't lock buffers (unless we are readint them, that is),
  * something might happen to it while we sleep (ie a read-error
  * will force it bad). This shouldn't really happen currently, but
  * the code is ready.
- *
- * 代码为什么会是这样子的？我听见你问... 原因是竞争条件. 由于我们没有对
- * 缓冲块上锁(除非我们正在读取它们中的数据), 那么当我们(进程)睡眠时
- * 缓冲块可能会发生一些问题(例如一个读错误将导致该缓冲块出错). 目前
- * 这种情况实际上是不会发生的, 但处理的代码已经准备好了
- *
- * @param dev
- * @param block
- * @return struct buffer_head*
  */
-struct buffer_head *get_hash_table(int dev, int block)
+struct buffer_head * get_hash_table(dev_t dev, int block, int size)
 {
-    struct buffer_head *bh;
+	struct buffer_head * bh;
 
-    for (;;) {
-        if (!(bh = find_buffer(dev, block))) {
-            return NULL;
-        }
-
-        /* 对该缓冲块增加引用计数, 并等待该缓冲块解锁(如果已被上锁)
-         * 由于经过了睡眠状态, 因此有必要再验证该缓冲块的正确性, 并返回缓冲块头指针 */
-        bh->b_count++;
-        wait_on_buffer(bh);
-        if (bh->b_dev == dev && bh->b_blocknr == block) {
-            return bh;
-        }
-
-        /* 如果在睡眠时该缓冲块所属的设备号或块号发生了改变, 则撤消对它的引用计数, 重新寻找 */
-        bh->b_count--;
-    }
+	for (;;) {
+		if (!(bh=find_buffer(dev,block,size)))
+			return NULL;
+		bh->b_count++;
+		wait_on_buffer(bh);
+		if (bh->b_dev == dev && bh->b_blocknr == block && bh->b_size == size)
+			return bh;
+		bh->b_count--;
+	}
 }
 
-/* 下面宏用于同时判断缓冲区的修改标志和锁定标志, 并且定义修改标志的权重要比锁定标志大 */
-#define BADNESS(bh) (((bh)->b_dirt << 1) + (bh)->b_lock)
+void set_blocksize(dev_t dev, int size)
+{
+	int i;
+	struct buffer_head * bh, *bhnext;
 
-/**
- * @brief 取高速缓冲中指定的缓冲块
- *
- * 检查指定(设备号和块号)的缓冲区是否已经在高速缓冲中
- *
- * 如果指定块已经在高速缓冲中, 则返回对应缓冲区头指针退出;
- * 如果不在, 就需要在高速缓冲中设置一个对应设备号和块号的新项. 返回相应缓冲区头指针.
- *
+	if (!blksize_size[MAJOR(dev)])
+		return;
+
+	switch(size) {
+		default: panic("Invalid blocksize passed to set_blocksize");
+		case 512: case 1024: case 2048: case 4096:;
+	}
+
+	if (blksize_size[MAJOR(dev)][MINOR(dev)] == 0 && size == BLOCK_SIZE) {
+		blksize_size[MAJOR(dev)][MINOR(dev)] = size;
+		return;
+	}
+	if (blksize_size[MAJOR(dev)][MINOR(dev)] == size)
+		return;
+	sync_buffers(dev, 2);
+	blksize_size[MAJOR(dev)][MINOR(dev)] = size;
+
+  /* We need to be quite careful how we do this - we are moving entries
+     around on the free list, and we can get in a loop if we are not careful.*/
+
+	bh = free_list;
+	for (i = nr_buffers*2 ; --i > 0 ; bh = bhnext) {
+		bhnext = bh->b_next_free; 
+		if (bh->b_dev != dev)
+			continue;
+		if (bh->b_size == size)
+			continue;
+
+		wait_on_buffer(bh);
+		if (bh->b_dev == dev && bh->b_size != size)
+			bh->b_uptodate = bh->b_dirt = 0;
+		remove_from_hash_queue(bh);
+/*    put_first_free(bh); */
+	}
+}
+
+/*
  * Ok, this is getblk, and it isn't very clear, again to hinder
  * race-conditions. Most of the code is seldom used, (ie repeating),
  * so it should be much more efficient than it looks.
  *
  * The algoritm is changed: hopefully better, and an elusive bug removed.
  *
- * OK, 下面是getblk函数, 该函数的逻辑并不是很清晰, 同样也是因为要考虑
- * 竞争条件问题. 其中大部分代码很少用到(例如重复操作语句), 因此它应该
- * 比看上去的样子有效得多.
- *
- * 算法已经作了改变: 希望能更好, 而且一个难以琢磨的错误已经去除
- *
- * @param dev
- * @param block
- * @return struct buffer_head*
+ * 14.02.92: changed it to sync dirty buffers a bit: better performance
+ * when the filesystem starts to get full of dirty blocks (I hope).
  */
-struct buffer_head *getblk(int dev, int block)
+#define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock)
+struct buffer_head * getblk(dev_t dev, int block, int size)
 {
-    struct buffer_head *tmp, *bh;
+	struct buffer_head * bh, * tmp;
+	int buffers;
+	static int grow_size = 0;
 
 repeat:
-    if ((bh = get_hash_table(dev, block))) {
-        return bh;
-    }
+	bh = get_hash_table(dev, block, size);
+	if (bh) {
+		if (bh->b_uptodate && !bh->b_dirt)
+			put_last_free(bh);
+		return bh;
+	}
+	grow_size -= size;
+	if (nr_free_pages > min_free_pages && grow_size <= 0) {
+		if (grow_buffers(GFP_BUFFER, size))
+			grow_size = PAGE_SIZE;
+	}
+	buffers = nr_buffers;
+	bh = NULL;
 
-    tmp = free_list;
-    do {
+	for (tmp = free_list; buffers-- > 0 ; tmp = tmp->b_next_free) {
+		if (tmp->b_count || tmp->b_size != size)
+			continue;
+		if (mem_map[MAP_NR((unsigned long) tmp->b_data)] != 1)
+			continue;
+		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
+			bh = tmp;
+			if (!BADNESS(tmp))
+				break;
+		}
+#if 0
+		if (tmp->b_dirt) {
+			tmp->b_count++;
+			ll_rw_block(WRITEA, 1, &tmp);
+			tmp->b_count--;
+		}
+#endif
+	}
 
-        if (tmp->b_count) {
-            /* 该缓冲区正被使用(引用计数不等于0), 继续扫描下一项 */
-            continue;
-        }
+	if (!bh) {
+		if (nr_free_pages > 5)
+			if (grow_buffers(GFP_BUFFER, size))
+				goto repeat;
+		if (!grow_buffers(GFP_ATOMIC, size))
+			sleep_on(&buffer_wait);
+		goto repeat;
+	}
 
-        /* 对于 b_count=0 的块, 即高速缓冲中当前没有引用的块不一定就是干净的(b_dirt=0)或
-         * 没有锁定的(b_lock=0)
-         *
-         * TODO: 在梳理一遍 b_lock, b_count 的设定和取消, 在熟悉下磁盘读写流程
-         *
-         * 例如当一个任务改写过一块内容后就释放了, 于是该块 b_count=0, 但 b_lock=1
-         * 再比如一个任务执行 breada 预读几个块时, 只要 ll_rw_block 命令发出后, 它就会递减
-         * b_count, 但此时实际上硬盘访问操作可能还在进行, 因此此时 b_lock=1, 但 b_count=0
-         *
-         * 如果缓冲头指针 bh 为空, 或者 tmp 所指缓冲头的标志(修改、锁定)权重小于 bh 头标志的权
-         * 重, 则让 bh 指向 tmp 缓冲块.  如果该 tmp 缓冲块头表明缓冲块既没有修改也没有锁定标
-         * 志置位, 则说明已为指定设备上的块取得对应的高速缓冲块, 则退出循环. 否则我们就继续
-         * 执行本循环, 看看能否找到一个 BADNESS 最小的缓冲快
-         *
-         * 参考下面的梳理
-         *
-         * BADNESS = ${DIRT}_${LOCK}
-         *
-         * 0_0 < 0_0 = TRUE
-         * 0_0 < 0_1 = TRUE
-         * 0_0 < 1_0 = TRUE
-         * 0_0 < 1_1 = TRUE
-         *
-         * 上面四种情况, 说明 tmp 是一个完全空闲的快, 使用它没有任何问题
-         * 下面的组合(tmp.lock == 1 && bh.dirty == 1)也可能让 tmp 当做 bh 使用
-         *
-         * ----------------------------
-         * 01 < 10 = TRUE
-         * 01 < 11 = TRUE
-         * ----------------------------
-         *
-         * 这里的原因是, bh 的 dirty 位置位, 相比 lock 置位被覆盖要严重(dirty置位被覆盖
-         * 会丢数据), 因此会优先使用 lock 被置位的数据块, 最坏的情况, 只要在后面等它被 release 就行了
-         */
-        if (!bh || BADNESS(tmp) < BADNESS(bh)) {
-            bh = tmp;
-            if (!BADNESS(tmp)) {
-                break; /* 要求 tmp 必须是 dirty=0 && lock=0 */
-            }
-        }
-        /* and repeat until we find something good */
-    } while ((tmp = tmp->b_next_free) != free_list);
-
-    if (!bh) {
-        /* 没找到空闲块 */
-        sleep_on(&buffer_wait);
-        goto repeat;
-    }
-
-    wait_on_buffer(bh); /* 等区块解锁 */
-
-    /* 等的过程中可能有会出现区块被占用的情况, 这时候再回去重新找 */
-    if (bh->b_count) {
-        goto repeat;
-    }
-
-    /* 等的过程中可能有会出现缓冲区被修改的情况, 这时候也要再回去重新找 */
-    while (bh->b_dirt) {
-        sync_dev(bh->b_dev);
-        wait_on_buffer(bh);
-        if (bh->b_count) {
-            goto repeat;
-        }
-    }
-
-    /* NOTE!! While we slept waiting for this block, somebody else might
-     * already have added "this" block to the cache. check it
-     * 这里也是因为 sleep 被占用的情况 */
-    if (find_buffer(dev, block)) {
-        goto repeat;
-    }
-
-    /* OK, FINALLY we know that this buffer is the only one of it's kind,
-     * and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
-    bh->b_count = 1;
-    bh->b_dirt = 0;
-    bh->b_uptodate = 0;
-    remove_from_queues(bh);
-    bh->b_dev = dev;
-    bh->b_blocknr = block;
-    insert_into_queues(bh);
-    return bh;
+	wait_on_buffer(bh);
+	if (bh->b_count || bh->b_size != size)
+		goto repeat;
+	if (bh->b_dirt) {
+		sync_buffers(0,0);
+		goto repeat;
+	}
+/* NOTE!! While we slept waiting for this block, somebody else might */
+/* already have added "this" block to the cache. check it */
+	if (find_buffer(dev,block,size))
+		goto repeat;
+/* OK, FINALLY we know that this buffer is the only one of its kind, */
+/* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
+	bh->b_count=1;
+	bh->b_dirt=0;
+	bh->b_uptodate=0;
+	bh->b_req=0;
+	remove_from_queues(bh);
+	bh->b_dev=dev;
+	bh->b_blocknr=block;
+	insert_into_queues(bh);
+	return bh;
 }
 
-/**
- * @brief 释放指定缓冲块
- *
- * 等待该缓冲块解锁
- * 然后引用计数递减 1, 并明确地唤醒等待空闲缓冲块的进程
- *
- * @param buf
- */
-void brelse(struct buffer_head *buf)
+void brelse(struct buffer_head * buf)
 {
-    if (!buf) {
-        return;
-    }
-
-    wait_on_buffer(buf);
-    if (!(buf->b_count--)) {
-        panic("Trying to free free buffer");
-    }
-
-    wake_up(&buffer_wait);
+	if (!buf)
+		return;
+	wait_on_buffer(buf);
+	if (buf->b_count) {
+		if (--buf->b_count)
+			return;
+		wake_up(&buffer_wait);
+		return;
+	}
+	printk("VFS: brelse: Trying to free free buffer\n");
 }
 
-/**
- * @brief 从设备上读取数据块
- *
+/*
  * bread() reads a specified block and returns the buffer that contains
  * it. It returns NULL if the block was unreadable.
- *
- * @param dev
- * @param block
- * @return struct buffer_head*
  */
-struct buffer_head *bread(int dev, int block)
+struct buffer_head * bread(dev_t dev, int block, int size)
 {
-    struct buffer_head *bh;
+	struct buffer_head * bh;
 
-    /* 根据设备号 dev 和数据块号 block, 首先在高速缓冲区中申请一块缓冲块,
-     * 如果该缓冲块中已经包含有有效的数据就直接返回该缓冲块指针, 否则就从设
-     * 备中读取指定的数据块到该缓冲块中并返回缓冲块指针 */
-    if (!(bh = getblk(dev, block))) {
-        panic("bread: getblk returned NULL\n");
-    }
-
-    if (bh->b_uptodate) {
-        return bh;
-    }
-
-    /* 从设备中读数据 */
-    ll_rw_block(READ, bh);
-
-    /* 然后等待指定数据块被读入, 并等待缓冲区解锁 */
-    wait_on_buffer(bh);
-    if (bh->b_uptodate) {
-        return bh;
-    }
-
-    /* 这里是睡眠等待的时候, 导致 bh 数据不够新了, 这种情况按照读取失败处理 */
-    brelse(bh);
-    return NULL;
+	if (!(bh = getblk(dev, block, size))) {
+		printk("VFS: bread: READ error on device %d/%d\n",
+						MAJOR(dev), MINOR(dev));
+		return NULL;
+	}
+	if (bh->b_uptodate)
+		return bh;
+	ll_rw_block(READ, 1, &bh);
+	wait_on_buffer(bh);
+	if (bh->b_uptodate)
+		return bh;
+	brelse(bh);
+	return NULL;
 }
 
-/* 从 from 拷贝 1024B 的数据 到 to */
-#define COPYBLK(from, to)                                                                          \
-    __asm__("cld\n\t"                                                                              \
-            "rep movsl\n\t"                                                                        \
-            :                                                                                      \
-            : "c"(BLOCK_SIZE / 4), "S"(from), "D"(to))
-
-/**
- * @brief 读设备上一个页面(4个缓冲块)的内容到指定内存地址处
- *
- * 该函数仅用于 mm/memory.c 文件的 do_no_page 函数中
- *
- * bread_page reads four buffers into memory at the desired address. It's
- * a function of its own, as there is some speed to be got by reading them
- * all at the same time, not waiting for one to be read, and then another
- * etc.
- *
- * bread_page 一次读四个缓冲块数据读到内存指定的地址处.
- * 它是一个完整的函数, 因为同时读取四块可以获得速度上的好处, 不用等着读一块, 再读一块了.
- *
- * @param address 保存页面数据的地址
- * @param dev 设备号
- * @param b 含有4个设备数据块号的数组
- */
-void bread_page(unsigned long address, int dev, int b[4])
-{
-    struct buffer_head *bh[4];
-    int i;
-
-    /* 发起读磁盘请求 */
-    for (i = 0; i < 4; i++) {
-        if (b[i]) {
-            if ((bh[i] = getblk(dev, b[i]))) {
-                if (!bh[i]->b_uptodate) {
-                    ll_rw_block(READ, bh[i]);
-                }
-            }
-        } else {
-            bh[i] = NULL;
-        }
-    }
-
-    /* 等数据读取完毕, 然后拷贝到目标地址 */
-    for (i = 0; i < 4; i++, address += BLOCK_SIZE) {
-        if (bh[i]) {
-            /* 这里对睡眠的处理就比较粗糙了, 没有考虑睡眠的时候被修改之后的情况 */
-            wait_on_buffer(bh[i]);
-            if (bh[i]->b_uptodate) {
-                COPYBLK((unsigned long)bh[i]->b_data, address);
-            }
-
-            brelse(bh[i]);
-        }
-    }
-}
-
-/**
- * @brief 从指定设备读取指定的一些块
- *
+/*
  * Ok, breada can be used as bread, but additionally to mark other
  * blocks for reading as well. End the argument list with a negative
  * number.
- *
- * OK, breada 可以象 bread 一样使用, 但会另外预读一些块
- * 该函数参数列表需要使用一个负数来表明参数列表的结束
- *
- * @param dev 设备号
- * @param first 第一个指定的块号
- * @param ... 后续指定的块号
- * @return struct buffer_head* 成功时返回第1块的缓冲块头指针, 否则返回NULL
  */
-struct buffer_head *breada(int dev, int first, ...)
+struct buffer_head * breada(dev_t dev,int first, ...)
 {
-    va_list args;
-    struct buffer_head *bh, *tmp;
+	va_list args;
+	unsigned int blocksize;
+	struct buffer_head * bh, *tmp;
 
-    va_start(args, first);
-    if (!(bh = getblk(dev, first))) {
-        panic("bread: getblk returned NULL\n");
-    }
+	va_start(args,first);
 
-    if (!bh->b_uptodate) {
-        ll_rw_block(READ, bh);
-    }
+	blocksize = BLOCK_SIZE;
+	if (blksize_size[MAJOR(dev)] && blksize_size[MAJOR(dev)][MINOR(dev)])
+		blocksize = blksize_size[MAJOR(dev)][MINOR(dev)];
 
-    while ((first = va_arg(args, int)) >= 0) {
-        tmp = getblk(dev, first);
-        if (tmp) {
-            if (!tmp->b_uptodate) {
-                ll_rw_block(READA, bh); // BUG: ??? --- bh 应该是 tmp
-            }
-
-            tmp->b_count--; /* 这里直接释放掉预读的块, 后面不配合 brelse 了 */
-        }
-    }
-
-    va_end(args);
-
-    /* 我们只关心低一个区块的完成情况, 其他都是预读取, 不需要等他们读完 */
-    wait_on_buffer(bh);
-    if (bh->b_uptodate) {
-        return bh;
-    }
-
-    brelse(bh);
-    return (NULL);
+	if (!(bh = getblk(dev, first, blocksize))) {
+		printk("VFS: breada: READ error on device %d/%d\n",
+						MAJOR(dev), MINOR(dev));
+		return NULL;
+	}
+	if (!bh->b_uptodate)
+		ll_rw_block(READ, 1, &bh);
+	while ((first=va_arg(args,int))>=0) {
+		tmp = getblk(dev, first, blocksize);
+		if (tmp) {
+			if (!tmp->b_uptodate)
+				ll_rw_block(READA, 1, &tmp);
+			tmp->b_count--;
+		}
+	}
+	va_end(args);
+	wait_on_buffer(bh);
+	if (bh->b_uptodate)
+		return bh;
+	brelse(bh);
+	return (NULL);
 }
 
-/**
- * @brief 初始化块缓冲区
- *
- * 在 init.c#main 里面, 对于内存容量具有:
- *  - >= 12MB: 缓冲区末端被设置为 4MB
- *  - >=  6MB: 缓冲区末端被设置为 2MB
- *  - <   6MB: 缓冲区末端被设置为 1MB
- *
- * 该函数从缓冲区开始位置 start_buffer 处和缓冲区末端 buffer_end 处分别同时
- * 设置(初始化)缓冲块头结构和对应的数据块, 直到缓冲区中所有内存被分配完毕
- *
- * @param buffer_end 块缓冲区结束位置
+/*
+ * See fs/inode.c for the weird use of volatile..
  */
-void buffer_init(long buffer_end)
+static void put_unused_buffer_head(struct buffer_head * bh)
 {
-    struct buffer_head *h = start_buffer;
-    void *b;
-    int i;
+	struct wait_queue * wait;
 
-    /* 首先根据参数提供的缓冲区高端位置确定实际缓冲区高端位置 b. 如果缓冲区高端等于 1MB,
-     * 则因为从 640KB - 1MB 被显示内存和 BIOS 占用, 所以实际可用缓冲区内存高端位置应该是
-     * 640KB. 否则缓冲区内存高端一定大于1MB.
-     *
-     * TODO-DONE: 高端大于 1M 的情形, 是怎么规避 显存和 BIOS 被擦写的?
-     * 答: 在下面 while 循环里面有跳过的逻辑
-     */
-    if (buffer_end == 1 << 20) {
-        b = (void *)(640 * 1024);
-    } else {
-        b = (void *)buffer_end;
-    }
+	wait = ((volatile struct buffer_head *) bh)->b_wait;
+	memset((void *) bh,0,sizeof(*bh));
+	((volatile struct buffer_head *) bh)->b_wait = wait;
+	bh->b_next_free = unused_list;
+	unused_list = bh;
+}
 
-    /* 循环设置空闲缓冲块链表, 这里对内存的使用是这样的:
-     *  1. 开始部分的内存区域, 被用来作为 buffer_header 结构体了
-     *  2. 末尾的部分内存区域, 作为真正的缓存区域使用, 每块是 BLOCK_SIZE 大小
-     *  3. 1 里面的 buffer_header 里面有的 b_data 指针指向 2 里面的缓存区域
-     *  4. 当出现 1 和 2 内存区域有交叠的时候, buffer_memory 就用完了 */
-    while ((b -= BLOCK_SIZE) >= ((void *)(h + 1))) {
-        h->b_dev = 0;
-        h->b_dirt = 0;
-        h->b_count = 0;
-        h->b_lock = 0;
-        h->b_uptodate = 0;
-        h->b_wait = NULL;
-        h->b_next = NULL;
-        h->b_prev = NULL;
-        h->b_data = (char *)b;
-        h->b_prev_free = h - 1;
-        h->b_next_free = h + 1;
-        h++;
-        NR_BUFFERS++;
+static void get_more_buffer_heads(void)
+{
+	int i;
+	struct buffer_head * bh;
 
-        /* 若 b 递减到等于 1MB 的位置的时候, 跳过 BIOS 和显存
-         * 使用的 384KB 空间, 直接重新从 640KB 处重新继续 */
-        if (b == (void *)0x100000) {
-            b = (void *)0xA0000;
-        }
-    }
+	if (unused_list)
+		return;
 
-    h--;                        /* 循环中, 最后一个 h 没用到 */
-    free_list = start_buffer;   /* 登记 free_list 开始位置 */
-    free_list->b_prev_free = h; /* 把 free_list 弄成循环链表 */
-    h->b_next_free = free_list;
+	if(! (bh = (struct buffer_head*) get_free_page(GFP_BUFFER)))
+		return;
 
-    /* 哈希桶里面初始化成空值 */
-    for (i = 0; i < NR_HASH; i++) {
-        hash_table[i] = NULL;
-    }
+	for (nr_buffer_heads+=i=PAGE_SIZE/sizeof*bh ; i>0; i--) {
+		bh->b_next_free = unused_list;	/* only make link */
+		unused_list = bh++;
+	}
+}
+
+static struct buffer_head * get_unused_buffer_head(void)
+{
+	struct buffer_head * bh;
+
+	get_more_buffer_heads();
+	if (!unused_list)
+		return NULL;
+	bh = unused_list;
+	unused_list = bh->b_next_free;
+	bh->b_next_free = NULL;
+	bh->b_data = NULL;
+	bh->b_size = 0;
+	bh->b_req = 0;
+	return bh;
+}
+
+/*
+ * Create the appropriate buffers when given a page for data area and
+ * the size of each buffer.. Use the bh->b_this_page linked list to
+ * follow the buffers created.  Return NULL if unable to create more
+ * buffers.
+ */
+static struct buffer_head * create_buffers(unsigned long page, unsigned long size)
+{
+	struct buffer_head *bh, *head;
+	unsigned long offset;
+
+	head = NULL;
+	offset = PAGE_SIZE;
+	while ((offset -= size) < PAGE_SIZE) {
+		bh = get_unused_buffer_head();
+		if (!bh)
+			goto no_grow;
+		bh->b_this_page = head;
+		head = bh;
+		bh->b_data = (char *) (page+offset);
+		bh->b_size = size;
+	}
+	return head;
+/*
+ * In case anything failed, we just free everything we got.
+ */
+no_grow:
+	bh = head;
+	while (bh) {
+		head = bh;
+		bh = bh->b_this_page;
+		put_unused_buffer_head(head);
+	}
+	return NULL;
+}
+
+static void read_buffers(struct buffer_head * bh[], int nrbuf)
+{
+	int i;
+	int bhnum = 0;
+	struct buffer_head * bhr[8];
+
+	for (i = 0 ; i < nrbuf ; i++) {
+		if (bh[i] && !bh[i]->b_uptodate)
+			bhr[bhnum++] = bh[i];
+	}
+	if (bhnum)
+		ll_rw_block(READ, bhnum, bhr);
+	for (i = 0 ; i < nrbuf ; i++) {
+		if (bh[i]) {
+			wait_on_buffer(bh[i]);
+		}
+	}
+}
+
+static unsigned long check_aligned(struct buffer_head * first, unsigned long address,
+	dev_t dev, int *b, int size)
+{
+	struct buffer_head * bh[8];
+	unsigned long page;
+	unsigned long offset;
+	int block;
+	int nrbuf;
+
+	page = (unsigned long) first->b_data;
+	if (page & ~PAGE_MASK) {
+		brelse(first);
+		return 0;
+	}
+	mem_map[MAP_NR(page)]++;
+	bh[0] = first;
+	nrbuf = 1;
+	for (offset = size ; offset < PAGE_SIZE ; offset += size) {
+		block = *++b;
+		if (!block)
+			goto no_go;
+		first = get_hash_table(dev, block, size);
+		if (!first)
+			goto no_go;
+		bh[nrbuf++] = first;
+		if (page+offset != (unsigned long) first->b_data)
+			goto no_go;
+	}
+	read_buffers(bh,nrbuf);		/* make sure they are actually read correctly */
+	while (nrbuf-- > 0)
+		brelse(bh[nrbuf]);
+	free_page(address);
+	++current->min_flt;
+	return page;
+no_go:
+	while (nrbuf-- > 0)
+		brelse(bh[nrbuf]);
+	free_page(page);
+	return 0;
+}
+
+static unsigned long try_to_load_aligned(unsigned long address,
+	dev_t dev, int b[], int size)
+{
+	struct buffer_head * bh, * tmp, * arr[8];
+	unsigned long offset;
+	int * p;
+	int block;
+
+	bh = create_buffers(address, size);
+	if (!bh)
+		return 0;
+	/* do any of the buffers already exist? punt if so.. */
+	p = b;
+	for (offset = 0 ; offset < PAGE_SIZE ; offset += size) {
+		block = *(p++);
+		if (!block)
+			goto not_aligned;
+		if (find_buffer(dev, block, size))
+			goto not_aligned;
+	}
+	tmp = bh;
+	p = b;
+	block = 0;
+	while (1) {
+		arr[block++] = bh;
+		bh->b_count = 1;
+		bh->b_dirt = 0;
+		bh->b_uptodate = 0;
+		bh->b_dev = dev;
+		bh->b_blocknr = *(p++);
+		nr_buffers++;
+		insert_into_queues(bh);
+		if (bh->b_this_page)
+			bh = bh->b_this_page;
+		else
+			break;
+	}
+	buffermem += PAGE_SIZE;
+	bh->b_this_page = tmp;
+	mem_map[MAP_NR(address)]++;
+	read_buffers(arr,block);
+	while (block-- > 0)
+		brelse(arr[block]);
+	++current->maj_flt;
+	return address;
+not_aligned:
+	while ((tmp = bh) != NULL) {
+		bh = bh->b_this_page;
+		put_unused_buffer_head(tmp);
+	}
+	return 0;
+}
+
+/*
+ * Try-to-share-buffers tries to minimize memory use by trying to keep
+ * both code pages and the buffer area in the same page. This is done by
+ * (a) checking if the buffers are already aligned correctly in memory and
+ * (b) if none of the buffer heads are in memory at all, trying to load
+ * them into memory the way we want them.
+ *
+ * This doesn't guarantee that the memory is shared, but should under most
+ * circumstances work very well indeed (ie >90% sharing of code pages on
+ * demand-loadable executables).
+ */
+static inline unsigned long try_to_share_buffers(unsigned long address,
+	dev_t dev, int *b, int size)
+{
+	struct buffer_head * bh;
+	int block;
+
+	block = b[0];
+	if (!block)
+		return 0;
+	bh = get_hash_table(dev, block, size);
+	if (bh)
+		return check_aligned(bh, address, dev, b, size);
+	return try_to_load_aligned(address, dev, b, size);
+}
+
+#define COPYBLK(size,from,to) \
+__asm__ __volatile__("rep ; movsl": \
+	:"c" (((unsigned long) size) >> 2),"S" (from),"D" (to) \
+	:"cx","di","si")
+
+/*
+ * bread_page reads four buffers into memory at the desired address. It's
+ * a function of its own, as there is some speed to be got by reading them
+ * all at the same time, not waiting for one to be read, and then another
+ * etc. This also allows us to optimize memory usage by sharing code pages
+ * and filesystem buffers..
+ */
+unsigned long bread_page(unsigned long address, dev_t dev, int b[], int size, int prot)
+{
+	struct buffer_head * bh[8];
+	unsigned long where;
+	int i, j;
+
+	if (!(prot & PAGE_RW)) {
+		where = try_to_share_buffers(address,dev,b,size);
+		if (where)
+			return where;
+	}
+	++current->maj_flt;
+ 	for (i=0, j=0; j<PAGE_SIZE ; i++, j+= size) {
+		bh[i] = NULL;
+		if (b[i])
+			bh[i] = getblk(dev, b[i], size);
+	}
+	read_buffers(bh,i);
+	where = address;
+ 	for (i=0, j=0; j<PAGE_SIZE ; i++, j += size,address += size) {
+		if (bh[i]) {
+			if (bh[i]->b_uptodate)
+				COPYBLK(size, (unsigned long) bh[i]->b_data,address);
+			brelse(bh[i]);
+		}
+	}
+	return where;
+}
+
+/*
+ * Try to increase the number of buffers available: the size argument
+ * is used to determine what kind of buffers we want.
+ */
+static int grow_buffers(int pri, int size)
+{
+	unsigned long page;
+	struct buffer_head *bh, *tmp;
+
+	if ((size & 511) || (size > PAGE_SIZE)) {
+		printk("VFS: grow_buffers: size = %d\n",size);
+		return 0;
+	}
+	if(!(page = __get_free_page(pri)))
+		return 0;
+	bh = create_buffers(page, size);
+	if (!bh) {
+		free_page(page);
+		return 0;
+	}
+	tmp = bh;
+	while (1) {
+		if (free_list) {
+			tmp->b_next_free = free_list;
+			tmp->b_prev_free = free_list->b_prev_free;
+			free_list->b_prev_free->b_next_free = tmp;
+			free_list->b_prev_free = tmp;
+		} else {
+			tmp->b_prev_free = tmp;
+			tmp->b_next_free = tmp;
+		}
+		free_list = tmp;
+		++nr_buffers;
+		if (tmp->b_this_page)
+			tmp = tmp->b_this_page;
+		else
+			break;
+	}
+	tmp->b_this_page = bh;
+	buffermem += PAGE_SIZE;
+	return 1;
+}
+
+/*
+ * try_to_free() checks if all the buffers on this particular page
+ * are unused, and free's the page if so.
+ */
+static int try_to_free(struct buffer_head * bh, struct buffer_head ** bhp)
+{
+	unsigned long page;
+	struct buffer_head * tmp, * p;
+
+	*bhp = bh;
+	page = (unsigned long) bh->b_data;
+	page &= PAGE_MASK;
+	tmp = bh;
+	do {
+		if (!tmp)
+			return 0;
+		if (tmp->b_count || tmp->b_dirt || tmp->b_lock || tmp->b_wait)
+			return 0;
+		tmp = tmp->b_this_page;
+	} while (tmp != bh);
+	tmp = bh;
+	do {
+		p = tmp;
+		tmp = tmp->b_this_page;
+		nr_buffers--;
+		if (p == *bhp)
+			*bhp = p->b_prev_free;
+		remove_from_queues(p);
+		put_unused_buffer_head(p);
+	} while (tmp != bh);
+	buffermem -= PAGE_SIZE;
+	free_page(page);
+	return !mem_map[MAP_NR(page)];
+}
+
+/*
+ * Try to free up some pages by shrinking the buffer-cache
+ *
+ * Priority tells the routine how hard to try to shrink the
+ * buffers: 3 means "don't bother too much", while a value
+ * of 0 means "we'd better get some free pages now".
+ */
+int shrink_buffers(unsigned int priority)
+{
+	struct buffer_head *bh;
+	int i;
+
+	if (priority < 2)
+		sync_buffers(0,0);
+	bh = free_list;
+	i = nr_buffers >> priority;
+	for ( ; i-- > 0 ; bh = bh->b_next_free) {
+		if (bh->b_count ||
+		    (priority >= 5 &&
+		     mem_map[MAP_NR((unsigned long) bh->b_data)] > 1)) {
+			put_last_free(bh);
+			continue;
+		}
+		if (!bh->b_this_page)
+			continue;
+		if (bh->b_lock)
+			if (priority)
+				continue;
+			else
+				wait_on_buffer(bh);
+		if (bh->b_dirt) {
+			bh->b_count++;
+			ll_rw_block(WRITEA, 1, &bh);
+			bh->b_count--;
+			continue;
+		}
+		if (try_to_free(bh, &bh))
+			return 1;
+	}
+	return 0;
+}
+
+void show_buffers(void)
+{
+	struct buffer_head * bh;
+	int found = 0, locked = 0, dirty = 0, used = 0, lastused = 0;
+
+	printk("Buffer memory:   %6dkB\n",buffermem>>10);
+	printk("Buffer heads:    %6d\n",nr_buffer_heads);
+	printk("Buffer blocks:   %6d\n",nr_buffers);
+	bh = free_list;
+	do {
+		found++;
+		if (bh->b_lock)
+			locked++;
+		if (bh->b_dirt)
+			dirty++;
+		if (bh->b_count)
+			used++, lastused = found;
+		bh = bh->b_next_free;
+	} while (bh != free_list);
+	printk("Buffer mem: %d buffers, %d used (last=%d), %d locked, %d dirty\n",
+		found, used, lastused, locked, dirty);
+}
+
+/*
+ * This initializes the initial buffer free list.  nr_buffers is set
+ * to one less the actual number of buffers, as a sop to backwards
+ * compatibility --- the old code did this (I think unintentionally,
+ * but I'm not sure), and programs in the ps package expect it.
+ * 					- TYT 8/30/92
+ */
+void buffer_init(void)
+{
+	int i;
+
+	if (high_memory >= 4*1024*1024)
+		min_free_pages = 200;
+	else
+		min_free_pages = 20;
+	for (i = 0 ; i < NR_HASH ; i++)
+		hash_table[i] = NULL;
+	free_list = 0;
+	grow_buffers(GFP_KERNEL, BLOCK_SIZE);
+	if (!free_list)
+		panic("VFS: Unable to initialize buffer free list!");
+	return;
 }

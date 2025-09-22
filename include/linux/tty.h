@@ -1,214 +1,448 @@
+#ifndef _LINUX_TTY_H
+#define _LINUX_TTY_H
+
 /*
  * 'tty.h' defines some structures used by tty_io.c and some defines.
- *
- * NOTE! Don't touch this without checking that nothing in rs_io.s or
- * con_io.s breaks. Some constants are hardwired into the system (mainly
- * offsets into 'tty_queue'
- *
- * 在修改这里的定义时, 一定要检查 rs_io.s 或 con_io.s 程序中不会出现问题
- * 在系统中有些常量是直接写在程序中的(主要是一些tty_queue中的偏移值)
  */
 
-#ifndef _TTY_H
-#define _TTY_H
+#include <linux/termios.h>
 
-#define MAX_CONSOLES 8 // 最大虚拟控制台数量
-#define NR_SERIALS 2   // 串行终端数量
-#define NR_PTYS 4      // 伪终端数量
+#include <asm/system.h>
 
-extern int NR_CONSOLES; // 虚拟控制台数量
-
-#include <termios.h>
-
-#define TTY_BUF_SIZE 1024 // tty缓冲区(缓冲队列)大小
-
-/**
- * tty 字符缓冲队列数据结构(这是个环形缓冲区)
- * 用于 tty_struc 结构中的读/写和辅助(规范)缓冲队列 */
-struct tty_queue {
-    /* 队列缓冲区中含有字符行数值(不是当前字符数), 对于串口终端，则存放串行端口地址 */
-    unsigned long data;            // TODO: 缓冲区中的行数? + 串口的地址
-    unsigned long head;            // 缓冲区中数据头游标位置
-    unsigned long tail;            // 缓冲区中数据尾游标位置
-    struct task_struct *proc_list; // 等待本队列的进程列表
-    char buf[TTY_BUF_SIZE];        // 队列的缓冲区
-};
-
-#define IS_A_CONSOLE(min) (((min) & 0xC0) == 0x00)    // 是一个控制终端
-#define IS_A_SERIAL(min) (((min) & 0xC0) == 0x40)     // 是一个串行终端
-#define IS_A_PTY(min) ((min) & 0x80)                  // 是一个伪终端
-#define IS_A_PTY_MASTER(min) (((min) & 0xC0) == 0x80) // 是一个主伪终端
-#define IS_A_PTY_SLAVE(min) (((min) & 0xC0) == 0xC0)  // 是一个辅伪终端
-#define PTY_OTHER(min) ((min) ^ 0x40)                 // 其他伪终端
-
-/**
- * 以下定义了 tty 等待队列中缓冲区操作宏函数
- * tail 在前, head在后. 参见 tty_io.c 的图
- * TODO: 是个循环缓冲区, 研究一下环形缓冲区的操作 */
+#define NR_CONSOLES	8
+#define NR_LDISCS	16
 
 /*
+ * These are set up by the setup-routine at boot-time:
+ */
 
-假如有以下内存区域(SIZE=8): 0-1-2-3-4-5-6-7
-
-1. 最开始的时候 tail = head = 0
-2. 开始往里面让字符, 比如放了 A/B/C 三个字符, 此时内存变为
-                              0-1-2-3-4-5-6-7- 8- 9-10-11-12-13-14-15
-    0-1-2-3-4-5-6-7           0-1-2-3-4-5-6-7-X0-X1-X2-X3-X4-X5-X6-X7
-        A-B-C                     A-B-C              ^
-        ^     ^     ----->        ^     ^            ^
-        |     |                   |     |            ^
-        |     head                |     head         ^
-        tail                      tail               ^
-
-    这个数学原理有点不太好解释, 大概想一下:
-
-    如此, 求队列空闲字符数, 就是 R = SIZE - (head - tail) = (SIZE - 1) + (tail -
-head + 1) 因为 SIZE 设定值符合 2 的幂, 因此 R 可取的最大值就是 SIZE-1,
-这么考虑使用 `&(SIZE-1)` 的问题:
-
-    (SIZE - 1) + X = (SIZE - 1) + (X/SIZE) + (X%SIZE)
-                   = (SIZE - 1) + 1 + (X/SIZE) + (X%SIZE) - 1
-
-    把这个式子看成 SIZE 进制的处理, 那么如果做 `&(SIZE-1)` 相当于我们只有一个
-SIZE 进制数位可以用, 多出来的数位都要丢掉, 于是上面的式子里面 (SIZE-1) + 1  +
-(X/SIZE) 因为都需要用多出来的数位表示, 他们都被丢掉, 于是这种情况下出现了
-(SIZE-1) + X = (X%SIZE) - 1, 进一步得到 SIZE + X = (X % SIZE)
-
-    R = (tail + SIZE) - head - 1
-      = SIZE + (tail - head - 1)
-      = (tail - head - 1) % SIZE
-
-3. 如果队列因为读写操作, 变成了下面这样
-    0-1-2-3-4-5-6-7
-    E-F     A-B-C-D
-        ^   ^
-        |   |
-        |   tail
-        head
-
-    如此, 求队列空闲字符数, 就是 R = tail - head - 1, 在数值山与 `(tail - head -
-1) & (SIZE-1)` 也是一样的
-*/
-
-// a 是指向缓冲区的索引指针, INC 把索引往后移动一字节, 若已超出缓冲区右侧,
-// 则指针循环
-#define INC(a) ((a) = ((a) + 1) & (TTY_BUF_SIZE - 1))
-
-// a 指针后退 1 字节, 并循环
-#define DEC(a) ((a) = ((a) - 1) & (TTY_BUF_SIZE - 1))
-
-// 清空指定队列的缓冲区
-#define EMPTY(a) ((a)->head == (a)->tail)
-
-// 缓冲区还可存放字符的长度(空闲区长度). 这里的 -1 可能是 buf 故意不放满,
-// 以免区别不出来真满和空状态
-#define LEFT(a) (((a)->tail - (a)->head - 1) & (TTY_BUF_SIZE - 1))
-
-// 缓冲区中最后一个位置
-#define LAST(a) ((a)->buf[(TTY_BUF_SIZE - 1) & ((a)->head - 1)])
-
-// 缓冲区满
-#define FULL(a) (!LEFT(a))
-
-// 缓冲区中已存放字符的长度(字符数)
-#define CHARS(a) (((a)->head - (a)->tail) & (TTY_BUF_SIZE - 1))
-
-// 从 queue 队列项缓冲区中取一字符(从tail处，并且tail+=1)
-#define GETCH(queue, c)                                                                            \
-    (void)({                                                                                       \
-        c = (queue)->buf[(queue)->tail];                                                           \
-        INC((queue)->tail);                                                                        \
-    })
-
-// 往 queue 队列项缓冲区中放置一字符(在head处，并且head+=1)
-#define PUTCH(c, queue)                                                                            \
-    (void)({                                                                                       \
-        (queue)->buf[(queue)->head] = (c);                                                         \
-        INC((queue)->head);                                                                        \
-    })
-
-// 判断终端键盘字符类型
-
-#define INTR_CHAR(tty) ((tty)->termios.c_cc[VINTR])    // 中断符。发中断信号SIGINT
-#define QUIT_CHAR(tty) ((tty)->termios.c_cc[VQUIT])    // 退出符。发退出信号SIGQUIT
-#define ERASE_CHAR(tty) ((tty)->termios.c_cc[VERASE])  // 削除符。擦除一个字符
-#define KILL_CHAR(tty) ((tty)->termios.c_cc[VKILL])    // 删除行。删除一行字符
-#define EOF_CHAR(tty) ((tty)->termios.c_cc[VEOF])      // 文件结束符
-#define START_CHAR(tty) ((tty)->termios.c_cc[VSTART])  // 开始符。恢复输出
-#define STOP_CHAR(tty) ((tty)->termios.c_cc[VSTOP])    // 停止符。停止输出
-#define SUSPEND_CHAR(tty) ((tty)->termios.c_cc[VSUSP]) // 挂起符, 发挂起信号SIGTSTP
-
-// tty 数据结构
-struct tty_struct {
-    struct termios termios; // 终端 io 属性和控制字符数据结构
-
-    int pgrp;    // 所属进程组
-    int session; // 会话号
-    int stopped; // 停止标志
-
-    /* tty 写函数指针 */
-    void (*write)(struct tty_struct *tty);
-
-    /* tty 读队列 */
-    struct tty_queue *read_q;
-
-    /* tty 写队列 */
-    struct tty_queue *write_q;
-
-    /* tty 辅助队列(存放规范模式字符序列), 可称为规范(熟)模式队列 */
-    struct tty_queue *secondary;
+struct screen_info {
+	unsigned char  orig_x;
+	unsigned char  orig_y;
+	unsigned char  unused1[2];
+	unsigned short orig_video_page;
+	unsigned char  orig_video_mode;
+	unsigned char  orig_video_cols;
+	unsigned short orig_video_ega_ax;
+	unsigned short orig_video_ega_bx;
+	unsigned short orig_video_ega_cx;
+	unsigned char  orig_video_lines;
 };
 
-extern struct tty_struct tty_table[]; // tty结构数组
-extern int fg_console;                // 前台控制台号
+extern struct screen_info screen_info;
 
-/**
- * 根据终端类型在 tty_table[] 中取对应终端号 nr 的 tty 结构指针
- * 第73行后半部分用于根据子设备号 dev 在 tty_table[] 表中选择对应的 tty 结构.
- * 如果 dev = 0, 表示正在使用前台终端, 因此直接使用终端号 fg_console 作为
- * tty_table[] 项索引取 tty 结构. 如果 dev 大于 0, 那么就要分两种情况考虑:
- *
- *  1. dev 是虚拟终端号
- *  2. dev 是串行终端号或者伪终端号
- *
- * 对于虚拟终端其 tty 结构在 tty_table[] 中索引项是 dev-1(0 -- 63),
- * 对于其它类型终端, 它们的 tty 结构索引项就是 dev. 例如, 如果 dev = 64,
- * 表示是一个串行终端 1, 则其 tty 结构就是 tty_table[dev]. 如果 dev = 1,
- * 则对应终端的 tty 结构是 tty_table[0]. 参见 tty_io.c 程序 */
-#define TTY_TABLE(nr) (tty_table + ((nr) ? (((nr) < 64) ? (nr) - 1 : (nr)) : fg_console))
+#define ORIG_X			(screen_info.orig_x)
+#define ORIG_Y			(screen_info.orig_y)
+#define ORIG_VIDEO_PAGE		(screen_info.orig_video_page)
+#define ORIG_VIDEO_MODE		(screen_info.orig_video_mode)
+#define ORIG_VIDEO_COLS 	(screen_info.orig_video_cols)
+#define ORIG_VIDEO_EGA_AX	(screen_info.orig_video_ega_ax)
+#define ORIG_VIDEO_EGA_BX	(screen_info.orig_video_ega_bx)
+#define ORIG_VIDEO_EGA_CX	(screen_info.orig_video_ega_cx)
+#define ORIG_VIDEO_LINES	(screen_info.orig_video_lines)
 
-/**
- * @brief 这里给出了终端 termios 结构中可更改的特殊字符数组 c_cc[] 的初始值
- *
- * 该 termios 结构定义在 include/termios.h 中
- * 参考从 `#define VINTR 0` 行开始的十几个常量
- *
- * POSIX.1 定义了 11 个特殊字符, 但是 Linux 系统还另外定义了 SVR4 使用的 6
- * 个特殊字符 如果定义了 `_POSIX_VDISABLE(\0), 那么当某一项值等于 _POSIX_VDISABLE
- * 的值时, 表示 禁止使用相应的特殊字符
- *
- *    intr=^C        quit=^|        erase=del    kill=^U
- *    eof=^D        vtime=\0    vmin=\1        sxtc=\0
- *    start=^Q    stop=^S        susp=^Z        eol=\0
- *    reprint=^R    discard=^U    werase=^W    lnext=^V
- *    eol2=\0
+#define VIDEO_TYPE_MDA		0x10	/* Monochrome Text Display	*/
+#define VIDEO_TYPE_CGA		0x11	/* CGA Display 			*/
+#define VIDEO_TYPE_EGAM		0x20	/* EGA/VGA in Monochrome Mode	*/
+#define VIDEO_TYPE_EGAC		0x21	/* EGA/VGA in Color Mode	*/
+
+/*
+ * This character is the same as _POSIX_VDISABLE: it cannot be used as
+ * a c_cc[] character, but indicates that a particular special character
+ * isn't in use (eg VINTR ahs no character etc)
  */
+#define __DISABLED_CHAR '\0'
+
+/*
+ * See comment for the tty_struct structure before changing
+ * TTY_BUF_SIZE.  Actually, there should be different sized tty_queue
+ * structures for different purposes.  1024 bytes for the transmit
+ * queue is way overkill.  TYT, 9/14/92
+ */
+#define TTY_BUF_SIZE 1024	/* Must be a power of 2 */
+
+struct tty_queue {
+	unsigned long head;
+	unsigned long tail;
+	struct wait_queue * proc_list;
+	unsigned char buf[TTY_BUF_SIZE];
+};
+
+struct serial_struct {
+	int	type;
+	int	line;
+	int	port;
+	int	irq;
+	int	flags;
+	int	xmit_fifo_size;
+	int	custom_divisor;
+	int	baud_base;
+	unsigned short	close_delay;
+	char	reserved_char[2];
+	int	hub6;
+	int	reserved[5];
+};
+
+/*
+ * These are the supported serial types.
+ */
+#define PORT_UNKNOWN	0
+#define PORT_8250	1
+#define PORT_16450	2
+#define PORT_16550	3
+#define PORT_16550A	4
+#define PORT_MAX	4
+
+/*
+ * Definitions for async_struct (and serial_struct) flags field
+ */
+#define ASYNC_HUP_NOTIFY 0x0001 /* Notify getty on hangups and closes 
+				   on the callout port */
+#define ASYNC_FOURPORT  0x0002	/* Set OU1, OUT2 per AST Fourport settings */
+#define ASYNC_SAK	0x0004	/* Secure Attention Key (Orange book) */
+#define ASYNC_SPLIT_TERMIOS 0x0008 /* Separate termios for dialin/callout */
+
+#define ASYNC_SPD_MASK	0x0030
+#define ASYNC_SPD_HI	0x0010	/* Use 56000 instead of 38400 bps */
+#define ASYNC_SPD_VHI	0x0020  /* Use 115200 instead of 38400 bps */
+#define ASYNC_SPD_CUST	0x0030  /* Use user-specified divisor */
+
+#define ASYNC_SKIP_TEST	0x0040 /* Skip UART test during autoconfiguration */
+#define ASYNC_AUTO_IRQ  0x0080 /* Do automatic IRQ during autoconfiguration */
+#define ASYNC_SESSION_LOCKOUT 0x0100 /* Lock out cua opens based on session */
+#define ASYNC_PGRP_LOCKOUT    0x0200 /* Lock out cua opens based on pgrp */
+#define ASYNC_CALLOUT_NOHUP   0x0400 /* Don't do hangups for cua device */
+
+#define ASYNC_FLAGS	0x0FFF	/* Possible legal async flags */
+#define ASYNC_USR_MASK 0x0430	/* Legal flags that non-privileged
+				 * users can set or reset */
+
+/* Internal flags used only by kernel/chr_drv/serial.c */
+#define ASYNC_INITIALIZED	0x80000000 /* Serial port was initialized */
+#define ASYNC_CALLOUT_ACTIVE	0x40000000 /* Call out device is active */
+#define ASYNC_NORMAL_ACTIVE	0x20000000 /* Normal device is active */
+#define ASYNC_BOOT_AUTOCONF	0x10000000 /* Autoconfigure port on bootup */
+#define ASYNC_CLOSING		0x08000000 /* Serial port is closing */
+
+#define IS_A_CONSOLE(min)	(((min) & 0xC0) == 0x00)
+#define IS_A_SERIAL(min)	(((min) & 0xC0) == 0x40)
+#define IS_A_PTY(min)		((min) & 0x80)
+#define IS_A_PTY_MASTER(min)	(((min) & 0xC0) == 0x80)
+#define IS_A_PTY_SLAVE(min)	(((min) & 0xC0) == 0xC0)
+#define PTY_OTHER(min)		((min) ^ 0x40)
+
+#define SL_TO_DEV(line)		((line) | 0x40)
+#define DEV_TO_SL(min)		((min) & 0x3F)
+
+#define INC(a) ((a) = ((a)+1) & (TTY_BUF_SIZE-1))
+#define DEC(a) ((a) = ((a)-1) & (TTY_BUF_SIZE-1))
+#define EMPTY(a) ((a)->head == (a)->tail)
+#define LEFT(a) (((a)->tail-(a)->head-1)&(TTY_BUF_SIZE-1))
+#define LAST(a) ((a)->buf[(TTY_BUF_SIZE-1)&((a)->head-1)])
+#define FULL(a) (!LEFT(a))
+#define CHARS(a) (((a)->head-(a)->tail)&(TTY_BUF_SIZE-1))
+
+extern void put_tty_queue(unsigned char c, struct tty_queue * queue);
+extern int get_tty_queue(struct tty_queue * queue);
+
+#define INTR_CHAR(tty) ((tty)->termios->c_cc[VINTR])
+#define QUIT_CHAR(tty) ((tty)->termios->c_cc[VQUIT])
+#define ERASE_CHAR(tty) ((tty)->termios->c_cc[VERASE])
+#define KILL_CHAR(tty) ((tty)->termios->c_cc[VKILL])
+#define EOF_CHAR(tty) ((tty)->termios->c_cc[VEOF])
+#define TIME_CHAR(tty) ((tty)->termios->c_cc[VTIME])
+#define MIN_CHAR(tty) ((tty)->termios->c_cc[VMIN])
+#define SWTC_CHAR(tty) ((tty)->termios->c_cc[VSWTC])
+#define START_CHAR(tty) ((tty)->termios->c_cc[VSTART])
+#define STOP_CHAR(tty) ((tty)->termios->c_cc[VSTOP])
+#define SUSP_CHAR(tty) ((tty)->termios->c_cc[VSUSP])
+#define EOL_CHAR(tty) ((tty)->termios->c_cc[VEOL])
+#define REPRINT_CHAR(tty) ((tty)->termios->c_cc[VREPRINT])
+#define DISCARD_CHAR(tty) ((tty)->termios->c_cc[VDISCARD])
+#define WERASE_CHAR(tty) ((tty)->termios->c_cc[VWERASE])
+#define LNEXT_CHAR(tty)	((tty)->termios->c_cc[VLNEXT])
+#define EOL2_CHAR(tty) ((tty)->termios->c_cc[VEOL2])
+
+#define _I_FLAG(tty,f)	((tty)->termios->c_iflag & (f))
+#define _O_FLAG(tty,f)	((tty)->termios->c_oflag & (f))
+#define _C_FLAG(tty,f)	((tty)->termios->c_cflag & (f))
+#define _L_FLAG(tty,f)	((tty)->termios->c_lflag & (f))
+
+#define I_IGNBRK(tty)	_I_FLAG((tty),IGNBRK)
+#define I_BRKINT(tty)	_I_FLAG((tty),BRKINT)
+#define I_IGNPAR(tty)	_I_FLAG((tty),IGNPAR)
+#define I_PARMRK(tty)	_I_FLAG((tty),PARMRK)
+#define I_INPCK(tty)	_I_FLAG((tty),INPCK)
+#define I_ISTRIP(tty)	_I_FLAG((tty),ISTRIP)
+#define I_INLCR(tty)	_I_FLAG((tty),INLCR)
+#define I_IGNCR(tty)	_I_FLAG((tty),IGNCR)
+#define I_ICRNL(tty)	_I_FLAG((tty),ICRNL)
+#define I_IUCLC(tty)	_I_FLAG((tty),IUCLC)
+#define I_IXON(tty)	_I_FLAG((tty),IXON)
+#define I_IXANY(tty)	_I_FLAG((tty),IXANY)
+#define I_IXOFF(tty)	_I_FLAG((tty),IXOFF)
+#define I_IMAXBEL(tty)	_I_FLAG((tty),IMAXBEL)
+
+#define O_OPOST(tty)	_O_FLAG((tty),OPOST)
+#define O_OLCUC(tty)	_O_FLAG((tty),OLCUC)
+#define O_ONLCR(tty)	_O_FLAG((tty),ONLCR)
+#define O_OCRNL(tty)	_O_FLAG((tty),OCRNL)
+#define O_ONOCR(tty)	_O_FLAG((tty),ONOCR)
+#define O_ONLRET(tty)	_O_FLAG((tty),ONLRET)
+#define O_OFILL(tty)	_O_FLAG((tty),OFILL)
+#define O_OFDEL(tty)	_O_FLAG((tty),OFDEL)
+#define O_NLDLY(tty)	_O_FLAG((tty),NLDLY)
+#define O_CRDLY(tty)	_O_FLAG((tty),CRDLY)
+#define O_TABDLY(tty)	_O_FLAG((tty),TABDLY)
+#define O_BSDLY(tty)	_O_FLAG((tty),BSDLY)
+#define O_VTDLY(tty)	_O_FLAG((tty),VTDLY)
+#define O_FFDLY(tty)	_O_FLAG((tty),FFDLY)
+
+#define C_BAUD(tty)	_C_FLAG((tty),CBAUD)
+#define C_CSIZE(tty)	_C_FLAG((tty),CSIZE)
+#define C_CSTOPB(tty)	_C_FLAG((tty),CSTOPB)
+#define C_CREAD(tty)	_C_FLAG((tty),CREAD)
+#define C_PARENB(tty)	_C_FLAG((tty),PARENB)
+#define C_PARODD(tty)	_C_FLAG((tty),PARODD)
+#define C_HUPCL(tty)	_C_FLAG((tty),HUPCL)
+#define C_CLOCAL(tty)	_C_FLAG((tty),CLOCAL)
+#define C_CIBAUD(tty)	_C_FLAG((tty),CIBAUD)
+#define C_CRTSCTS(tty)	_C_FLAG((tty),CRTSCTS)
+
+#define L_ISIG(tty)	_L_FLAG((tty),ISIG)
+#define L_ICANON(tty)	_L_FLAG((tty),ICANON)
+#define L_XCASE(tty)	_L_FLAG((tty),XCASE)
+#define L_ECHO(tty)	_L_FLAG((tty),ECHO)
+#define L_ECHOE(tty)	_L_FLAG((tty),ECHOE)
+#define L_ECHOK(tty)	_L_FLAG((tty),ECHOK)
+#define L_ECHONL(tty)	_L_FLAG((tty),ECHONL)
+#define L_NOFLSH(tty)	_L_FLAG((tty),NOFLSH)
+#define L_TOSTOP(tty)	_L_FLAG((tty),TOSTOP)
+#define L_ECHOCTL(tty)	_L_FLAG((tty),ECHOCTL)
+#define L_ECHOPRT(tty)	_L_FLAG((tty),ECHOPRT)
+#define L_ECHOKE(tty)	_L_FLAG((tty),ECHOKE)
+#define L_FLUSHO(tty)	_L_FLAG((tty),FLUSHO)
+#define L_PENDIN(tty)	_L_FLAG((tty),PENDIN)
+#define L_IEXTEN(tty)	_L_FLAG((tty),IEXTEN)
+
+/*
+ * Where all of the state associated with a tty is kept while the tty
+ * is open.  Since the termios state should be kept even if the tty
+ * has been closed --- for things like the baud rate, etc --- it is
+ * not stored here, but rather a pointer to the real state is stored
+ * here.  Possible the winsize structure should have the same
+ * treatment, but (1) the default 80x24 is usually right and (2) it's
+ * most often used by a windowing system, which will set the correct
+ * size each time the window is created or resized anyway.
+ * IMPORTANT: since this structure is dynamically allocated, it must
+ * be no larger than 4096 bytes.  Changing TTY_BUF_SIZE will change
+ * the size of this structure, and it needs to be done with care.
+ * 						- TYT, 9/14/92
+ */
+struct tty_struct {
+	struct termios *termios;
+	int pgrp;
+	int session;
+	unsigned char stopped:1, hw_stopped:1, packet:1, lnext:1;
+	unsigned char char_error:3;
+	unsigned char erasing:1;
+	unsigned char ctrl_status;
+	short line;
+	int disc;
+	int flags;
+	int count;
+	unsigned int column;
+	struct winsize winsize;
+	int  (*open)(struct tty_struct * tty, struct file * filp);
+	void (*close)(struct tty_struct * tty, struct file * filp);
+	void (*write)(struct tty_struct * tty);
+	int  (*ioctl)(struct tty_struct *tty, struct file * file,
+		    unsigned int cmd, unsigned long arg);
+	void (*throttle)(struct tty_struct * tty, int status);
+	void (*set_termios)(struct tty_struct *tty, struct termios * old);
+	void (*stop)(struct tty_struct *tty);
+	void (*start)(struct tty_struct *tty);
+	void (*hangup)(struct tty_struct *tty);
+	struct tty_struct *link;
+	unsigned char *write_data_ptr;
+	int write_data_cnt;
+	void (*write_data_callback)(void * data);
+	void * write_data_arg;
+	int readq_flags[TTY_BUF_SIZE/32];
+	int secondary_flags[TTY_BUF_SIZE/32];
+	int canon_data;
+	unsigned long canon_head;
+	unsigned int canon_column;
+	struct tty_queue read_q;
+	struct tty_queue write_q;
+	struct tty_queue secondary;
+	void *disc_data;
+};
+
+struct tty_ldisc {
+	int	flags;
+	/*
+	 * The following routines are called from above.
+	 */
+	int	(*open)(struct tty_struct *);
+	void	(*close)(struct tty_struct *);
+	int	(*read)(struct tty_struct * tty, struct file * file,
+			unsigned char * buf, unsigned int nr);
+	int	(*write)(struct tty_struct * tty, struct file * file,
+			 unsigned char * buf, unsigned int nr);	
+	int	(*ioctl)(struct tty_struct * tty, struct file * file,
+			 unsigned int cmd, unsigned long arg);
+	int	(*select)(struct tty_struct * tty, struct inode * inode,
+			  struct file * file, int sel_type,
+			  struct select_table_struct *wait);
+	/*
+	 * The following routines are called from below.
+	 */
+	void	(*handler)(struct tty_struct *);
+};
+
+#define LDISC_FLAG_DEFINED	0x00000001
+
+/*
+ * These are the different types of thottle status which can be sent
+ * to the low-level tty driver.  The tty_io.c layer is responsible for
+ * notifying the low-level tty driver of the following conditions:
+ * secondary queue full, secondary queue available, and read queue
+ * available.  The low-level driver must send the read queue full
+ * command to itself, if it is interested in that condition.
+ *
+ * Note that the low-level tty driver may elect to ignore one or both
+ * of these conditions; normally, however, it will use ^S/^Q or some
+ * sort of hardware flow control to regulate the input to try to avoid
+ * overflow.  While the low-level driver is responsible for all
+ * receiving flow control, note that the ^S/^Q handling (but not
+ * hardware flow control) is handled by the upper layer, in
+ * copy_to_cooked.  
+ */
+#define TTY_THROTTLE_SQ_FULL	1
+#define TTY_THROTTLE_SQ_AVAIL	2
+#define TTY_THROTTLE_RQ_FULL	3
+#define TTY_THROTTLE_RQ_AVAIL	4
+
+/*
+ * This defines the low- and high-watermarks for the various conditions.
+ * Again, the low-level driver is free to ignore any of these, and has
+ * to implement RQ_THREHOLD_LW for itself if it wants it.
+ */
+#define SQ_THRESHOLD_LW	16
+#define SQ_THRESHOLD_HW 768
+#define RQ_THRESHOLD_LW 16
+#define RQ_THRESHOLD_HW 768
+
+/*
+ * These bits are used in the flags field of the tty structure.
+ * 
+ * So that interrupts won't be able to mess up the queues,
+ * copy_to_cooked must be atomic with repect to itself, as must
+ * tty->write.  Thus, you must use the inline functions set_bit() and
+ * clear_bit() to make things atomic.
+ */
+#define TTY_WRITE_BUSY 0
+#define TTY_READ_BUSY 1
+#define TTY_SQ_THROTTLED 2
+#define TTY_RQ_THROTTLED 3
+#define TTY_IO_ERROR 4
+#define TTY_SLAVE_CLOSED 5
+#define TTY_EXCLUSIVE 6
+
+/*
+ * When a break, frame error, or parity error happens, these codes are
+ * stuffed into the read queue, and the relevant bit in readq_flag bit
+ * array is set.
+ */
+#define TTY_BREAK	1
+#define TTY_FRAME	2
+#define TTY_PARITY	3
+#define TTY_OVERRUN	4
+
+#define TTY_WRITE_FLUSH(tty) tty_write_flush((tty))
+#define TTY_READ_FLUSH(tty) tty_read_flush((tty))
+
+extern void tty_write_flush(struct tty_struct *);
+extern void tty_read_flush(struct tty_struct *);
+
+/* Number of chars that must be available in a write queue before
+   the queue is awakened. */
+#define WAKEUP_CHARS (3*TTY_BUF_SIZE/4)
+
+extern struct tty_struct *tty_table[];
+extern struct termios *tty_termios[];
+extern struct termios *termios_locked[];
+extern int tty_check_write[];
+extern struct tty_struct * redirect;
+extern struct tty_ldisc ldiscs[];
+extern int fg_console;
+extern unsigned long video_num_columns;
+extern unsigned long video_num_lines;
+extern struct wait_queue * keypress_wait;
+
+#define TTY_TABLE_IDX(nr)	((nr) ? (nr) : (fg_console+1))
+#define TTY_TABLE(nr) 		(tty_table[TTY_TABLE_IDX(nr)])
+
+/*	intr=^C		quit=^|		erase=del	kill=^U
+	eof=^D		vtime=\0	vmin=\1		sxtc=\0
+	start=^Q	stop=^S		susp=^Z		eol=\0
+	reprint=^R	discard=^U	werase=^W	lnext=^V
+	eol2=\0
+*/
 #define INIT_C_CC "\003\034\177\025\004\0\1\0\021\023\032\0\022\017\027\026\0"
 
-void rs_init(void);  // 异步串行通信初始化。(kernel/chr_drv/serial.c)
-void con_init(void); // 控制终端初始化。    (kernel/chr_drv/console.c)
-void tty_init(void); // tty初始化。         (kernel/chr_drv/tty_io.c)
+extern long rs_init(long);
+extern long lp_init(long);
+extern long con_init(long);
+extern long tty_init(long);
 
-int tty_read(unsigned c, char *buf, int n);  // (kernel/chr_drv/tty_io.c)
-int tty_write(unsigned c, char *buf, int n); // (kernel/chr_drv/tty_io.c)
+extern void flush_input(struct tty_struct * tty);
+extern void flush_output(struct tty_struct * tty);
+extern void wait_until_sent(struct tty_struct * tty, int timeout);
+extern int check_change(struct tty_struct * tty, int channel);
+extern void stop_tty(struct tty_struct * tty);
+extern void start_tty(struct tty_struct * tty);
+extern int tty_register_ldisc(int disc, struct tty_ldisc *new_ldisc);
+extern int tty_read_raw_data(struct tty_struct *tty, unsigned char *bufp,
+			     int buflen);
+extern int tty_write_data(struct tty_struct *tty, char *bufp, int buflen,
+			  void (*callback)(void * data), void * callarg);
 
-void con_write(struct tty_struct *tty);  // (kernel/chr_drv/console.c)
-void rs_write(struct tty_struct *tty);   // (kernel/chr_drv/serial.c)
-void mpty_write(struct tty_struct *tty); // (kernel/chr_drv/pty.c)
-void spty_write(struct tty_struct *tty); // (kernel/chr_drv/pty.c)
+extern int tty_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
+extern int is_orphaned_pgrp(int pgrp);
+extern int is_ignored(int sig);
+extern int tty_signal(int sig, struct tty_struct *tty);
+extern void tty_hangup(struct tty_struct * tty);
+extern void tty_vhangup(struct tty_struct * tty);
+extern void tty_unhangup(struct file *filp);
+extern int tty_hung_up_p(struct file * filp);
+extern void do_SAK(struct tty_struct *tty);
+extern void disassociate_ctty(int priv);
 
-void copy_to_cooked(struct tty_struct *tty); // (kernel/chr_drv/tty_io.c)
+/* tty write functions */
 
-void update_screen(void); // (kernel/chr_drv/console.c)
+extern void rs_write(struct tty_struct * tty);
+extern void con_write(struct tty_struct * tty);
+
+/* serial.c */
+
+extern int  rs_open(struct tty_struct * tty, struct file * filp);
+
+/* pty.c */
+
+extern int  pty_open(struct tty_struct * tty, struct file * filp);
+
+/* console.c */
+
+extern int con_open(struct tty_struct * tty, struct file * filp);
+extern void update_screen(int new_console);
+extern void blank_screen(void);
+extern void unblank_screen(void);
+
+/* vt.c */
+
+extern int vt_ioctl(struct tty_struct *tty, struct file * file,
+		    unsigned int cmd, unsigned long arg);
 
 #endif

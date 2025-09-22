@@ -1,118 +1,103 @@
 /*
  *  linux/fs/fcntl.c
  *
- *  (C) 1991  Linus Torvalds
+ *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
 #include <asm/segment.h>
-#include <errno.h>
-#include <linux/kernel.h>
+
 #include <linux/sched.h>
-#include <string.h>
+#include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/stat.h>
+#include <linux/fcntl.h>
+#include <linux/string.h>
 
-#include <fcntl.h>
-#include <sys/stat.h>
+extern int fcntl_getlk(unsigned int, struct flock *);
+extern int fcntl_setlk(unsigned int, unsigned int, struct flock *);
+extern int sock_fcntl (struct file *, unsigned int cmd, unsigned long arg);
 
-extern int sys_close(int fd);
-
-/**
- * @brief 拷贝文件描述符
- *
- * @param fd 被拷贝的文件描述符
- * @param arg 新文件描述符值
- * @return int 拷贝后实际的文件描述符值
- */
 static int dupfd(unsigned int fd, unsigned int arg)
 {
-    if (fd >= NR_OPEN || !current->filp[fd]) {
-        return -EBADF;
-    }
-
-    if (arg >= NR_OPEN) {
-        return -EINVAL;
-    }
-
-    while (arg < NR_OPEN) {
-        if (current->filp[arg]) {
-            arg++;
-        } else {
-            break;
-        }
-    }
-
-    if (arg >= NR_OPEN) {
-        return -EMFILE;
-    }
-
-    current->close_on_exec &= ~(1 << arg);
-    (current->filp[arg] = current->filp[fd])->f_count++;
-    return arg;
+	if (fd >= NR_OPEN || !current->filp[fd])
+		return -EBADF;
+	if (arg >= NR_OPEN)
+		return -EINVAL;
+	while (arg < NR_OPEN)
+		if (current->filp[arg])
+			arg++;
+		else
+			break;
+	if (arg >= NR_OPEN)
+		return -EMFILE;
+	FD_CLR(arg, &current->close_on_exec);
+	(current->filp[arg] = current->filp[fd])->f_count++;
+	return arg;
 }
 
-/**
- * @brief 将 oldfd 代表的文件描述符复制到 newfd
- *
- * @param oldfd
- * @param newfd
- * @return int 返回复制后的文件描述符(实际上就是 newfd)
- */
-int sys_dup2(unsigned int oldfd, unsigned int newfd)
+asmlinkage int sys_dup2(unsigned int oldfd, unsigned int newfd)
 {
-    sys_close(newfd);
-    return dupfd(oldfd, newfd);
+	if (oldfd >= NR_OPEN || !current->filp[oldfd])
+		return -EBADF;
+	if (newfd == oldfd)
+		return newfd;
+	/*
+	 * errno's for dup2() are slightly different than for fcntl(F_DUPFD)
+	 * for historical reasons.
+	 */
+	if (newfd > NR_OPEN)	/* historical botch - should have been >= */
+		return -EBADF;	/* dupfd() would return -EINVAL */
+#if 1
+	if (newfd == NR_OPEN)
+		return -EBADF;	/* dupfd() does return -EINVAL and that may
+				 * even be the standard!  But that is too
+				 * weird for now.
+				 */
+#endif
+	sys_close(newfd);
+	return dupfd(oldfd,newfd);
 }
 
-/**
- * @brief 拷贝 fildes 表示的文件描述符
- *
- * @param fildes
- * @return int 返回拷贝出来的新文件描述赋值
- */
-int sys_dup(unsigned int fildes)
+asmlinkage int sys_dup(unsigned int fildes)
 {
-    return dupfd(fildes, 0);
+	return dupfd(fildes,0);
 }
 
-/**
- * @brief fcntl 系统调用
- *
- * @param fd
- * @param cmd
- * @param arg
- * @return int
- */
-int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-    struct file *filp;
+asmlinkage int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{	
+	struct file * filp;
 
-    if (fd >= NR_OPEN || !(filp = current->filp[fd])) {
-        return -EBADF;
-    }
-
-    switch (cmd) {
-    case F_DUPFD:
-        return dupfd(fd, arg);
-    case F_GETFD: /* 仅支持 FD_CLOEXEC 标记 */
-        return (current->close_on_exec >> fd) & 1;
-    case F_SETFD:
-        if (arg & 1) {
-            current->close_on_exec |= (1 << fd);
-        } else {
-            current->close_on_exec &= ~(1 << fd);
-        }
-        return 0;
-    case F_GETFL:
-        return filp->f_flags;
-    case F_SETFL:
-        /* 仅支持 O_APPEND, O_NONBLOCK 两个标记 */
-        filp->f_flags &= ~(O_APPEND | O_NONBLOCK);
-        filp->f_flags |= arg & (O_APPEND | O_NONBLOCK);
-        return 0;
-    case F_GETLK:
-    case F_SETLK:
-    case F_SETLKW:
-        return -1;
-    default:
-        return -1;
-    }
+	if (fd >= NR_OPEN || !(filp = current->filp[fd]))
+		return -EBADF;
+	switch (cmd) {
+		case F_DUPFD:
+			return dupfd(fd,arg);
+		case F_GETFD:
+			return FD_ISSET(fd, &current->close_on_exec);
+		case F_SETFD:
+			if (arg&1)
+				FD_SET(fd, &current->close_on_exec);
+			else
+				FD_CLR(fd, &current->close_on_exec);
+			return 0;
+		case F_GETFL:
+			return filp->f_flags;
+		case F_SETFL:
+			filp->f_flags &= ~(O_APPEND | O_NONBLOCK);
+			filp->f_flags |= arg & (O_APPEND | O_NONBLOCK);
+			return 0;
+		case F_GETLK:
+			return fcntl_getlk(fd, (struct flock *) arg);
+		case F_SETLK:
+			return fcntl_setlk(fd, cmd, (struct flock *) arg);
+		case F_SETLKW:
+			return fcntl_setlk(fd, cmd, (struct flock *) arg);
+		default:
+			/* sockets need a few special fcntls. */
+			if (S_ISSOCK (filp->f_inode->i_mode))
+			  {
+			     return (sock_fcntl (filp, cmd, arg));
+			  }
+			return -EINVAL;
+	}
 }

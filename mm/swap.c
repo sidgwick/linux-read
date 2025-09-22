@@ -1,7 +1,7 @@
 /*
  *  linux/mm/swap.c
  *
- *  (C) 1991  Linus Torvalds
+ *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
 /*
@@ -9,417 +9,849 @@
  * Started 18.12.91
  */
 
-#include <string.h>
-
-#include <linux/head.h>
-#include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
+#include <linux/head.h>
+#include <linux/kernel.h>
+#include <linux/kernel_stat.h>
+#include <linux/errno.h>
+#include <linux/string.h>
+#include <linux/stat.h>
 
-#define SWAP_BITS (4096 << 3) /* 一页(4KB)有多少个 bit 位 */
+#include <asm/system.h> /* for cli()/sti() */
+#include <asm/bitops.h>
 
-/* bt, BitTest, 用目的操作数的位值置 CR 标记
- * bts, BitTestAndSet, 目的操作数位值置 1, 并用目的操作数的原始位值置 CR 标记
- * btr, BitTestAndReset, 目的操作数位值置 0, 并用目的操作数的原始位值置 CR 标记
- *
- * adcl src, dst
- * dst = dst + src + CF
- */
-#define bitop(name, op)                                                                            \
-    static inline int name(char *addr, unsigned int nr)                                            \
-    {                                                                                              \
-        int __res;                                                                                 \
-        __asm__ __volatile__("bt" op " %1,%2\n\t"                                                  \
-                             "adcl $0,%0\n\t" /* adc 用于将 CR 标记体现到最终结果里面 */           \
-                             : "=g"(__res)                                                         \
-                             : "r"(nr), "m"(*(addr)), "0"(0));                                     \
-        return __res;                                                                              \
-    }
+#define MAX_SWAPFILES 8
 
-bitop(bit, "");     // bt
-bitop(setbit, "s"); // bts
-bitop(clrbit, "r"); // btr
+#define SWP_USED	1
+#define SWP_WRITEOK	3
 
-/* swap_bitmap 是管理 SWAP 空间的位图, 相关的位置 1, 说明对应的页空间可用, 0 表示不可用 */
-static char *swap_bitmap = NULL;
+#define SWP_TYPE(entry) (((entry) & 0xfe) >> 1)
+#define SWP_OFFSET(entry) ((entry) >> PAGE_SHIFT)
+#define SWP_ENTRY(type,offset) (((type) << 1) | ((offset) << PAGE_SHIFT))
 
-/* 交换设备号, 在 main 函数里面被设置, 最早在 bootsect.s 设置 */
-int SWAP_DEV = 0;
+static int nr_swapfiles = 0;
+static struct wait_queue * lock_queue = NULL;
+
+static struct swap_info_struct {
+	unsigned long flags;
+	struct inode * swap_file;
+	unsigned int swap_device;
+	unsigned char * swap_map;
+	unsigned char * swap_lockmap;
+	int pages;
+	int lowest_bit;
+	int highest_bit;
+	unsigned long max;
+} swap_info[MAX_SWAPFILES];
+
+extern unsigned long free_page_list;
+extern int shm_swap (int);
 
 /*
- * We never page the pages in task[0] - kernel memory.
- * We page all other pages.
- *
- * task-0 的页面不做交换, 因为它在内核内存范围
- *
- * 第一个虚拟页面号, 在 LOW_MEMORY + TASK_SIZE 处, 也就是从 idle 进程(不含)之后的内存空间
- * 对应的页面都可以做交换
+ * The following are used to make sure we don't thrash too much...
+ * NOTE!! NR_LAST_FREE_PAGES must be a power of 2...
  */
-#define FIRST_VM_PAGE (TASK_SIZE >> 12)         /* 第一个虚拟页面号*/
-#define LAST_VM_PAGE (1024 * 1024)              /* 最后一个虚拟页面号 */
-#define VM_PAGES (LAST_VM_PAGE - FIRST_VM_PAGE) /* 虚拟页面数量 */
+#define NR_LAST_FREE_PAGES 32
+static unsigned long last_free_pages[NR_LAST_FREE_PAGES] = {0,};
 
-/* swap_bitmap 记录了现在那个 swap 页面是空闲的
- * 这里找到第一个可用的空闲页面, 返回这个页面的编号 */
-static int get_swap_page(void)
+void rw_swap_page(int rw, unsigned long entry, char * buf)
 {
-    int nr;
+	unsigned long type, offset;
+	struct swap_info_struct * p;
 
-    if (!swap_bitmap) {
-        return 0;
-    }
+	type = SWP_TYPE(entry);
+	if (type >= nr_swapfiles) {
+		printk("Internal error: bad swap-device\n");
+		return;
+	}
+	p = &swap_info[type];
+	offset = SWP_OFFSET(entry);
+	if (offset >= p->max) {
+		printk("rw_swap_page: weirdness\n");
+		return;
+	}
+	if (!(p->flags & SWP_USED)) {
+		printk("Trying to swap to unused swap-device\n");
+		return;
+	}
+	while (set_bit(offset,p->swap_lockmap))
+		sleep_on(&lock_queue);
+	if (rw == READ)
+		kstat.pswpin++;
+	else
+		kstat.pswpout++;
+	if (p->swap_device) {
+		ll_rw_page(rw,p->swap_device,offset,buf);
+	} else if (p->swap_file) {
+		unsigned int zones[8];
+		unsigned int block;
+		int i, j;
 
-    for (nr = 1; nr < 32768; nr++) {
-        if (clrbit(swap_bitmap, nr)) { /* bit 1 => 0 */
-            return nr;
-        }
-    }
+		block = offset << (12 - p->swap_file->i_sb->s_blocksize_bits);
 
-    return 0;
+		for (i=0, j=0; j< PAGE_SIZE ; i++, j +=p->swap_file->i_sb->s_blocksize)
+			if (!(zones[i] = bmap(p->swap_file,block++))) {
+				printk("rw_swap_page: bad swap file\n");
+				return;
+			}
+		ll_rw_swap_file(rw,p->swap_file->i_dev, zones, i,buf);
+	} else
+		printk("re_swap_page: no swap file or device\n");
+	if (offset && !clear_bit(offset,p->swap_lockmap))
+		printk("rw_swap_page: lock already cleared\n");
+	wake_up(&lock_queue);
 }
 
-/* 把 swap_nr 对应的页面在 swap 释放 */
-void swap_free(int swap_nr)
+unsigned int get_swap_page(void)
 {
-    if (!swap_nr) {
-        return;
-    }
+	struct swap_info_struct * p;
+	unsigned int offset, type;
 
-    if (swap_bitmap && swap_nr < SWAP_BITS) {
-        if (!setbit(swap_bitmap, swap_nr)) {
-            return;
-        }
-    }
-
-    printk("Swap-space bad (swap_free())\n\r");
-    return;
+	p = swap_info;
+	for (type = 0 ; type < nr_swapfiles ; type++,p++) {
+		if ((p->flags & SWP_WRITEOK) != SWP_WRITEOK)
+			continue;
+		for (offset = p->lowest_bit; offset <= p->highest_bit ; offset++) {
+			if (p->swap_map[offset])
+				continue;
+			p->swap_map[offset] = 1;
+			nr_swap_pages--;
+			if (offset == p->highest_bit)
+				p->highest_bit--;
+			p->lowest_bit = offset;
+			return SWP_ENTRY(type,offset);
+		}
+	}
+	return 0;
 }
 
-/* 把 table_ptr 指向的页面, 交换会内存中  */
+unsigned long swap_duplicate(unsigned long entry)
+{
+	struct swap_info_struct * p;
+	unsigned long offset, type;
+
+	if (!entry)
+		return 0;
+	offset = SWP_OFFSET(entry);
+	type = SWP_TYPE(entry);
+	if (type == SHM_SWP_TYPE)
+		return entry;
+	if (type >= nr_swapfiles) {
+		printk("Trying to duplicate nonexistent swap-page\n");
+		return 0;
+	}
+	p = type + swap_info;
+	if (offset >= p->max) {
+		printk("swap_free: weirdness\n");
+		return 0;
+	}
+	if (!p->swap_map[offset]) {
+		printk("swap_duplicate: trying to duplicate unused page\n");
+		return 0;
+	}
+	p->swap_map[offset]++;
+	return entry;
+}
+
+void swap_free(unsigned long entry)
+{
+	struct swap_info_struct * p;
+	unsigned long offset, type;
+
+	if (!entry)
+		return;
+	type = SWP_TYPE(entry);
+	if (type == SHM_SWP_TYPE)
+		return;
+	if (type >= nr_swapfiles) {
+		printk("Trying to free nonexistent swap-page\n");
+		return;
+	}
+	p = & swap_info[type];
+	offset = SWP_OFFSET(entry);
+	if (offset >= p->max) {
+		printk("swap_free: weirdness\n");
+		return;
+	}
+	if (!(p->flags & SWP_USED)) {
+		printk("Trying to free swap from unused swap-device\n");
+		return;
+	}
+	while (set_bit(offset,p->swap_lockmap))
+		sleep_on(&lock_queue);
+	if (offset < p->lowest_bit)
+		p->lowest_bit = offset;
+	if (offset > p->highest_bit)
+		p->highest_bit = offset;
+	if (!p->swap_map[offset])
+		printk("swap_free: swap-space map bad (entry %08lx)\n",entry);
+	else
+		if (!--p->swap_map[offset])
+			nr_swap_pages++;
+	if (!clear_bit(offset,p->swap_lockmap))
+		printk("swap_free: lock already cleared\n");
+	wake_up(&lock_queue);
+}
+
 void swap_in(unsigned long *table_ptr)
 {
-    int swap_nr;
-    unsigned long page;
+	unsigned long entry;
+	unsigned long page;
 
-    if (!swap_bitmap) {
-        printk("Trying to swap in without swap bit-map");
-        return;
-    }
-
-    if (1 & *table_ptr) {
-        printk("trying to swap in present page\n\r");
-        return;
-    }
-
-    swap_nr = *table_ptr >> 1;
-    if (!swap_nr) {
-        printk("No swap page in swap_in\n\r");
-        return;
-    }
-
-    if (!(page = get_free_page()))
-        oom();
-
-    read_swap_page(swap_nr, (char *)page);
-    if (setbit(swap_bitmap, swap_nr)) { /* bitmap 0 => 1 */
-        printk("swapping in multiply from same page\n\r");
-    }
-
-    /* TODO: 这里为啥要把页面置为脏页?
-     * 答: 不标记为脏的话, 可能这个页面很快又被 swap out 了 */
-    *table_ptr = page | (PAGE_DIRTY | 7);
+	entry = *table_ptr;
+	if (PAGE_PRESENT & entry) {
+		printk("trying to swap in present page\n");
+		return;
+	}
+	if (!entry) {
+		printk("No swap page in swap_in\n");
+		return;
+	}
+	if (SWP_TYPE(entry) == SHM_SWP_TYPE) {
+		shm_no_page ((unsigned long *) table_ptr);
+		return;
+	}
+	if (!(page = get_free_page(GFP_KERNEL))) {
+		oom(current);
+		page = BAD_PAGE;
+	} else	
+		read_swap_page(entry, (char *) page);
+	if (*table_ptr != entry) {
+		free_page(page);
+		return;
+	}
+	*table_ptr = page | (PAGE_DIRTY | PAGE_PRIVATE);
+	swap_free(entry);
 }
 
-/* 把 table_ptr 指向的 PTE 对应的页, 换出到 SWAP
- *
- * 若页面没有被修改过则不用保存在交换设备中,
- * 因为对应页面还可以再直接从相应映像文件 中读入, 可以直接释放掉相应物理页面了事
- * 否则就申请一个交换页面号, 然后把页面交换出去.
- * 此时交换页面号要保存在对应页表项中, 并且仍需要保持页表项存在位 P = 0
- *
- * TODO: 那些刚刚分配出来用于堆栈的空间, 岂不是有可能很快又被释放了?
- *
- * 页面交换或释放成功返回 1, 否则返回 0 */
-int try_to_swap_out(unsigned long *table_ptr)
+static inline int try_to_swap_out(unsigned long * table_ptr)
 {
-    unsigned long page;
-    unsigned long swap_nr;
+	int i;
+	unsigned long page;
+	unsigned long entry;
 
-    page = *table_ptr; /* PTE 内容 = 页地址 + 属性 */
-    if (!(PAGE_PRESENT & page)) {
-        return 0;
-    }
-
-    /* 最多支持到 16M 内存, 去掉 1M 内核使用还剩余 15M 可供分页使用 */
-    if (page - LOW_MEM > PAGING_MEMORY) {
-        return 0;
-    }
-
-    /* 脏页? */
-    if (PAGE_DIRTY & page) {
-        page &= 0xfffff000;               /* 页基地址 */
-        if (mem_map[MAP_NR(page)] != 1) { /* 共享页面, 不能换出 */
-            return 0;
-        }
-
-        /* 找到页面即将被换出到的那个 SWAP 分区页面 */
-        if (!(swap_nr = get_swap_page())) {
-            return 0;
-        }
-
-        /* 被换出的页面, 页表项里面保存 swap_nr << 1
-         * 这样 PTE 的 P 位还可以设置 0, 表示他不在内存里 */
-        *table_ptr = swap_nr << 1;
-        invalidate();
-
-        /* 将页面正式写到 SWAP 里面  */
-        write_swap_page(swap_nr, (char *)page);
-
-        /* 释放页面所占用的物理内存 */
-        free_page(page);
-
-        return 1;
-    }
-
-    /* 不是脏页直接抹掉, 被抹掉的页面, 有需要的话, 会以缺页中断的方式重新被加载回来 */
-    *table_ptr = 0;
-    invalidate();
-    free_page(page);
-    return 1;
+	page = *table_ptr;
+	if (!(PAGE_PRESENT & page))
+		return 0;
+	if (page >= high_memory)
+		return 0;
+	if (mem_map[MAP_NR(page)] & MAP_PAGE_RESERVED)
+		return 0;
+	if (PAGE_ACCESSED & page) {
+		*table_ptr &= ~PAGE_ACCESSED;
+		return 0;
+	}
+	for (i = 0; i < NR_LAST_FREE_PAGES; i++)
+		if (last_free_pages[i] == (page & PAGE_MASK))
+			return 0;
+	if (PAGE_DIRTY & page) {
+		page &= PAGE_MASK;
+		if (mem_map[MAP_NR(page)] != 1)
+			return 0;
+		if (!(entry = get_swap_page()))
+			return 0;
+		*table_ptr = entry;
+		invalidate();
+		write_swap_page(entry, (char *) page);
+		free_page(page);
+		return 1;
+	}
+	page &= PAGE_MASK;
+	*table_ptr = 0;
+	invalidate();
+	free_page(page);
+	return 1 + mem_map[MAP_NR(page)];
 }
 
 /*
- * Ok, this has a rather intricate logic - the idea is to make good
- * and fast machine code. If we didn't worry about that, things would
- * be easier.
- *
- * 把某个页, 交换到 SWAP 设备
+ * sys_idle() does nothing much: it just searches for likely candidates for
+ * swapping out or forgetting about. This speeds up the search when we
+ * actually have to swap.
  */
-int swap_out(void)
+asmlinkage int sys_idle(void)
 {
-    static int dir_entry = FIRST_VM_PAGE >> 10; /* 即任务 1 的第 1 个 PDT 索引 */
-    static int page_entry = -1;
-    int counter = VM_PAGES;
-    int pg_table;
+	need_resched = 1;
+	return 0;
+}
 
-    /* 首先搜索页目录表, 查找存在二级页表页的页目录项, 这个二级页表页里面的页表项的某一个项,
-     * 就是我们这次希望 swap 的对象
-     *
-     * 找到直接退出循环, 否则调整页目录项数对应剩余二级页表项数 counter, 然后继续检测下一页目录项.
-     * 若全部搜索完还没有找到适合的(存在的)页目录项, 就重新继续搜索
-     *
-     * TODO-DONE: 这里重新搜索的意义是什么? 不是已经找不到了吗?
-     * 答: counter 是最差的情况下要迭代的次数, 只要找不到符合交换条件的页面就需要一直找下去, 一直到 counter 消耗完毕 */
-    while (counter > 0) {
-        pg_table = pg_dir[dir_entry];
-        if (pg_table & 1) {
-            break;
-        }
+/*
+ * A new implementation of swap_out().  We do not swap complete processes,
+ * but only a small number of blocks, before we continue with the next
+ * process.  The number of blocks actually swapped is determined on the
+ * number of page faults, that this process actually had in the last time,
+ * so we won't swap heavily used processes all the time ...
+ *
+ * Note: the priority argument is a hint on much CPU to waste with the
+ *       swap block search, not a hint, of how much blocks to swap with
+ *       each process.
+ *
+ * (C) 1993 Kai Petzke, wpp@marie.physik.tu-berlin.de
+ */
+#ifdef NEW_SWAP
+/*
+ * These are the miminum and maximum number of pages to swap from one process,
+ * before proceeding to the next:
+ */
+#define SWAP_MIN	4
+#define SWAP_MAX	32
 
-        counter -= 1024; /* 一个 PDT 已经检查完, 相当于一次性查找了 1024 个 PTE */
-        dir_entry++;
-        if (dir_entry >= 1024) { /* 避免越界 */
-            dir_entry = FIRST_VM_PAGE >> 10;
-        }
+/*
+ * The actual number of pages to swap is determined as:
+ * SWAP_RATIO / (number of recent major page faults)
+ */
+#define SWAP_RATIO	128
+
+static int swap_out(unsigned int priority)
+{
+    static int swap_task;
+    int table;
+    int page;
+    long pg_table;
+    int loop;
+    int counter = NR_TASKS * 2 >> priority;
+    struct task_struct *p;
+
+    counter = NR_TASKS * 2 >> priority;
+    for(; counter >= 0; counter--, swap_task++) {
+	/*
+	 * Check that swap_task is suitable for swapping.  If not, look for
+	 * the next suitable process.
+	 */
+	loop = 0;
+	while(1) {
+	    if(swap_task >= NR_TASKS) {
+		swap_task = 1;
+		if(loop)
+		    /* all processes are unswappable or already swapped out */
+		    return 0;
+		loop = 1;
+	    }
+
+	    p = task[swap_task];
+	    if(p && p->swappable && p->rss)
+		break;
+
+	    swap_task++;
+	}
+
+	/*
+	 * Determine the number of pages to swap from this process.
+	 */
+	if(! p -> swap_cnt) {
+	    p->dec_flt = (p->dec_flt * 3) / 4 + p->maj_flt - p->old_maj_flt;
+	    p->old_maj_flt = p->maj_flt;
+
+	    if(p->dec_flt >= SWAP_RATIO / SWAP_MIN) {
+		p->dec_flt = SWAP_RATIO / SWAP_MIN;
+		p->swap_cnt = SWAP_MIN;
+	    } else if(p->dec_flt <= SWAP_RATIO / SWAP_MAX)
+		p->swap_cnt = SWAP_MAX;
+	    else
+		p->swap_cnt = SWAP_RATIO / p->dec_flt;
+	}
+
+	/*
+	 * Go through process' page directory.
+	 */
+	for(table = p->swap_table; table < 1024; table++) {
+	    pg_table = ((unsigned long *) p->tss.cr3)[table];
+	    if(pg_table >= high_memory)
+		    continue;
+	    if(mem_map[MAP_NR(pg_table)] & MAP_PAGE_RESERVED)
+		    continue;
+	    if(!(PAGE_PRESENT & pg_table)) {
+		    printk("swap_out: bad page-table at pg_dir[%d]: %08lx\n",
+			    table, pg_table);
+		    ((unsigned long *) p->tss.cr3)[table] = 0;
+		    continue;
+	    }
+	    pg_table &= 0xfffff000;
+
+	    /*
+	     * Go through this page table.
+	     */
+	    for(page = p->swap_page; page < 1024; page++) {
+		switch(try_to_swap_out(page + (unsigned long *) pg_table)) {
+		    case 0:
+			break;
+
+		    case 1:
+			p->rss--;
+			/* continue with the following page the next time */
+			p->swap_table = table;
+			p->swap_page  = page + 1;
+			if((--p->swap_cnt) == 0)
+			    swap_task++;
+			return 1;
+
+		    default:
+			p->rss--;
+			break;
+		}
+	    }
+
+	    p->swap_page = 0;
+	}
+
+	/*
+	 * Finish work with this process, if we reached the end of the page
+	 * directory.  Mark restart from the beginning the next time.
+	 */
+	p->swap_table = 0;
     }
-
-    /* 在取得二级页表页地址之后, 针对该页表页中的所有 1024 个页面,
-     * 逐一调用交换函数 try_to_swap_out 尝试交换出去.
-     * 一旦某个页面成功交换到交换设备中就返回 1. 若对所
-     * 有目录项的所有页表都已尝试失败, 则显示 "交换内存用完" 的警告, 并返回 0 */
-
-    pg_table &= 0xfffff000; /* pg_table 现在指向页表页的基地址 */
-    while (counter-- > 0) {
-        page_entry++;
-        if (page_entry >= 1024) {
-            page_entry = 0;
-
-        repeat:
-            dir_entry++;
-            if (dir_entry >= 1024) {
-                dir_entry = FIRST_VM_PAGE >> 10;
-            }
-
-            pg_table = pg_dir[dir_entry];
-            if (!(pg_table & 1)) { /* page 不在内存里 */
-                if ((counter -= 1024) > 0) {
-                    goto repeat;
-                } else {
-                    break;
-                }
-            }
-
-            pg_table &= 0xfffff000;
-        }
-
-        if (try_to_swap_out(page_entry + (unsigned long *)pg_table)) {
-            return 1;
-        }
-    }
-
-    printk("Out of swap-memory\n\r");
     return 0;
 }
 
-/**
- * @brief 分配一个空闲的物理页面
+#else /* old swapping procedure */
+
+/*
+ * Go through the page tables, searching for a user page that
+ * we can swap out.
+ * 
+ * We now check that the process is swappable (normally only 'init'
+ * is un-swappable), allowing high-priority processes which cannot be
+ * swapped out (things like user-level device drivers (Not implemented)).
+ */
+static int swap_out(unsigned int priority)
+{
+	static int swap_task = 1;
+	static int swap_table = 0;
+	static int swap_page = 0;
+	int counter = NR_TASKS*8;
+	int pg_table;
+	struct task_struct * p;
+
+	counter >>= priority;
+check_task:
+	if (counter-- < 0)
+		return 0;
+	if (swap_task >= NR_TASKS) {
+		swap_task = 1;
+		goto check_task;
+	}
+	p = task[swap_task];
+	if (!p || !p->swappable) {
+		swap_task++;
+		goto check_task;
+	}
+check_dir:
+	if (swap_table >= PTRS_PER_PAGE) {
+		swap_table = 0;
+		swap_task++;
+		goto check_task;
+	}
+	pg_table = ((unsigned long *) p->tss.cr3)[swap_table];
+	if (pg_table >= high_memory || (mem_map[MAP_NR(pg_table)] & MAP_PAGE_RESERVED)) {
+		swap_table++;
+		goto check_dir;
+	}
+	if (!(PAGE_PRESENT & pg_table)) {
+		printk("bad page-table at pg_dir[%d]: %08x\n",
+			swap_table,pg_table);
+		((unsigned long *) p->tss.cr3)[swap_table] = 0;
+		swap_table++;
+		goto check_dir;
+	}
+	pg_table &= PAGE_MASK;
+check_table:
+	if (swap_page >= PTRS_PER_PAGE) {
+		swap_page = 0;
+		swap_table++;
+		goto check_dir;
+	}
+	switch (try_to_swap_out(swap_page + (unsigned long *) pg_table)) {
+		case 0: break;
+		case 1: p->rss--; return 1;
+		default: p->rss--;
+	}
+	swap_page++;
+	goto check_table;
+}
+
+#endif
+
+static int try_to_free_page(void)
+{
+	int i=6;
+
+	while (i--) {
+		if (shrink_buffers(i))
+			return 1;
+		if (shm_swap(i))
+			return 1;
+		if (swap_out(i))
+			return 1;
+	}
+	return 0;
+}
+
+/*
+ * Note that this must be atomic, or bad things will happen when
+ * pages are requested in interrupts (as malloc can do). Thus the
+ * cli/sti's.
+ */
+static inline void add_mem_queue(unsigned long addr, unsigned long * queue)
+{
+	addr &= PAGE_MASK;
+	*(unsigned long *) addr = *queue;
+	*queue = addr;
+}
+
+/*
+ * Free_page() adds the page to the free lists. This is optimized for
+ * fast normal cases (no error jumps taken normally).
  *
+ * The way to optimize jumps for gcc-2.2.2 is to:
+ *  - select the "normal" case and put it inside the if () { XXX }
+ *  - no else-statements if you can avoid them
+ *
+ * With the above two rules, you get a straight-line execution path
+ * for the normal case, giving better asm-code.
+ */
+void free_page(unsigned long addr)
+{
+	if (addr < high_memory) {
+		unsigned short * map = mem_map + MAP_NR(addr);
+
+		if (*map) {
+			if (!(*map & MAP_PAGE_RESERVED)) {
+				unsigned long flag;
+
+				save_flags(flag);
+				cli();
+				if (!--*map) {
+					if (nr_secondary_pages < MAX_SECONDARY_PAGES) {
+						add_mem_queue(addr,&secondary_page_list);
+						nr_secondary_pages++;
+						restore_flags(flag);
+						return;
+					}
+					add_mem_queue(addr,&free_page_list);
+					nr_free_pages++;
+				}
+				restore_flags(flag);
+			}
+			return;
+		}
+		printk("Trying to free free memory (%08lx): memory probabably corrupted\n",addr);
+		printk("PC = %08lx\n",*(((unsigned long *)&addr)-1));
+		return;
+	}
+}
+
+/*
+ * This is one ugly macro, but it simplifies checking, and makes
+ * this speed-critical place reasonably fast, especially as we have
+ * to do things with the interrupt flag etc.
+ *
+ * Note that this #define is heavily optimized to give fast code
+ * for the normal case - the if-statements are ordered so that gcc-2.2.2
+ * will make *no* jumps for the normal code. Don't touch unless you
+ * know what you are doing.
+ */
+#define REMOVE_FROM_MEM_QUEUE(queue,nr) \
+	cli(); \
+	if ((result = queue) != 0) { \
+		if (!(result & ~PAGE_MASK) && result < high_memory) { \
+			queue = *(unsigned long *) result; \
+			if (!mem_map[MAP_NR(result)]) { \
+				mem_map[MAP_NR(result)] = 1; \
+				nr--; \
+last_free_pages[index = (index + 1) & (NR_LAST_FREE_PAGES - 1)] = result; \
+				restore_flags(flag); \
+				return result; \
+			} \
+			printk("Free page %08lx has mem_map = %d\n", \
+				result,mem_map[MAP_NR(result)]); \
+		} else \
+			printk("Result = 0x%08lx - memory map destroyed\n", result); \
+		queue = 0; \
+		nr = 0; \
+	} else if (nr) { \
+		printk(#nr " is %d, but " #queue " is empty\n",nr); \
+		nr = 0; \
+	} \
+	restore_flags(flag)
+
+/*
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
  *
- * @return unsigned long 返回页面的物理地址
+ * Note that this is one of the most heavily called functions in the kernel,
+ * so it's a bit timing-critical (especially as we have to disable interrupts
+ * in it). See the above macro which does most of the work, and which is
+ * optimized for a fast normal path of execution.
  */
-unsigned long get_free_page(void)
+unsigned long __get_free_page(int priority)
 {
-    register unsigned long __res asm("ax");
+	extern unsigned long intr_count;
+	unsigned long result, flag;
+	static unsigned long index = 0;
 
-    // scasb 比较 %al 和 (%edi), 比较完后 %edi+1, %ecx-1
+	/* this routine can be called at interrupt time via
+	   malloc.  We want to make sure that the critical
+	   sections of code have interrupts disabled. -RAB
+	   Is this code reentrant? */
 
+	if (intr_count && priority != GFP_ATOMIC) {
+		printk("gfp called nonatomically from interrupt %08lx\n",
+			((unsigned long *)&priority)[-1]);
+		priority = GFP_ATOMIC;
+	}
+	save_flags(flag);
 repeat:
-    __asm__(
-        "std\n\t"
-        "repne scasb\n\t" /* 倒着找, mem_map 里面不为 0 的字节 */
-        "jne 1f\n\t" /* jne 说明没有找到, 否则说明找到了, 相关的值为 0 的字节指针在 %edi+1 位置 */
-        "movb $1, 1(%%edi)\n\t" /* 将那个 0 字节置 1, 表示这个页面现在被用了 */
-        "sall $12, %%ecx\n\t" /* sall = shll, 都是左移, (PAGING_PAGS << 12) 得相对页面起始地址 - 这个地址是相对 LOW_MEM 的 */
-        "addl %2, %%ecx\n\t" /* 加上 LOW_MEM 之后, 得到的就是那个值为 0 的字节, 对应的物理地址了 */
-        "movl %%ecx, %%edx\n\t"       /* 物理地址存到 EDX */
-        "movl $1024, %%ecx\n\t"       /* ECX = 1024 */
-        "leal 4092(%%edx), %%edi\n\t" /* EDI = 物理地址+4092, 实际上就是页的末尾 */
-        "rep stosl\n\t"               /* 上面已经 std, 这里倒着给页面填充 0 */
-        "movl %%edx, %%eax\n"         /* 返回页面地址 */
-        "1:"
-        : "=a"(__res)
-        : "0"(0), "i"(LOW_MEM), "c"(PAGING_PAGES), "D"(mem_map + PAGING_PAGES - 1)
-        : "dx");
-
-    /* 找的结果不对, 重找 */
-    if (__res >= HIGH_MEMORY)
-        goto repeat;
-
-    /* 没找到, 交换出去老页面重新来过 */
-    if (!__res && swap_out())
-        goto repeat;
-
-    /* 最后这里要是还没找到 __res 预期应该也是 0 */
-    return __res;
+	REMOVE_FROM_MEM_QUEUE(free_page_list,nr_free_pages);
+	if (priority == GFP_BUFFER)
+		return 0;
+	if (priority != GFP_ATOMIC)
+		if (try_to_free_page())
+			goto repeat;
+	REMOVE_FROM_MEM_QUEUE(secondary_page_list,nr_secondary_pages);
+	return 0;
 }
 
-/**
- * @brief 初始化交换分区
- *
- * swap_bitmap 首尾部分的 bits 应该是 0, 其他部分的 bits 是 1
- * bits=1 表示这个分页是可以用的, bits=0 表示对应的交换区分页不可用
- *
- *  - 第一个 bit 是 0 的原因是, 第一个 page 被用作了 swap_bitmap, 不做普通的交换功能使用
- *  - swap_size 之后的 bits 置 0 的原因是, 这些位置不是合法的 swap 交换分区范围, 因此不可用
- *
- * 比方说像下面这个 swap 分区:
- *
- *  00000000  fe ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
- *  00000010  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
- *  *
- *  000003e0  ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00  |................|
- *  000003f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
- *  *
- *  00000ff0  00 00 00 00 00 00 53 57  41 50 2d 53 50 41 43 45  |......SWAP-SPACE|
- *  00001000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
- *
- * 可以看到第一个 bit=0, 第 ((0x3e0 + 8) * 8 + 1) 位置开始的 bits 也是 0, 在靠近页面结束
- * 的地方, 有 `SWAP-SPACE` 文本标记.
- *
- * 这个例子里面, swap 分区的大小是 ((0x3e0 + 8) * 8) = 8000 个页面, 也就是 8000 * 4KB = 32M 字节
+/*
+ * Trying to stop swapping from a file is fraught with races, so
+ * we repeat quite a bit here when we have to pause. swapoff()
+ * isn't exactly timing-critical, so who cares?
  */
-void init_swapping(void)
+static int try_to_unuse(unsigned int type)
 {
-    /* blk_size[] 指向指定主设备号的块设备块数数组.
-     * 该块数数组每一项对应一个子设备上所拥有的数据块总数(1块大小=1KB) */
-    extern int *blk_size[];
-    int swap_size, i, j;
+	int nr, pgt, pg;
+	unsigned long page, *ppage;
+	unsigned long tmp = 0;
+	struct task_struct *p;
 
-    /* 没有交换功能的, 就不初始化了 */
-    if (!SWAP_DEV)
-        return;
+	nr = 0;
+/*
+ * When we have to sleep, we restart the whole algorithm from the same
+ * task we stopped in. That at least rids us of all races.
+ */
+repeat:
+	for (; nr < NR_TASKS ; nr++) {
+		p = task[nr];
+		if (!p)
+			continue;
+		for (pgt = 0 ; pgt < PTRS_PER_PAGE ; pgt++) {
+			ppage = pgt + ((unsigned long *) p->tss.cr3);
+			page = *ppage;
+			if (!page)
+				continue;
+			if (!(page & PAGE_PRESENT) || (page >= high_memory))
+				continue;
+			if (mem_map[MAP_NR(page)] & MAP_PAGE_RESERVED)
+				continue;
+			ppage = (unsigned long *) (page & PAGE_MASK);	
+			for (pg = 0 ; pg < PTRS_PER_PAGE ; pg++,ppage++) {
+				page = *ppage;
+				if (!page)
+					continue;
+				if (page & PAGE_PRESENT)
+					continue;
+				if (SWP_TYPE(page) != type)
+					continue;
+				if (!tmp) {
+					if (!(tmp = __get_free_page(GFP_KERNEL)))
+						return -ENOMEM;
+					goto repeat;
+				}
+				read_swap_page(page, (char *) tmp);
+				if (*ppage == page) {
+					*ppage = tmp | (PAGE_DIRTY | PAGE_PRIVATE);
+					++p->rss;
+					swap_free(page);
+					tmp = 0;
+				}
+				goto repeat;
+			}
+		}
+	}
+	free_page(tmp);
+	return 0;
+}
 
-    /* 如果交换设备没有设置块数组, 则显示信息并返回
-     * 这个值通常在软/硬盘的初始化里面就会设置好, 取不到说明设备初始化的不对 */
-    if (!blk_size[MAJOR(SWAP_DEV)]) {
-        printk("Unable to get size of swap device\n\r");
-        return;
-    }
+asmlinkage int sys_swapoff(const char * specialfile)
+{
+	struct swap_info_struct * p;
+	struct inode * inode;
+	unsigned int type;
+	int i;
 
-    /* 取指定交换设备号的交换区数据块总数 swap_size
-     * 每个 block 是 1KB, 交换分区一共就是 swap_size KB */
-    swap_size = blk_size[MAJOR(SWAP_DEV)][MINOR(SWAP_DEV)];
-    if (!swap_size) {
-        return;
-    }
+	if (!suser())
+		return -EPERM;
+	i = namei(specialfile,&inode);
+	if (i)
+		return i;
+	p = swap_info;
+	for (type = 0 ; type < nr_swapfiles ; type++,p++) {
+		if ((p->flags & SWP_WRITEOK) != SWP_WRITEOK)
+			continue;
+		if (p->swap_file) {
+			if (p->swap_file == inode)
+				break;
+		} else {
+			if (!S_ISBLK(inode->i_mode))
+				continue;
+			if (p->swap_device == inode->i_rdev)
+				break;
+		}
+	}
+	iput(inode);
+	if (type >= nr_swapfiles)
+		return -EINVAL;
+	p->flags = SWP_USED;
+	i = try_to_unuse(type);
+	if (i) {
+		p->flags = SWP_WRITEOK;
+		return i;
+	}
+	nr_swap_pages -= p->pages;
+	iput(p->swap_file);
+	p->swap_file = NULL;
+	p->swap_device = 0;
+	vfree(p->swap_map);
+	p->swap_map = NULL;
+	free_page((long) p->swap_lockmap);
+	p->swap_lockmap = NULL;
+	p->flags = 0;
+	return 0;
+}
 
-    /* 交换设备需要足够大才行 */
-    if (swap_size < 100) {
-        printk("Swap device too small (%d blocks)\n\r", swap_size);
-        return;
-    }
+/*
+ * Written 01/25/92 by Simmule Turner, heavily changed by Linus.
+ *
+ * The swapon system call
+ */
+asmlinkage int sys_swapon(const char * specialfile)
+{
+	struct swap_info_struct * p;
+	struct inode * swap_inode;
+	unsigned int type;
+	int i,j;
+	int error;
 
-    /* 交换数据块总数转换成对应可交换页面总数, 该值不能大于 SWAP_BITS
-     * 所能表示的页面数即交换页面总数不得大于 32768.
-     * 然后申请一页物理内存用来存放交换页面位映射数组 swap_bitmap, 其中每 1
-     * 比特代表 1 页交换页面 */
-    swap_size >>= 2; /* swap_size KB / 4KB = swap page number */
-    if (swap_size > SWAP_BITS) {
-        swap_size = SWAP_BITS;
-    }
+	if (!suser())
+		return -EPERM;
+	p = swap_info;
+	for (type = 0 ; type < nr_swapfiles ; type++,p++)
+		if (!(p->flags & SWP_USED))
+			break;
+	if (type >= MAX_SWAPFILES)
+		return -EPERM;
+	if (type >= nr_swapfiles)
+		nr_swapfiles = type+1;
+	p->flags = SWP_USED;
+	p->swap_file = NULL;
+	p->swap_device = 0;
+	p->swap_map = NULL;
+	p->swap_lockmap = NULL;
+	p->lowest_bit = 0;
+	p->highest_bit = 0;
+	p->max = 1;
+	error = namei(specialfile,&swap_inode);
+	if (error)
+		goto bad_swap;
+	error = -EBUSY;
+	if (swap_inode->i_count != 1)
+		goto bad_swap;
+	error = -EINVAL;
+	if (S_ISBLK(swap_inode->i_mode)) {
+		p->swap_device = swap_inode->i_rdev;
+		iput(swap_inode);
+		error = -ENODEV;
+		if (!p->swap_device)
+			goto bad_swap;
+		error = -EBUSY;
+		for (i = 0 ; i < nr_swapfiles ; i++) {
+			if (i == type)
+				continue;
+			if (p->swap_device == swap_info[i].swap_device)
+				goto bad_swap;
+		}
+	} else if (S_ISREG(swap_inode->i_mode))
+		p->swap_file = swap_inode;
+	else
+		goto bad_swap;
+	p->swap_lockmap = (unsigned char *) get_free_page(GFP_USER);
+	if (!p->swap_lockmap) {
+		printk("Unable to start swapping: out of memory :-)\n");
+		error = -ENOMEM;
+		goto bad_swap;
+	}
+	read_swap_page(SWP_ENTRY(type,0), (char *) p->swap_lockmap);
+	if (memcmp("SWAP-SPACE",p->swap_lockmap+4086,10)) {
+		printk("Unable to find swap-space signature\n");
+		error = -EINVAL;
+		goto bad_swap;
+	}
+	memset(p->swap_lockmap+PAGE_SIZE-10,0,10);
+	j = 0;
+	p->lowest_bit = 0;
+	p->highest_bit = 0;
+	for (i = 1 ; i < 8*PAGE_SIZE ; i++) {
+		if (test_bit(i,p->swap_lockmap)) {
+			if (!p->lowest_bit)
+				p->lowest_bit = i;
+			p->highest_bit = i;
+			p->max = i+1;
+			j++;
+		}
+	}
+	if (!j) {
+		printk("Empty swap-file\n");
+		error = -EINVAL;
+		goto bad_swap;
+	}
+	p->swap_map = (unsigned char *) vmalloc(p->max);
+	if (!p->swap_map) {
+		error = -ENOMEM;
+		goto bad_swap;
+	}
+	for (i = 1 ; i < p->max ; i++) {
+		if (test_bit(i,p->swap_lockmap))
+			p->swap_map[i] = 0;
+		else
+			p->swap_map[i] = 0x80;
+	}
+	p->swap_map[0] = 0x80;
+	memset(p->swap_lockmap,0,PAGE_SIZE);
+	p->flags = SWP_WRITEOK;
+	p->pages = j;
+	nr_swap_pages += j;
+	printk("Adding Swap: %dk swap-space\n",j<<2);
+	return 0;
+bad_swap:
+	free_page((long) p->swap_lockmap);
+	vfree(p->swap_map);
+	iput(p->swap_file);
+	p->swap_device = 0;
+	p->swap_file = NULL;
+	p->swap_map = NULL;
+	p->swap_lockmap = NULL;
+	p->flags = 0;
+	return error;
+}
 
-    /* 准备一张空页面, 这个页面使用位图来记录交换区域的使用情况 */
-    swap_bitmap = (char *)get_free_page();
-    if (!swap_bitmap) {
-        printk("Unable to start swapping: out of memory :-)\n\r");
-        return;
-    }
+void si_swapinfo(struct sysinfo *val)
+{
+	unsigned int i, j;
 
-    /* 从 SWAP 分区读取 0 号页面对应的数据页面, 这个页面是交换区管理页面
-     * 管理页面需要以字符 `SWAP-SPACE` 结束, 这是 SWAP 区域的特征 */
-    read_swap_page(0, swap_bitmap);
-    if (strncmp("SWAP-SPACE", swap_bitmap + 4086, 10)) {
-        printk("Unable to find swap-space signature\n\r");
-        free_page((long)swap_bitmap);
-        swap_bitmap = NULL;
-        return;
-    }
-
-    /* 把 `SWAP-SPACE` 标记位置, 清零
-     * NOTICE: 这些位置不能用于正常的交换位图信息 */
-    memset(swap_bitmap + 4086, 0, 10);
-
-    /* 然后检查读入的交换位映射图 */
-    for (i = 0; i < SWAP_BITS; i++) {
-        if (i == 1) {
-            i = swap_size; /* 跳过中间的部分 */
-        }
-
-        /* 对应的 bit 位置不是 0? */
-        if (bit(swap_bitmap, i)) {
-            printk("Bad swap-space bit-map\n\r");
-            free_page((long)swap_bitmap);
-            swap_bitmap = NULL;
-            return;
-        }
-    }
-
-    /* 检查 swap_bitmap 的 [1, swap_size) 区间, 应该有最起码一个 bit 的值是 1
-     * 否则的话, 这就不是一个正常的 swap 分区了 */
-    j = 0;
-    for (i = 1; i < swap_size; i++) {
-        if (bit(swap_bitmap, i)) {
-            j++;
-        }
-    }
-
-    if (!j) {
-        free_page((long)swap_bitmap);
-        swap_bitmap = NULL;
-        return;
-    }
-
-    printk("Swap device ok: %d pages (%d bytes) swap-space\n\r", j, j * 4096);
+	val->freeswap = val->totalswap = 0;
+	for (i = 0; i < nr_swapfiles; i++) {
+		if (!(swap_info[i].flags & SWP_USED))
+			continue;
+		for (j = 0; j < swap_info[i].max; ++j)
+			switch (swap_info[i].swap_map[j]) {
+				case 128:
+					continue;
+				case 0:
+					++val->freeswap;
+				default:
+					++val->totalswap;
+			}
+	}
+	val->freeswap <<= PAGE_SHIFT;
+	val->totalswap <<= PAGE_SHIFT;
+	return;
 }
