@@ -9,52 +9,52 @@
 /*
  * The timers are:
  *
- * BLANK_TIMER		console screen-saver timer
+ * BLANK_TIMER        console screen-saver timer
  *
- * BEEP_TIMER		console beep timer
+ * BEEP_TIMER        console beep timer
  *
- * RS_TIMER		timer for the RS-232 ports
- * 
- * HD_TIMER		harddisk timer
+ * RS_TIMER        timer for the RS-232 ports
  *
- * HD_TIMER2		(atdisk2 patches)
+ * HD_TIMER        harddisk timer
  *
- * FLOPPY_TIMER		floppy disk timer (not used right now)
- * 
- * SCSI_TIMER		scsi.c timeout timer
+ * HD_TIMER2        (atdisk2 patches)
  *
- * NET_TIMER		tcp/ip timeout timer
+ * FLOPPY_TIMER        floppy disk timer (not used right now)
  *
- * COPRO_TIMER		387 timeout for buggy hardware..
+ * SCSI_TIMER        scsi.c timeout timer
  *
- * TAPE_QIC02_TIMER	timer for QIC-02 tape driver (it's not hardcoded)
+ * NET_TIMER        tcp/ip timeout timer
  *
- * MCD_TIMER		Mitsumi CD-ROM Timer
+ * COPRO_TIMER        387 timeout for buggy hardware..
  *
- * SBPCD_TIMER		SoundBlaster/Matsushita/Panasonic CD-ROM timer
+ * TAPE_QIC02_TIMER    timer for QIC-02 tape driver (it's not hardcoded)
+ *
+ * MCD_TIMER        Mitsumi CD-ROM Timer
+ *
+ * SBPCD_TIMER        SoundBlaster/Matsushita/Panasonic CD-ROM timer
  */
 
-#define BLANK_TIMER	0
-#define BEEP_TIMER	1
-#define RS_TIMER	2
+#define BLANK_TIMER 0
+#define BEEP_TIMER 1
+#define RS_TIMER 2
 
-#define HD_TIMER	16
-#define FLOPPY_TIMER	17
-#define SCSI_TIMER 	18
-#define NET_TIMER	19
-#define SOUND_TIMER	20
-#define COPRO_TIMER	21
+#define HD_TIMER 16
+#define FLOPPY_TIMER 17
+#define SCSI_TIMER 18
+#define NET_TIMER 19
+#define SOUND_TIMER 20
+#define COPRO_TIMER 21
 
-#define TAPE_QIC02_TIMER	22	/* hhb */
-#define MCD_TIMER	23
+#define TAPE_QIC02_TIMER 22 /* hhb */
+#define MCD_TIMER 23
 
-#define HD_TIMER2	24
+#define HD_TIMER2 24
 
-#define SBPCD_TIMER	25
+#define SBPCD_TIMER 25
 
 struct timer_struct {
-	unsigned long expires;
-	void (*fn)(void);
+    unsigned long expires;
+    void (*fn)(void);
 };
 
 extern unsigned long timer_active;
@@ -74,14 +74,14 @@ extern struct timer_struct timer_table[32];
  * to distinguish between the different invocations.
  */
 struct timer_list {
-	struct timer_list *next;
-	struct timer_list *prev;
-	unsigned long expires;
-	unsigned long data;
-	void (*function)(unsigned long);
+    struct timer_list *next;
+    struct timer_list *prev;
+    unsigned long expires;
+    unsigned long data;
+    void (*function)(unsigned long);
 };
 
-extern void add_timer(struct timer_list * timer);
-extern int  del_timer(struct timer_list * timer);
+extern void add_timer(struct timer_list *timer);
+extern int del_timer(struct timer_list *timer);
 
 #endif

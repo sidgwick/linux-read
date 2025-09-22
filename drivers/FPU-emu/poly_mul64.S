@@ -15,58 +15,58 @@
 #include "fpu_asm.h"
 
 .text
-	.align 2,144
+    .align 2,144
 .globl _mul64
 _mul64:
-	pushl %ebp
-	movl %esp,%ebp
-	subl $16,%esp
-	pushl %esi
-	pushl %ebx
+    pushl %ebp
+    movl %esp,%ebp
+    subl $16,%esp
+    pushl %esi
+    pushl %ebx
 
-	movl PARAM1,%esi
-	movl PARAM2,%ecx
-	movl PARAM3,%ebx
+    movl PARAM1,%esi
+    movl PARAM2,%ecx
+    movl PARAM3,%ebx
 
-	xor %eax,%eax
-	movl %eax,-4(%ebp)
-	movl %eax,-8(%ebp)
+    xor %eax,%eax
+    movl %eax,-4(%ebp)
+    movl %eax,-8(%ebp)
 
-	movl (%esi),%eax
-	mull (%ecx)
-	movl %eax,-16(%ebp)	/* Not used */
-	movl %edx,-12(%ebp)
+    movl (%esi),%eax
+    mull (%ecx)
+    movl %eax,-16(%ebp)    /* Not used */
+    movl %edx,-12(%ebp)
 
-	movl (%esi),%eax
-	mull 4(%ecx)
-	addl %eax,-12(%ebp)
-	adcl %edx,-8(%ebp)
-	adcl $0,-4(%ebp)
+    movl (%esi),%eax
+    mull 4(%ecx)
+    addl %eax,-12(%ebp)
+    adcl %edx,-8(%ebp)
+    adcl $0,-4(%ebp)
 
-	movl 4(%esi),%eax
-	mull (%ecx)
-	addl %eax,-12(%ebp)
-	adcl %edx,-8(%ebp)
-	adcl $0,-4(%ebp)
+    movl 4(%esi),%eax
+    mull (%ecx)
+    addl %eax,-12(%ebp)
+    adcl %edx,-8(%ebp)
+    adcl $0,-4(%ebp)
 
-	movl 4(%esi),%eax
-	mull 4(%ecx)
-	addl %eax,-8(%ebp)
-	adcl %edx,-4(%ebp)
+    movl 4(%esi),%eax
+    mull 4(%ecx)
+    addl %eax,-8(%ebp)
+    adcl %edx,-4(%ebp)
 
-	testb $128,-9(%ebp)
-	je L_no_round
+    testb $128,-9(%ebp)
+    je L_no_round
 
-	addl $1,-8(%ebp)
-	adcl $0,-4(%ebp)
+    addl $1,-8(%ebp)
+    adcl $0,-4(%ebp)
 
 L_no_round:
-	movl -8(%ebp),%esi
-	movl %esi,(%ebx)
-	movl -4(%ebp),%esi
-	movl %esi,4(%ebx)
+    movl -8(%ebp),%esi
+    movl %esi,(%ebx)
+    movl -4(%ebp),%esi
+    movl %esi,4(%ebx)
 
-	popl %ebx
-	popl %esi
-	leave
-	ret
+    popl %ebx
+    popl %esi
+    leave
+    ret

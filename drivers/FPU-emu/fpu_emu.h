@@ -7,7 +7,6 @@
  |                                                                           |
  +---------------------------------------------------------------------------*/
 
-
 #ifndef _FPU_EMU_H_
 #define _FPU_EMU_H_
 
@@ -30,43 +29,42 @@
 
 #ifdef __ASSEMBLER__
 #include "fpu_asm.h"
-#define	Const(x)	$##x
+#define Const(x) $##x
 #else
-#define	Const(x)	x
+#define Const(x) x
 #endif
 
-#define EXP_BIAS	Const(0)
-#define EXP_OVER	Const(0x4000)    /* smallest invalid large exponent */
-#define	EXP_UNDER	Const(-0x3fff)   /* largest invalid small exponent */
-#define EXP_Infinity    EXP_OVER
-#define EXP_NaN         EXP_OVER
+#define EXP_BIAS Const(0)
+#define EXP_OVER Const(0x4000)   /* smallest invalid large exponent */
+#define EXP_UNDER Const(-0x3fff) /* largest invalid small exponent */
+#define EXP_Infinity EXP_OVER
+#define EXP_NaN EXP_OVER
 
-#define SIGN_POS	Const(0)
-#define SIGN_NEG	Const(1)
+#define SIGN_POS Const(0)
+#define SIGN_NEG Const(1)
 
 /* Keep the order TW_Valid, TW_Zero, TW_Denormal */
-#define TW_Valid	Const(0)	/* valid */
-#define TW_Zero		Const(1)	/* zero */
+#define TW_Valid Const(0) /* valid */
+#define TW_Zero Const(1)  /* zero */
 /* The following fold to 2 (Special) in the Tag Word */
-/* #define TW_Denormal     Const(4) */       /* De-normal */
-#define TW_Infinity	Const(5)	/* + or - infinity */
-#define	TW_NaN		Const(6)	/* Not a Number */
+/* #define TW_Denormal     Const(4) */ /* De-normal */
+#define TW_Infinity Const(5)           /* + or - infinity */
+#define TW_NaN Const(6)                /* Not a Number */
 
-#define TW_Empty	Const(7)	/* empty */
-
+#define TW_Empty Const(7) /* empty */
 
 #ifndef __ASSEMBLER__
 
-#include <linux/math_emu.h>
 #include <linux/linkage.h>
+#include <linux/math_emu.h>
 
 #ifdef PARANOID
 extern char emulating;
-#  define RE_ENTRANT_CHECK_OFF emulating = 0
-#  define RE_ENTRANT_CHECK_ON emulating = 1
+#define RE_ENTRANT_CHECK_OFF emulating = 0
+#define RE_ENTRANT_CHECK_ON emulating = 1
 #else
-#  define RE_ENTRANT_CHECK_OFF
-#  define RE_ENTRANT_CHECK_ON
+#define RE_ENTRANT_CHECK_OFF
+#define RE_ENTRANT_CHECK_ON
 #endif PARANOID
 
 #define FWAIT_OPCODE 0x9b
@@ -90,82 +88,95 @@ extern char emulating;
 
 /* These are to defeat the default action, giving the instruction
    no net effect: */
-#define NO_NET_DATA_EFFECT \
-      { FPU_data_address = (void *)data_operand_offset; \
-	FPU_data_selector = operand_selector; }
-#define NO_NET_INSTR_EFFECT \
-      { FPU_entry_eip = ip_offset; \
-	FPU_entry_op_cs = cs_selector; }
-
+#define NO_NET_DATA_EFFECT                                                                         \
+    {                                                                                              \
+        FPU_data_address = (void *)data_operand_offset;                                            \
+        FPU_data_selector = operand_selector;                                                      \
+    }
+#define NO_NET_INSTR_EFFECT                                                                        \
+    {                                                                                              \
+        FPU_entry_eip = ip_offset;                                                                 \
+        FPU_entry_op_cs = cs_selector;                                                             \
+    }
 
 typedef void (*FUNC)(void);
 typedef struct fpu_reg FPU_REG;
-typedef struct { unsigned char address_size, operand_size, segment; }
-        overrides;
+typedef struct {
+    unsigned char address_size, operand_size, segment;
+} overrides;
 /* This structure is 32 bits: */
-typedef struct { overrides override;
-		 unsigned char vm86; } fpu_addr_modes;
+typedef struct {
+    overrides override;
+    unsigned char vm86;
+} fpu_addr_modes;
 
-#define	st(x)	( regs[((top+x) &7 )] )
+#define st(x) (regs[((top + x) & 7)])
 
-#define	STACK_OVERFLOW	(st_new_ptr = &st(-1), st_new_ptr->tag != TW_Empty)
-#define	NOT_EMPTY(i)	(st(i).tag != TW_Empty)
-#define	NOT_EMPTY_0	(FPU_st0_tag ^ TW_Empty)
+#define STACK_OVERFLOW (st_new_ptr = &st(-1), st_new_ptr->tag != TW_Empty)
+#define NOT_EMPTY(i) (st(i).tag != TW_Empty)
+#define NOT_EMPTY_0 (FPU_st0_tag ^ TW_Empty)
 
 extern unsigned char FPU_rm;
 
-extern	char	FPU_st0_tag;
-extern	FPU_REG	*FPU_st0_ptr;
+extern char FPU_st0_tag;
+extern FPU_REG *FPU_st0_ptr;
 
 /* ###### These need to be shifted to somewhere safe. */
 /* extern void  *FPU_data_address; has been shifted */
 extern unsigned short FPU_data_selector;
 extern unsigned long FPU_entry_op_cs;
 
-extern  FPU_REG  FPU_loaded_data;
+extern FPU_REG FPU_loaded_data;
 
-#define pop()	{ FPU_st0_ptr->tag = TW_Empty; top++; }
+#define pop()                                                                                      \
+    {                                                                                              \
+        FPU_st0_ptr->tag = TW_Empty;                                                               \
+        top++;                                                                                     \
+    }
 
 /* push() does not affect the tags */
-#define push()	{ top--; FPU_st0_ptr = st_new_ptr; }
+#define push()                                                                                     \
+    {                                                                                              \
+        top--;                                                                                     \
+        FPU_st0_ptr = st_new_ptr;                                                                  \
+    }
 
+#define reg_move(x, y)                                                                             \
+    {                                                                                              \
+        *(short *)&((y)->sign) = *(short *)&((x)->sign);                                           \
+        *(long *)&((y)->exp) = *(long *)&((x)->exp);                                               \
+        *(long long *)&((y)->sigl) = *(long long *)&((x)->sigl);                                   \
+    }
 
-#define reg_move(x, y) { \
-		 *(short *)&((y)->sign) = *(short *)&((x)->sign); \
-		 *(long *)&((y)->exp) = *(long *)&((x)->exp); \
-		 *(long long *)&((y)->sigl) = *(long long *)&((x)->sigl); }
-
-#define significand(x) ( ((unsigned long long *)&((x)->sigl))[0] )
-
+#define significand(x) (((unsigned long long *)&((x)->sigl))[0])
 
 /*----- Prototypes for functions written in assembler -----*/
 /* extern void reg_move(FPU_REG *a, FPU_REG *b); */
 
 asmlinkage void mul64(unsigned long long const *a, unsigned long long const *b,
-		      unsigned long long *result);
+                      unsigned long long *result);
 asmlinkage void poly_div2(unsigned long long *x);
 asmlinkage void poly_div4(unsigned long long *x);
 asmlinkage void poly_div16(unsigned long long *x);
-asmlinkage void polynomial(unsigned accum[], unsigned const x[],
-		       unsigned short const terms[][4], int const n);
+asmlinkage void polynomial(unsigned accum[], unsigned const x[], unsigned short const terms[][4],
+                           int const n);
 asmlinkage void normalize(FPU_REG *x);
 asmlinkage void normalize_nuo(FPU_REG *x);
-asmlinkage int reg_div(FPU_REG const *arg1, FPU_REG const *arg2,
-		       FPU_REG *answ, unsigned int control_w);
-asmlinkage int reg_u_sub(FPU_REG const *arg1, FPU_REG const *arg2,
-			 FPU_REG *answ, unsigned int control_w);
-asmlinkage int reg_u_mul(FPU_REG const *arg1, FPU_REG const *arg2,
-			 FPU_REG *answ, unsigned int control_w);
-asmlinkage int reg_u_div(FPU_REG const *arg1, FPU_REG const *arg2,
-			 FPU_REG *answ, unsigned int control_w);
-asmlinkage int reg_u_add(FPU_REG const *arg1, FPU_REG const *arg2,
-			 FPU_REG *answ, unsigned int control_w);
+asmlinkage int reg_div(FPU_REG const *arg1, FPU_REG const *arg2, FPU_REG *answ,
+                       unsigned int control_w);
+asmlinkage int reg_u_sub(FPU_REG const *arg1, FPU_REG const *arg2, FPU_REG *answ,
+                         unsigned int control_w);
+asmlinkage int reg_u_mul(FPU_REG const *arg1, FPU_REG const *arg2, FPU_REG *answ,
+                         unsigned int control_w);
+asmlinkage int reg_u_div(FPU_REG const *arg1, FPU_REG const *arg2, FPU_REG *answ,
+                         unsigned int control_w);
+asmlinkage int reg_u_add(FPU_REG const *arg1, FPU_REG const *arg2, FPU_REG *answ,
+                         unsigned int control_w);
 asmlinkage int wm_sqrt(FPU_REG *n, unsigned int control_w);
-asmlinkage unsigned	shrx(void *l, unsigned x);
-asmlinkage unsigned	shrxs(void *v, unsigned x);
+asmlinkage unsigned shrx(void *l, unsigned x);
+asmlinkage unsigned shrxs(void *v, unsigned x);
 asmlinkage unsigned long div_small(unsigned long long *x, unsigned long y);
-asmlinkage void round_reg(FPU_REG *arg, unsigned int extent,
-		      unsigned int control_w);
+asmlinkage void round_reg(FPU_REG *arg, unsigned int extent, unsigned int control_w);
 
 #ifndef MAKING_PROTO
 #include "fpu_proto.h"

@@ -5,8 +5,7 @@
  */
 
 #define __LIBRARY__
-#include <linux/unistd.h>
 #include <linux/types.h>
+#include <linux/unistd.h>
 
-_syscall3(int,write,int,fd,const char *,buf,off_t,count)
-
+_syscall3(int, write, int, fd, const char *, buf, off_t, count)

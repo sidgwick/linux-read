@@ -5,7 +5,7 @@
  * extended file system inode data in memory
  */
 struct ext_inode_info {
-	unsigned long i_data[16];
+    unsigned long i_data[16];
 };
 
 #endif

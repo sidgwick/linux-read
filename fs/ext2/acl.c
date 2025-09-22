@@ -12,8 +12,8 @@
  */
 
 #include <linux/errno.h>
-#include <linux/fs.h>
 #include <linux/ext2_fs.h>
+#include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/stat.h>
 
@@ -22,24 +22,24 @@
  *
  * Check for access rights
  */
-int ext2_permission (struct inode * inode, int mask)
+int ext2_permission(struct inode *inode, int mask)
 {
-	unsigned short mode = inode->i_mode;
+    unsigned short mode = inode->i_mode;
 
-	/*
-	 * Special case, access is always granted for root
-	 */
-	if (suser ())
-		return 1;
-	/*
-	 * If no ACL, checks using the file mode
-	 */
-	else if (current->euid == inode->i_uid)
-		mode >>= 6;
-	else if (in_group_p (inode->i_gid))
-		mode >>= 3;
-	if (((mode & mask & S_IRWXO) == mask))
-		return 1;
-	else
-		return 0;
+    /*
+     * Special case, access is always granted for root
+     */
+    if (suser())
+        return 1;
+    /*
+     * If no ACL, checks using the file mode
+     */
+    else if (current->euid == inode->i_uid)
+        mode >>= 6;
+    else if (in_group_p(inode->i_gid))
+        mode >>= 3;
+    if (((mode & mask & S_IRWXO) == mask))
+        return 1;
+    else
+        return 0;
 }

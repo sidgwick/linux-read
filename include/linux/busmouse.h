@@ -27,74 +27,78 @@
  *
  */
 
-#define MOUSE_IRQ		5
-#define LOGITECH_BUSMOUSE       0   /* Minor device # for Logitech  */
-#define MICROSOFT_BUSMOUSE      2   /* Minor device # for Microsoft */
+#define MOUSE_IRQ 5
+#define LOGITECH_BUSMOUSE 0  /* Minor device # for Logitech  */
+#define MICROSOFT_BUSMOUSE 2 /* Minor device # for Microsoft */
 
 /*--------- LOGITECH BUSMOUSE ITEMS -------------*/
 
-#define	MSE_DATA_PORT		0x23c
-#define	MSE_SIGNATURE_PORT	0x23d
-#define	MSE_CONTROL_PORT	0x23e
-#define MSE_INTERRUPT_PORT	0x23e
-#define	MSE_CONFIG_PORT		0x23f
+#define MSE_DATA_PORT 0x23c
+#define MSE_SIGNATURE_PORT 0x23d
+#define MSE_CONTROL_PORT 0x23e
+#define MSE_INTERRUPT_PORT 0x23e
+#define MSE_CONFIG_PORT 0x23f
 
-#define	MSE_ENABLE_INTERRUPTS	0x00
-#define	MSE_DISABLE_INTERRUPTS	0x10
+#define MSE_ENABLE_INTERRUPTS 0x00
+#define MSE_DISABLE_INTERRUPTS 0x10
 
-#define	MSE_READ_X_LOW		0x80
-#define	MSE_READ_X_HIGH		0xa0
-#define	MSE_READ_Y_LOW		0xc0
-#define	MSE_READ_Y_HIGH		0xe0
+#define MSE_READ_X_LOW 0x80
+#define MSE_READ_X_HIGH 0xa0
+#define MSE_READ_Y_LOW 0xc0
+#define MSE_READ_Y_HIGH 0xe0
 
 /* Magic number used to check if the mouse exists */
-#define MSE_CONFIG_BYTE		0x91
-#define MSE_DEFAULT_MODE	0x90
-#define MSE_SIGNATURE_BYTE	0xa5
+#define MSE_CONFIG_BYTE 0x91
+#define MSE_DEFAULT_MODE 0x90
+#define MSE_SIGNATURE_BYTE 0xa5
 
 /* useful Logitech Mouse macros */
 
-#define MSE_INT_OFF()	outb(MSE_DISABLE_INTERRUPTS, MSE_CONTROL_PORT)
-#define MSE_INT_ON()	outb(MSE_ENABLE_INTERRUPTS, MSE_CONTROL_PORT)
+#define MSE_INT_OFF() outb(MSE_DISABLE_INTERRUPTS, MSE_CONTROL_PORT)
+#define MSE_INT_ON() outb(MSE_ENABLE_INTERRUPTS, MSE_CONTROL_PORT)
 
 /*--------- MICROSOFT BUSMOUSE ITEMS -------------*/
 
-#define	MS_MSE_DATA_PORT	        0x23d
-#define	MS_MSE_SIGNATURE_PORT	        0x23e
-#define	MS_MSE_CONTROL_PORT	        0x23c
-#define	MS_MSE_CONFIG_PORT		0x23f
+#define MS_MSE_DATA_PORT 0x23d
+#define MS_MSE_SIGNATURE_PORT 0x23e
+#define MS_MSE_CONTROL_PORT 0x23c
+#define MS_MSE_CONFIG_PORT 0x23f
 
-#define	MS_MSE_ENABLE_INTERRUPTS	0x11
-#define	MS_MSE_DISABLE_INTERRUPTS	0x10
+#define MS_MSE_ENABLE_INTERRUPTS 0x11
+#define MS_MSE_DISABLE_INTERRUPTS 0x10
 
-#define	MS_MSE_READ_BUTTONS             0x00
-#define	MS_MSE_READ_X		        0x01
-#define	MS_MSE_READ_Y                   0x02
+#define MS_MSE_READ_BUTTONS 0x00
+#define MS_MSE_READ_X 0x01
+#define MS_MSE_READ_Y 0x02
 
-#define MS_MSE_START                    0x80
-#define MS_MSE_COMMAND_MODE             0x07
+#define MS_MSE_START 0x80
+#define MS_MSE_COMMAND_MODE 0x07
 
 /* useful microsoft busmouse macros */
 
-#define MS_MSE_INT_OFF() {outb(MS_MSE_COMMAND_MODE, MS_MSE_CONTROL_PORT); \
-			    outb(MS_MSE_DISABLE_INTERRUPTS, MS_MSE_DATA_PORT);}
-#define MS_MSE_INT_ON()  {outb(MS_MSE_COMMAND_MODE, MS_MSE_CONTROL_PORT); \
-			    outb(MS_MSE_ENABLE_INTERRUPTS, MS_MSE_DATA_PORT);}
+#define MS_MSE_INT_OFF()                                                                           \
+    {                                                                                              \
+        outb(MS_MSE_COMMAND_MODE, MS_MSE_CONTROL_PORT);                                            \
+        outb(MS_MSE_DISABLE_INTERRUPTS, MS_MSE_DATA_PORT);                                         \
+    }
+#define MS_MSE_INT_ON()                                                                            \
+    {                                                                                              \
+        outb(MS_MSE_COMMAND_MODE, MS_MSE_CONTROL_PORT);                                            \
+        outb(MS_MSE_ENABLE_INTERRUPTS, MS_MSE_DATA_PORT);                                          \
+    }
 
- 
 struct mouse_status {
-	unsigned char	buttons;
-	unsigned char	latch_buttons;
-	int		dx;
-	int		dy;	
-	int 		present;
-	int		ready;
-	int		active;
-	struct wait_queue *wait;
+    unsigned char buttons;
+    unsigned char latch_buttons;
+    int dx;
+    int dy;
+    int present;
+    int ready;
+    int active;
+    struct wait_queue *wait;
 };
 
 /* Function Prototypes */
 extern long mouse_init(long);
 
 #endif
-

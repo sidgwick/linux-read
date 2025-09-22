@@ -25,65 +25,64 @@
     the serial driver.
 */
 
-
 #ifdef version
-static char *version="auto_irq.c:v0.02 1993 Donald Becker (becker@super.org)";
+static char *version = "auto_irq.c:v0.02 1993 Donald Becker (becker@super.org)";
 #endif
 
 /*#include <linux/config.h>*/
 /*#include <linux/kernel.h>*/
-#include <linux/sched.h>
+#include "dev.h"
 #include <asm/bitops.h>
 #include <asm/io.h>
-#include "dev.h"
+#include <linux/sched.h>
 /*#include <asm/system.h>*/
 
 struct device *irq2dev_map[16] = {0, 0, /* ... zeroed */};
 
-int irqs_busy = 0x01;		/* The set of fixed IRQs always enabled */
-int irqs_used = 0x01;		/* The set of fixed IRQs sometimes enabled. */
-int irqs_reserved = 0x00;	/* An advisory "reserved" table. */
-int irqs_shared = 0x00;		/* IRQ lines "shared" among conforming cards.*/
+int irqs_busy = 0x01;     /* The set of fixed IRQs always enabled */
+int irqs_used = 0x01;     /* The set of fixed IRQs sometimes enabled. */
+int irqs_reserved = 0x00; /* An advisory "reserved" table. */
+int irqs_shared = 0x00;   /* IRQ lines "shared" among conforming cards.*/
 
-static volatile int irq_number;	/* The latest irq number we actually found. */
+static volatile int irq_number; /* The latest irq number we actually found. */
 static volatile int irq_bitmap; /* The irqs we actually found. */
-static int irq_handled;		/* The irq lines we have a handler on. */
+static int irq_handled;         /* The irq lines we have a handler on. */
 
 static void autoirq_probe(int irq)
 {
-	irq_number = irq;
-	set_bit(irq, (void *)&irq_bitmap);	/* irq_bitmap |= 1 << irq; */
-	return;
+    irq_number = irq;
+    set_bit(irq, (void *)&irq_bitmap); /* irq_bitmap |= 1 << irq; */
+    return;
 }
-struct sigaction autoirq_sigaction = { autoirq_probe, 0, SA_INTERRUPT, NULL};
+struct sigaction autoirq_sigaction = {autoirq_probe, 0, SA_INTERRUPT, NULL};
 
 int autoirq_setup(int waittime)
 {
     int i, mask;
-    int timeout = jiffies+waittime;
+    int timeout = jiffies + waittime;
 
     irq_number = 0;
     irq_bitmap = 0;
     irq_handled = 0;
     for (i = 0; i < 16; i++) {
-	if (!irqaction(i, &autoirq_sigaction))
-	    set_bit(i, (void *)&irq_handled);	/* irq_handled |= 1 << i;*/
+        if (!irqaction(i, &autoirq_sigaction))
+            set_bit(i, (void *)&irq_handled); /* irq_handled |= 1 << i;*/
     }
     /* Update our USED lists. */
     irqs_used |= ~irq_handled;
 
     /* Hang out at least <waittime> jiffies waiting for bogus IRQ hits. */
     while (timeout > jiffies)
-	;
+        ;
 
     for (i = 0, mask = 0x01; i < 16; i++, mask <<= 1) {
-	if (irq_bitmap & irq_handled & mask) {
-	    irq_handled &= ~mask;
+        if (irq_bitmap & irq_handled & mask) {
+            irq_handled &= ~mask;
 #ifdef notdef
-	    printk(" Spurious interrupt on IRQ %d\n", i);
+            printk(" Spurious interrupt on IRQ %d\n", i);
 #endif
-	    free_irq(i);
-	}
+            free_irq(i);
+        }
     }
     return irq_handled;
 }
@@ -91,21 +90,21 @@ int autoirq_setup(int waittime)
 int autoirq_report(int waittime)
 {
     int i;
-    int timeout = jiffies+waittime;
+    int timeout = jiffies + waittime;
 
     /* Hang out at least <waittime> jiffies waiting for the IRQ. */
     while (timeout > jiffies)
-	if (irq_number)
-	    break;
+        if (irq_number)
+            break;
 
     /* Retract the irq handlers that we installed. */
     for (i = 0; i < 16; i++) {
-	if (test_bit(i, (void *)&irq_handled))
-	    free_irq(i);
+        if (test_bit(i, (void *)&irq_handled))
+            free_irq(i);
     }
     return irq_number;
 }
-
+
 /*
  * Local variables:
  *  compile-command: "gcc -DKERNEL -Wall -O6 -fomit-frame-pointer -I/usr/src/linux/net/tcp -c auto_irq.c"

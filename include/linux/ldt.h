@@ -7,27 +7,26 @@
 #define _LINUX_LDT_H
 
 /* Maximum number of LDT entries supported. */
-#define LDT_ENTRIES	8192
+#define LDT_ENTRIES 8192
 /* The size of each LDT entry. */
-#define LDT_ENTRY_SIZE	8
+#define LDT_ENTRY_SIZE 8
 
 struct modify_ldt_ldt_s {
-	unsigned int  entry_number;
-	unsigned long base_addr;
-	unsigned int  limit;
-	unsigned int  seg_32bit:1;
-	unsigned int  contents:2;
-	unsigned int  read_exec_only:1;
-	unsigned int  limit_in_pages:1;
+    unsigned int entry_number;
+    unsigned long base_addr;
+    unsigned int limit;
+    unsigned int seg_32bit : 1;
+    unsigned int contents : 2;
+    unsigned int read_exec_only : 1;
+    unsigned int limit_in_pages : 1;
 };
 
-#define MODIFY_LDT_CONTENTS_DATA	0
-#define MODIFY_LDT_CONTENTS_STACK	1
-#define MODIFY_LDT_CONTENTS_CODE	2
+#define MODIFY_LDT_CONTENTS_DATA 0
+#define MODIFY_LDT_CONTENTS_STACK 1
+#define MODIFY_LDT_CONTENTS_CODE 2
 
 extern int get_ldt(void *buffer);
-extern int set_ldt_entry(int entry, unsigned long base, unsigned int limit,
-			 int seg_32bit_flag, int contents, int read_only_flag,
-			 int limit_in_pages_flag);
+extern int set_ldt_entry(int entry, unsigned long base, unsigned int limit, int seg_32bit_flag,
+                         int contents, int read_only_flag, int limit_in_pages_flag);
 
 #endif

@@ -3,73 +3,72 @@
    extensions are present on the disk, and this is fine as long as they
    all use SUSP */
 
-struct SU_SP{
-  unsigned char magic[2];
-  unsigned char skip;
+struct SU_SP {
+    unsigned char magic[2];
+    unsigned char skip;
 };
 
-struct SU_CE{
-  char extent[8];
-  char offset[8];
-  char size[8];
+struct SU_CE {
+    char extent[8];
+    char offset[8];
+    char size[8];
 };
 
-struct SU_ER{
-  unsigned char len_id;
-  unsigned char len_des;
-  unsigned char len_src;
-  unsigned char ext_ver;
-  char data[0];
+struct SU_ER {
+    unsigned char len_id;
+    unsigned char len_des;
+    unsigned char len_src;
+    unsigned char ext_ver;
+    char data[0];
 };
 
-struct RR_RR{
-  char flags[1];
+struct RR_RR {
+    char flags[1];
 };
 
-struct RR_PX{
-  char mode[8];
-  char n_links[8];
-  char uid[8];
-  char gid[8];
+struct RR_PX {
+    char mode[8];
+    char n_links[8];
+    char uid[8];
+    char gid[8];
 };
 
-struct RR_PN{
-  char dev_high[8];
-  char dev_low[8];
+struct RR_PN {
+    char dev_high[8];
+    char dev_low[8];
 };
 
-
-struct SL_component{
-  unsigned char flags;
-  unsigned char len;
-  char text[0];
+struct SL_component {
+    unsigned char flags;
+    unsigned char len;
+    char text[0];
 };
 
-struct RR_SL{
-  unsigned char flags;
-  struct SL_component link;
+struct RR_SL {
+    unsigned char flags;
+    struct SL_component link;
 };
 
-struct RR_NM{
-  unsigned char flags;
-  char name[0];
+struct RR_NM {
+    unsigned char flags;
+    char name[0];
 };
 
-struct RR_CL{
-  char location[8];
+struct RR_CL {
+    char location[8];
 };
 
-struct RR_PL{
-  char location[8];
+struct RR_PL {
+    char location[8];
 };
 
-struct stamp{
-  char time[7];
+struct stamp {
+    char time[7];
 };
 
-struct RR_TF{
-  char flags;
-  struct stamp times[0];  /* Variable number of these beasts */
+struct RR_TF {
+    char flags;
+    struct stamp times[0]; /* Variable number of these beasts */
 };
 
 /* These are the bits and their meanings for flags in the TF structure. */
@@ -82,23 +81,23 @@ struct RR_TF{
 #define TF_EFFECTIVE 64
 #define TF_LONG_FORM 128
 
-struct rock_ridge{
-  char signature[2];
-  unsigned char len;
-  unsigned char version;
-  union{
-    struct SU_SP SP;
-    struct SU_CE CE;
-    struct SU_ER ER;
-    struct RR_RR RR;
-    struct RR_PX PX;
-    struct RR_PN PN;
-    struct RR_SL SL;
-    struct RR_NM NM;
-    struct RR_CL CL;
-    struct RR_PL PL;
-    struct RR_TF TF;
-  } u;
+struct rock_ridge {
+    char signature[2];
+    unsigned char len;
+    unsigned char version;
+    union {
+        struct SU_SP SP;
+        struct SU_CE CE;
+        struct SU_ER ER;
+        struct RR_RR RR;
+        struct RR_PX PX;
+        struct RR_PN PN;
+        struct RR_SL SL;
+        struct RR_NM NM;
+        struct RR_CL CL;
+        struct RR_PL PL;
+        struct RR_TF TF;
+    } u;
 };
 
 #define RR_PX 1   /* POSIX attributes */

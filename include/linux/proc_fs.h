@@ -10,12 +10,12 @@
 #define PROC_SUPER_MAGIC 0x9fa0
 
 struct proc_dir_entry {
-	unsigned short low_ino;
-	unsigned short namelen;
-	char * name;
+    unsigned short low_ino;
+    unsigned short namelen;
+    char *name;
 };
 
-extern struct super_block *proc_read_super(struct super_block *,void *,int);
+extern struct super_block *proc_read_super(struct super_block *, void *, int);
 extern void proc_put_inode(struct inode *);
 extern void proc_put_super(struct super_block *);
 extern void proc_statfs(struct super_block *, struct statfs *);

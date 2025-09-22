@@ -7,7 +7,7 @@
  * nfs fs inode data in memory
  */
 struct nfs_inode_info {
-	struct nfs_fh fhandle;
+    struct nfs_fh fhandle;
 };
 
 #endif

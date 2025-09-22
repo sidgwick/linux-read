@@ -4,21 +4,21 @@
 #include <linux/autoconf.h>
 
 /*
- * Defines for what uname() should return 
+ * Defines for what uname() should return
  */
 #ifndef UTS_SYSNAME
 #define UTS_SYSNAME "Linux"
 #endif
 #ifndef UTS_NODENAME
-#define UTS_NODENAME "(none)"	/* set by sethostname() */
+#define UTS_NODENAME "(none)" /* set by sethostname() */
 #endif
 
 #ifndef UTS_MACHINE
-#define UTS_MACHINE "i386"	/* hardware type */
+#define UTS_MACHINE "i386" /* hardware type */
 #endif
 
 #ifndef UTS_DOMAINNAME
-#define UTS_DOMAINNAME "(none)"	/* set by setdomainname() */
+#define UTS_DOMAINNAME "(none)" /* set by setdomainname() */
 #endif
 
 /*
@@ -27,15 +27,15 @@
  */
 
 /* Don't touch these, unless you really know what your doing. */
-#define DEF_INITSEG	0x9000
-#define DEF_SYSSEG	0x1000
-#define DEF_SETUPSEG	0x9020
-#define DEF_SYSSIZE	0x7F00
+#define DEF_INITSEG 0x9000
+#define DEF_SYSSEG 0x1000
+#define DEF_SETUPSEG 0x9020
+#define DEF_SYSSIZE 0x7F00
 
 /* internal svga startup constants */
-#define NORMAL_VGA	0xffff		/* 80x25 mode */
-#define EXTENDED_VGA	0xfffe		/* 80x50 mode */
-#define ASK_VGA		0xfffd		/* ask for it at bootup */
+#define NORMAL_VGA 0xffff   /* 80x25 mode */
+#define EXTENDED_VGA 0xfffe /* 80x50 mode */
+#define ASK_VGA 0xfffd      /* ask for it at bootup */
 
 /*
  * The root-device is no longer hard-coded. You can change the default
@@ -74,9 +74,9 @@
 */
 
 #undef HD_TYPE
- 
+
 /*
-	File type specific stuff goes into this.
+    File type specific stuff goes into this.
 */
 
 #ifdef ASM_SRC

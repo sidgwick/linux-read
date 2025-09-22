@@ -10,6 +10,6 @@ typedef unsigned int size_t;
 #define NULL ((void *)0)
 
 #undef offsetof
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#define offsetof(TYPE, MEMBER) ((size_t) & ((TYPE *)0)->MEMBER)
 
 #endif

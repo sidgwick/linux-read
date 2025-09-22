@@ -7,23 +7,23 @@
  */
 extern void __wait_on_buffer(struct buffer_head *);
 
-extern inline void wait_on_buffer(struct buffer_head * bh)
+extern inline void wait_on_buffer(struct buffer_head *bh)
 {
-	if (bh->b_lock)
-		__wait_on_buffer(bh);
+    if (bh->b_lock)
+        __wait_on_buffer(bh);
 }
 
-extern inline void lock_buffer(struct buffer_head * bh)
+extern inline void lock_buffer(struct buffer_head *bh)
 {
-	if (bh->b_lock)
-		__wait_on_buffer(bh);
-	bh->b_lock = 1;
+    if (bh->b_lock)
+        __wait_on_buffer(bh);
+    bh->b_lock = 1;
 }
 
-extern inline void unlock_buffer(struct buffer_head * bh)
+extern inline void unlock_buffer(struct buffer_head *bh)
 {
-	bh->b_lock = 0;
-	wake_up(&bh->b_wait);
+    bh->b_lock = 0;
+    wake_up(&bh->b_wait);
 }
 
 /*
@@ -33,24 +33,23 @@ extern inline void unlock_buffer(struct buffer_head * bh)
  */
 extern void __wait_on_super(struct super_block *);
 
-extern inline void wait_on_super(struct super_block * sb)
+extern inline void wait_on_super(struct super_block *sb)
 {
-	if (sb->s_lock)
-		__wait_on_super(sb);
+    if (sb->s_lock)
+        __wait_on_super(sb);
 }
 
-extern inline void lock_super(struct super_block * sb)
+extern inline void lock_super(struct super_block *sb)
 {
-	if (sb->s_lock)
-		__wait_on_super(sb);
-	sb->s_lock = 1;
+    if (sb->s_lock)
+        __wait_on_super(sb);
+    sb->s_lock = 1;
 }
 
-extern inline void unlock_super(struct super_block * sb)
+extern inline void unlock_super(struct super_block *sb)
 {
-	sb->s_lock = 0;
-	wake_up(&sb->s_wait);
+    sb->s_lock = 0;
+    wake_up(&sb->s_wait);
 }
 
 #endif /* _LINUX_LOCKS_H */
-

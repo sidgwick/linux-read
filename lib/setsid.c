@@ -8,5 +8,4 @@
 #include <linux/types.h>
 #include <linux/unistd.h>
 
-_syscall0(pid_t,setsid)
-
+_syscall0(pid_t, setsid)

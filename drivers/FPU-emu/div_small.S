@@ -1,4 +1,4 @@
-	.file	"div_small.S"
+    .file    "div_small.S"
 /*---------------------------------------------------------------------------+
  |  div_small.S                                                              |
  |                                                                           |
@@ -17,34 +17,34 @@
 #include "fpu_asm.h"
 
 .text
-	.align 2,144
+    .align 2,144
 
 .globl _div_small
 
 _div_small:
-	pushl	%ebp
-	movl	%esp,%ebp
+    pushl    %ebp
+    movl    %esp,%ebp
 
-	pushl	%esi
+    pushl    %esi
 
-	movl	PARAM1,%esi	/* pointer to num */
-	movl	PARAM2,%ecx	/* The denominator */
+    movl    PARAM1,%esi    /* pointer to num */
+    movl    PARAM2,%ecx    /* The denominator */
 
-	movl	4(%esi),%eax	/* Get the current num msw */
-	xorl	%edx,%edx
-	divl	%ecx
+    movl    4(%esi),%eax    /* Get the current num msw */
+    xorl    %edx,%edx
+    divl    %ecx
 
-	movl	%eax,4(%esi)
+    movl    %eax,4(%esi)
 
-	movl	(%esi),%eax	/* Get the num lsw */
-	divl	%ecx
+    movl    (%esi),%eax    /* Get the num lsw */
+    divl    %ecx
 
-	movl	%eax,(%esi)
+    movl    %eax,(%esi)
 
-	movl	%edx,%eax	/* Return the remainder in eax */
+    movl    %edx,%eax    /* Return the remainder in eax */
 
-	popl	%esi
+    popl    %esi
 
-	leave
-	ret
+    leave
+    ret
 

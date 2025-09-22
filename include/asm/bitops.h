@@ -16,41 +16,37 @@
 /*
  * Some hacks to defeat gcc over-optimizations..
  */
-struct __dummy { unsigned long a[100]; };
-#define ADDR (*(struct __dummy *) addr)
+struct __dummy {
+    unsigned long a[100];
+};
+#define ADDR (*(struct __dummy *)addr)
 
-extern __inline__ int set_bit(int nr, void * addr)
+extern __inline__ int set_bit(int nr, void *addr)
 {
-	int oldbit;
+    int oldbit;
 
-	__asm__ __volatile__("btsl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"=m" (ADDR)
-		:"r" (nr));
-	return oldbit;
+    __asm__ __volatile__("btsl %2,%1\n\tsbbl %0,%0" : "=r"(oldbit), "=m"(ADDR) : "r"(nr));
+    return oldbit;
 }
 
-extern __inline__ int clear_bit(int nr, void * addr)
+extern __inline__ int clear_bit(int nr, void *addr)
 {
-	int oldbit;
+    int oldbit;
 
-	__asm__ __volatile__("btrl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"=m" (ADDR)
-		:"r" (nr));
-	return oldbit;
+    __asm__ __volatile__("btrl %2,%1\n\tsbbl %0,%0" : "=r"(oldbit), "=m"(ADDR) : "r"(nr));
+    return oldbit;
 }
 
 /*
  * This routine doesn't need to be atomic, but it's faster to code it
  * this way.
  */
-extern __inline__ int test_bit(int nr, void * addr)
+extern __inline__ int test_bit(int nr, void *addr)
 {
-	int oldbit;
+    int oldbit;
 
-	__asm__ __volatile__("btl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit)
-		:"m" (ADDR),"r" (nr));
-	return oldbit;
+    __asm__ __volatile__("btl %2,%1\n\tsbbl %0,%0" : "=r"(oldbit) : "m"(ADDR), "r"(nr));
+    return oldbit;
 }
 
 #else
@@ -65,43 +61,43 @@ extern __inline__ int test_bit(int nr, void * addr)
  * Also note, these routines assume that you have 32 bit integers.
  * You will have to change this if you are trying to port Linux to the
  * Alpha architecture or to a Cray.  :-)
- * 
+ *
  * C language equivalents written by Theodore Ts'o, 9/26/92
  */
 
-extern __inline__ int set_bit(int nr,int * addr)
+extern __inline__ int set_bit(int nr, int *addr)
 {
-	int	mask, retval;
+    int mask, retval;
 
-	addr += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	cli();
-	retval = (mask & *addr) != 0;
-	*addr |= mask;
-	sti();
-	return retval;
+    addr += nr >> 5;
+    mask = 1 << (nr & 0x1f);
+    cli();
+    retval = (mask & *addr) != 0;
+    *addr |= mask;
+    sti();
+    return retval;
 }
 
-extern __inline__ int clear_bit(int nr, int * addr)
+extern __inline__ int clear_bit(int nr, int *addr)
 {
-	int	mask, retval;
+    int mask, retval;
 
-	addr += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	cli();
-	retval = (mask & *addr) != 0;
-	*addr &= ~mask;
-	sti();
-	return retval;
+    addr += nr >> 5;
+    mask = 1 << (nr & 0x1f);
+    cli();
+    retval = (mask & *addr) != 0;
+    *addr &= ~mask;
+    sti();
+    return retval;
 }
 
-extern __inline__ int test_bit(int nr, int * addr)
+extern __inline__ int test_bit(int nr, int *addr)
 {
-	int	mask;
+    int mask;
 
-	addr += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	return ((mask & *addr) != 0);
+    addr += nr >> 5;
+    mask = 1 << (nr & 0x1f);
+    return ((mask & *addr) != 0);
 }
-#endif	/* i386 */
+#endif /* i386 */
 #endif /* _ASM_BITOPS_H */

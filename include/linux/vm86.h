@@ -13,39 +13,39 @@
  */
 
 struct vm86_regs {
-/*
+    /*
  * normal regs, with special meaning for the segment descriptors..
  */
-	long ebx;
-	long ecx;
-	long edx;
-	long esi;
-	long edi;
-	long ebp;
-	long eax;
-	long __null_ds;
-	long __null_es;
-	long __null_fs;
-	long __null_gs;
-	long orig_eax;
-	long eip;
-	long cs;
-	long eflags;
-	long esp;
-	long ss;
-/*
+    long ebx;
+    long ecx;
+    long edx;
+    long esi;
+    long edi;
+    long ebp;
+    long eax;
+    long __null_ds;
+    long __null_es;
+    long __null_fs;
+    long __null_gs;
+    long orig_eax;
+    long eip;
+    long cs;
+    long eflags;
+    long esp;
+    long ss;
+    /*
  * these are specific to v86 mode:
  */
-	long es;
-	long ds;
-	long fs;
-	long gs;
+    long es;
+    long ds;
+    long fs;
+    long gs;
 };
 
 struct vm86_struct {
-	struct vm86_regs regs;
-	unsigned long flags;
-	unsigned long screen_bitmap;
+    struct vm86_regs regs;
+    unsigned long flags;
+    unsigned long screen_bitmap;
 };
 
 /*

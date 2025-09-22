@@ -2,7 +2,7 @@
  *
  * A driver for Soundcards, misc configuration parameters.
  *
- * 
+ *
  * Copyright by Hannu Savolainen 1993
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,6 @@
 
 #include "local.h"
 
-
 #undef CONFIGURE_SOUNDCARD
 #undef DYNAMIC_BUFFER
 
@@ -47,7 +46,7 @@
 #endif
 
 #ifndef SND_DEFAULT_ENABLE
-#define SND_DEFAULT_ENABLE	1
+#define SND_DEFAULT_ENABLE 1
 #endif
 
 /** UWM - new MIDI stuff **/
@@ -57,7 +56,7 @@
 #endif
 
 /** UWM - stuff **/
- 
+
 #if defined(EXCLUDE_SEQUENCER) && defined(EXCLUDE_AUDIO)
 #undef CONFIGURE_SOUNDCARD
 #endif
@@ -70,63 +69,63 @@ If your card has nonstandard I/O address or IRQ number, change defines
    for the following settings in your kernel Makefile */
 
 #ifndef SBC_BASE
-#define SBC_BASE	0x220	/* 0x220 is the factory default. */
+#define SBC_BASE 0x220 /* 0x220 is the factory default. */
 #endif
 
 #ifndef SBC_IRQ
-#define SBC_IRQ		7	/* IQR7 is the factory default.	 */
+#define SBC_IRQ 7 /* IQR7 is the factory default.     */
 #endif
 
 #ifndef SBC_DMA
-#define SBC_DMA		1
+#define SBC_DMA 1
 #endif
 
 #ifndef SB16_DMA
-#define SB16_DMA	6
+#define SB16_DMA 6
 #endif
 
 #ifndef SB16MIDI_BASE
-#define SB16MIDI_BASE	0x300
+#define SB16MIDI_BASE 0x300
 #endif
 
 #ifndef PAS_BASE
-#define PAS_BASE	0x388
+#define PAS_BASE 0x388
 #endif
 
 #ifndef PAS_IRQ
-#define PAS_IRQ		5
+#define PAS_IRQ 5
 #endif
 
 #ifndef PAS_DMA
-#define PAS_DMA		3
+#define PAS_DMA 3
 #endif
 
 #ifndef GUS_BASE
-#define GUS_BASE	0x220
+#define GUS_BASE 0x220
 #endif
 
 #ifndef GUS_IRQ
-#define GUS_IRQ		15
+#define GUS_IRQ 15
 #endif
 
 #ifndef GUS_MIDI_IRQ
-#define GUS_MIDI_IRQ	GUS_IRQ
+#define GUS_MIDI_IRQ GUS_IRQ
 #endif
 
 #ifndef GUS_DMA
-#define GUS_DMA		6
+#define GUS_DMA 6
 #endif
 
 #ifndef MPU_BASE
-#define MPU_BASE	0x330
+#define MPU_BASE 0x330
 #endif
 
 #ifndef MPU_IRQ
-#define MPU_IRQ		6
+#define MPU_IRQ 6
 #endif
 
 #ifndef MAX_REALTIME_FACTOR
-#define MAX_REALTIME_FACTOR	4
+#define MAX_REALTIME_FACTOR 4
 #endif
 
 /************* PCM DMA buffer sizes *******************/
@@ -141,90 +140,93 @@ If your card has nonstandard I/O address or IRQ number, change defines
    Use the make config command instead. */
 
 #ifndef DSP_BUFFSIZE
-#define DSP_BUFFSIZE		(4096)
+#define DSP_BUFFSIZE (4096)
 #endif
 
 #ifndef DSP_BUFFCOUNT
-#define DSP_BUFFCOUNT		2	/* 2 is recommended. */
+#define DSP_BUFFCOUNT 2 /* 2 is recommended. */
 #endif
 
-#define DMA_AUTOINIT		0x10
+#define DMA_AUTOINIT 0x10
 
-#define FM_MONO		0x388	/* This is the I/O address used by AdLib */
+#define FM_MONO 0x388 /* This is the I/O address used by AdLib */
 
 /* SEQ_MAX_QUEUE is the maximum number of sequencer events buffered by the
    driver. (There is no need to alter this) */
-#define SEQ_MAX_QUEUE	1024
+#define SEQ_MAX_QUEUE 1024
 
-#define SBFM_MAXINSTR		(256)	/* Size of the FM Instrument
-						   bank				 */
-/* 128 instruments for general MIDI setup and 16 unassigned	 */
+#define SBFM_MAXINSTR                                                                              \
+    (256) /* Size of the FM Instrument
+                           bank                 */
+/* 128 instruments for general MIDI setup and 16 unassigned     */
 
-#define SND_NDEVS	50	/* Number of supported devices */
-#define SND_DEV_CTL	0	/* Control port /dev/mixer */
-#define SND_DEV_SEQ	1	/* Sequencer output /dev/sequencer (FM
-				   synthesizer and MIDI output) */
-#define SND_DEV_MIDIN	2	/* MIDI input /dev/midin (not implemented
-				   yet) */
-#define SND_DEV_DSP	3	/* Digitized voice /dev/dsp */
-#define SND_DEV_AUDIO	4	/* Sparc compatible /dev/audio */
-#define SND_DEV_DSP16	5	/* Like /dev/dsp but 16 bits/sample */
-#define SND_DEV_STATUS	6	/* /dev/sndstatus */
+#define SND_NDEVS 50  /* Number of supported devices */
+#define SND_DEV_CTL 0 /* Control port /dev/mixer */
+#define SND_DEV_SEQ                                                                                \
+    1 /* Sequencer output /dev/sequencer (FM
+                   synthesizer and MIDI output) */
+#define SND_DEV_MIDIN                                                                              \
+    2                    /* MIDI input /dev/midin (not implemented
+                   yet) */
+#define SND_DEV_DSP 3    /* Digitized voice /dev/dsp */
+#define SND_DEV_AUDIO 4  /* Sparc compatible /dev/audio */
+#define SND_DEV_DSP16 5  /* Like /dev/dsp but 16 bits/sample */
+#define SND_DEV_STATUS 6 /* /dev/sndstatus */
 
-/* UWM ... note add new MIDI devices here..  
+/* UWM ... note add new MIDI devices here..
  *  Also do not forget to add table midi_supported[]
- *  Minor numbers for on-chip midi devices start from 15.. and 
+ *  Minor numbers for on-chip midi devices start from 15.. and
  *  should be contiguous.. viz. 15,16,17....
  * ERROR!!!!!!!!! NO NO. Minor numbers above 15 are reserved!!!!!! Hannu
  *  Also note the max # of midi devices as MAX_MIDI_DEV
- */ 
+ */
 
-#define CMIDI_DEV_PRO  15  	/* Chip midi device == /dev/pro_midi */
+#define CMIDI_DEV_PRO 15 /* Chip midi device == /dev/pro_midi */
 
 /*
  *  Add other midis here...
-		.
-		.
-		.
-		.
+        .
+        .
+        .
+        .
  */
 
-#define DSP_DEFAULT_SPEED	8000
+#define DSP_DEFAULT_SPEED 8000
 
-#define ON		1
-#define OFF		0
+#define ON 1
+#define OFF 0
 
-#define MAX_DSP_DEV	4
-#define MAX_MIXER_DEV	2
-#define MAX_SYNTH_DEV	3
-#define MAX_MIDI_DEV	4
+#define MAX_DSP_DEV 4
+#define MAX_MIXER_DEV 2
+#define MAX_SYNTH_DEV 3
+#define MAX_MIDI_DEV 4
 
 struct fileinfo {
-       	  int mode;	/* Open mode */
-       };
+    int mode; /* Open mode */
+};
 
 struct address_info {
-	int io_base;
-	int irq;
-	int dma;
+    int io_base;
+    int irq;
+    int dma;
 };
 
 /*
  * Process wakeup reasons
  */
-#define WK_NONE		0x00
-#define WK_WAKEUP	0x01
-#define WK_TIMEOUT	0x02
-#define WK_SIGNAL	0x04
-#define WK_SLEEP	0x08
+#define WK_NONE 0x00
+#define WK_WAKEUP 0x01
+#define WK_TIMEOUT 0x02
+#define WK_SIGNAL 0x04
+#define WK_SLEEP 0x08
 
-#define OPEN_READ	1
-#define OPEN_WRITE	2
-#define OPEN_READWRITE	3
+#define OPEN_READ 1
+#define OPEN_WRITE 2
+#define OPEN_READWRITE 3
 
+#include "dev_table.h"
 #include "os.h"
 #include "sound_calls.h"
-#include "dev_table.h"
 
 #ifndef DEB
 #define DEB(x)

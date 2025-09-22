@@ -41,31 +41,31 @@
  * 21 - scsi generic
  * 22 -                        (at2disk)
  * 23 -                        mitsumi cdrom
- * 24 -	                       sony535 cdrom
+ * 24 -                           sony535 cdrom
  * 25 -                        matsushita cdrom       minors 0..3
  * 26 -
  * 27 - qic117 tape
  */
 
-#define UNNAMED_MAJOR	0
-#define MEM_MAJOR	1
-#define FLOPPY_MAJOR	2
-#define HD_MAJOR	3
-#define TTY_MAJOR	4
-#define TTYAUX_MAJOR	5
-#define LP_MAJOR	6
+#define UNNAMED_MAJOR 0
+#define MEM_MAJOR 1
+#define FLOPPY_MAJOR 2
+#define HD_MAJOR 3
+#define TTY_MAJOR 4
+#define TTYAUX_MAJOR 5
+#define LP_MAJOR 6
 /* unused: 7 */
-#define SCSI_DISK_MAJOR	8
-#define SCSI_TAPE_MAJOR	9
-#define MOUSE_MAJOR	10
+#define SCSI_DISK_MAJOR 8
+#define SCSI_TAPE_MAJOR 9
+#define MOUSE_MAJOR 10
 #define SCSI_CDROM_MAJOR 11
 #define QIC02_TAPE_MAJOR 12
-#define XT_DISK_MAJOR	13
-#define SOUND_MAJOR	14
+#define XT_DISK_MAJOR 13
+#define SOUND_MAJOR 14
 #define CDU31A_CDROM_MAJOR 15
-#define SOCKET_MAJOR	16
-#define AF_UNIX_MAJOR	17
-#define AF_INET_MAJOR	18
+#define SOCKET_MAJOR 16
+#define AF_UNIX_MAJOR 17
+#define AF_INET_MAJOR 18
 /* unused: 19, 20 */
 #define SCSI_GENERIC_MAJOR 21
 /* unused: 22 */
@@ -78,14 +78,13 @@
  * Tests for SCSI devices.
  */
 
-#define SCSI_MAJOR(M) \
-  ((M) == SCSI_DISK_MAJOR	\
-   || (M) == SCSI_TAPE_MAJOR	\
-   || (M) == SCSI_CDROM_MAJOR	\
-   || (M) == SCSI_GENERIC_MAJOR)
+#define SCSI_MAJOR(M)                                                                              \
+    ((M) == SCSI_DISK_MAJOR || (M) == SCSI_TAPE_MAJOR || (M) == SCSI_CDROM_MAJOR ||                \
+     (M) == SCSI_GENERIC_MAJOR)
 
-static inline int scsi_major(int m) {
-	return SCSI_MAJOR(m);
+static inline int scsi_major(int m)
+{
+    return SCSI_MAJOR(m);
 }
 
 #endif

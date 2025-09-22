@@ -63,10 +63,8 @@ extern void trig_a(void);
 extern void trig_b(void);
 
 /* get_address.c */
-extern void get_address(unsigned char FPU_modrm, unsigned long *fpu_eip,
-			fpu_addr_modes);
-extern void get_address_16(unsigned char FPU_modrm, unsigned long *fpu_eip,
-			   fpu_addr_modes);
+extern void get_address(unsigned char FPU_modrm, unsigned long *fpu_eip, fpu_addr_modes);
+extern void get_address_16(unsigned char FPU_modrm, unsigned long *fpu_eip, fpu_addr_modes);
 
 /* load_store.c */
 extern void load_store_instr(char type, fpu_addr_modes addr_modes);
@@ -89,10 +87,8 @@ extern void poly_sine(FPU_REG const *arg, FPU_REG *result);
 extern void poly_tan(FPU_REG const *arg, FPU_REG *result, int invert);
 
 /* reg_add_sub.c */
-extern int reg_add(FPU_REG const *a, FPU_REG const *b,
-		   FPU_REG *dest, int control_w);
-extern int reg_sub(FPU_REG const *a, FPU_REG const *b,
-		   FPU_REG *dest, int control_w);
+extern int reg_add(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w);
+extern int reg_sub(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, int control_w);
 
 /* reg_compare.c */
 extern int compare(FPU_REG const *b);
@@ -130,5 +126,4 @@ extern char *fstenv(fpu_addr_modes addr_modes);
 extern void fsave(fpu_addr_modes addr_modes);
 
 /* reg_mul.c */
-extern int reg_mul(FPU_REG const *a, FPU_REG const *b,
-		   FPU_REG *dest, unsigned int control_w);
+extern int reg_mul(FPU_REG const *a, FPU_REG const *b, FPU_REG *dest, unsigned int control_w);

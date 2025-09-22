@@ -4,10 +4,10 @@
 #include <linux/limits.h>
 
 struct dirent {
-	long		d_ino;
-	off_t		d_off;
-	unsigned short	d_reclen;
-	char		d_name[NAME_MAX+1];
+    long d_ino;
+    off_t d_off;
+    unsigned short d_reclen;
+    char d_name[NAME_MAX + 1];
 };
 
 #endif

@@ -19,132 +19,132 @@
 
 .text
 
-	.align 2,144
+    .align 2,144
 .globl _normalize
 
 _normalize:
-	pushl	%ebp
-	movl	%esp,%ebp
-	pushl	%ebx
+    pushl    %ebp
+    movl    %esp,%ebp
+    pushl    %ebx
 
-	movl	PARAM1,%ebx
+    movl    PARAM1,%ebx
 
 #ifdef PARANOID
-	cmpb	TW_Valid,TAG(%ebx)
-	je	L_ok
+    cmpb    TW_Valid,TAG(%ebx)
+    je    L_ok
 
-	pushl	$0x220
-	call	_exception
-	addl	$4,%esp
+    pushl    $0x220
+    call    _exception
+    addl    $4,%esp
 
 L_ok:
 #endif PARANOID
 
-	movl	SIGH(%ebx),%edx
-	movl	SIGL(%ebx),%eax
+    movl    SIGH(%ebx),%edx
+    movl    SIGL(%ebx),%eax
 
-	orl	%edx,%edx	/* ms bits */
-	js	L_done		/* Already normalized */
-	jnz	L_shift_1	/* Shift left 1 - 31 bits */
+    orl    %edx,%edx    /* ms bits */
+    js    L_done        /* Already normalized */
+    jnz    L_shift_1    /* Shift left 1 - 31 bits */
 
-	orl	%eax,%eax
-	jz	L_zero		/* The contents are zero */
+    orl    %eax,%eax
+    jz    L_zero        /* The contents are zero */
 
-	movl	%eax,%edx
-	xorl	%eax,%eax
-	subl	$32,EXP(%ebx)	/* This can cause an underflow */
+    movl    %eax,%edx
+    xorl    %eax,%eax
+    subl    $32,EXP(%ebx)    /* This can cause an underflow */
 
 /* We need to shift left by 1 - 31 bits */
 L_shift_1:
-	bsrl	%edx,%ecx	/* get the required shift in %ecx */
-	subl	$31,%ecx
-	negl	%ecx
-	shld	%cl,%eax,%edx
-	shl	%cl,%eax
-	subl	%ecx,EXP(%ebx)	/* This can cause an underflow */
+    bsrl    %edx,%ecx    /* get the required shift in %ecx */
+    subl    $31,%ecx
+    negl    %ecx
+    shld    %cl,%eax,%edx
+    shl    %cl,%eax
+    subl    %ecx,EXP(%ebx)    /* This can cause an underflow */
 
-	movl	%edx,SIGH(%ebx)
-	movl	%eax,SIGL(%ebx)
+    movl    %edx,SIGH(%ebx)
+    movl    %eax,SIGL(%ebx)
 
 L_done:
-	cmpl	EXP_OVER,EXP(%ebx)
-	jge	L_overflow
+    cmpl    EXP_OVER,EXP(%ebx)
+    jge    L_overflow
 
-	cmpl	EXP_UNDER,EXP(%ebx)
-	jle	L_underflow
+    cmpl    EXP_UNDER,EXP(%ebx)
+    jle    L_underflow
 
 L_exit:
-	popl	%ebx
-	leave
-	ret
+    popl    %ebx
+    leave
+    ret
 
 
 L_zero:
-	movl	EXP_UNDER,EXP(%ebx)
-	movb	TW_Zero,TAG(%ebx)
-	jmp	L_exit
+    movl    EXP_UNDER,EXP(%ebx)
+    movb    TW_Zero,TAG(%ebx)
+    jmp    L_exit
 
 L_underflow:
-	push	%ebx
-	call	_arith_underflow
-	pop	%ebx
-	jmp	L_exit
+    push    %ebx
+    call    _arith_underflow
+    pop    %ebx
+    jmp    L_exit
 
 L_overflow:
-	push	%ebx
-	call	_arith_overflow
-	pop	%ebx
-	jmp	L_exit
+    push    %ebx
+    call    _arith_overflow
+    pop    %ebx
+    jmp    L_exit
 
 
 
 /* Normalise without reporting underflow or overflow */
-	.align 2,144
+    .align 2,144
 .globl _normalize_nuo
 
 _normalize_nuo:
-	pushl	%ebp
-	movl	%esp,%ebp
-	pushl	%ebx
+    pushl    %ebp
+    movl    %esp,%ebp
+    pushl    %ebx
 
-	movl	PARAM1,%ebx
+    movl    PARAM1,%ebx
 
 #ifdef PARANOID
-	cmpb	TW_Valid,TAG(%ebx)
-	je	L_ok_nuo
+    cmpb    TW_Valid,TAG(%ebx)
+    je    L_ok_nuo
 
-	pushl	$0x221
-	call	_exception
-	addl	$4,%esp
+    pushl    $0x221
+    call    _exception
+    addl    $4,%esp
 
 L_ok_nuo:
 #endif PARANOID
 
-	movl	SIGH(%ebx),%edx
-	movl	SIGL(%ebx),%eax
+    movl    SIGH(%ebx),%edx
+    movl    SIGL(%ebx),%eax
 
-	orl	%edx,%edx	/* ms bits */
-	js	L_exit		/* Already normalized */
-	jnz	L_nuo_shift_1	/* Shift left 1 - 31 bits */
+    orl    %edx,%edx    /* ms bits */
+    js    L_exit        /* Already normalized */
+    jnz    L_nuo_shift_1    /* Shift left 1 - 31 bits */
 
-	orl	%eax,%eax
-	jz	L_zero		/* The contents are zero */
+    orl    %eax,%eax
+    jz    L_zero        /* The contents are zero */
 
-	movl	%eax,%edx
-	xorl	%eax,%eax
-	subl	$32,EXP(%ebx)	/* This can cause an underflow */
+    movl    %eax,%edx
+    xorl    %eax,%eax
+    subl    $32,EXP(%ebx)    /* This can cause an underflow */
 
 /* We need to shift left by 1 - 31 bits */
 L_nuo_shift_1:
-	bsrl	%edx,%ecx	/* get the required shift in %ecx */
-	subl	$31,%ecx
-	negl	%ecx
-	shld	%cl,%eax,%edx
-	shl	%cl,%eax
-	subl	%ecx,EXP(%ebx)	/* This can cause an underflow */
+    bsrl    %edx,%ecx    /* get the required shift in %ecx */
+    subl    $31,%ecx
+    negl    %ecx
+    shld    %cl,%eax,%edx
+    shl    %cl,%eax
+    subl    %ecx,EXP(%ebx)    /* This can cause an underflow */
 
-	movl	%edx,SIGH(%ebx)
-	movl	%eax,SIGL(%ebx)
-	jmp	L_exit
+    movl    %edx,SIGH(%ebx)
+    movl    %eax,SIGL(%ebx)
+    jmp    L_exit
 
 

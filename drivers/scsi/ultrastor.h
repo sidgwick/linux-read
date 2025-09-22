@@ -1,13 +1,13 @@
 /*
- *	ultrastor.c	(C) 1991 David B. Gentzel
- *	Low-level scsi driver for UltraStor 14F
- *	by David B. Gentzel, Whitfield Software Services, Carnegie, PA
- *	    (gentzel@nova.enet.dec.com)
+ *    ultrastor.c    (C) 1991 David B. Gentzel
+ *    Low-level scsi driver for UltraStor 14F
+ *    by David B. Gentzel, Whitfield Software Services, Carnegie, PA
+ *        (gentzel@nova.enet.dec.com)
  *  scatter/gather added by Scott Taylor (n217cg@tamuts.tamu.edu)
  *  24F support by John F. Carr (jfc@athena.mit.edu)
- *    John's work modified by Caleb Epstein (cae@jpmorgan.com) and 
+ *    John's work modified by Caleb Epstein (cae@jpmorgan.com) and
  *    Eric Youngdale (eric@tantalus.nrl.navy.mil).
- *	Thanks to UltraStor for providing the necessary documentation
+ *    Thanks to UltraStor for providing the necessary documentation
  */
 
 #ifndef _ULTRASTOR_H
@@ -26,30 +26,29 @@ int ultrastor_biosparam(int, int, int *);
 
 #define ULTRASTOR_24F_PORT 0xC80
 
-
-#define ULTRASTOR_14F \
-    { "UltraStor 14F/24F/34F", ultrastor_detect, ultrastor_info, 0, \
-      ultrastor_queuecommand, ultrastor_abort, ultrastor_reset, \
-      0, ultrastor_biosparam, ULTRASTOR_MAX_CMDS, 0, \
-      ULTRASTOR_14F_MAX_SG, ULTRASTOR_MAX_CMDS_PER_LUN, 0, 1 }
-
+#define ULTRASTOR_14F                                                                              \
+    {                                                                                              \
+        "UltraStor 14F/24F/34F", ultrastor_detect, ultrastor_info, 0, ultrastor_queuecommand,      \
+            ultrastor_abort, ultrastor_reset, 0, ultrastor_biosparam, ULTRASTOR_MAX_CMDS, 0,       \
+            ULTRASTOR_14F_MAX_SG, ULTRASTOR_MAX_CMDS_PER_LUN, 0, 1                                 \
+    }
 
 #ifdef ULTRASTOR_PRIVATE
 
-#define UD_ABORT	0x0001
-#define UD_COMMAND	0x0002
-#define UD_DETECT	0x0004
-#define UD_INTERRUPT	0x0008
-#define UD_RESET	0x0010
-#define UD_MULTI_CMD	0x0020
-#define UD_CSIR		0x0040
-#define UD_ERROR	0x0080
+#define UD_ABORT 0x0001
+#define UD_COMMAND 0x0002
+#define UD_DETECT 0x0004
+#define UD_INTERRUPT 0x0008
+#define UD_RESET 0x0010
+#define UD_MULTI_CMD 0x0020
+#define UD_CSIR 0x0040
+#define UD_ERROR 0x0080
 
 /* #define PORT_OVERRIDE 0x330 */
 
 /* Values for the PRODUCT_ID ports for the 14F */
 #define US14F_PRODUCT_ID_0 0x56
-#define US14F_PRODUCT_ID_1 0x40		/* NOTE: Only upper nibble is used */
+#define US14F_PRODUCT_ID_1 0x40 /* NOTE: Only upper nibble is used */
 
 #define US24F_PRODUCT_ID_0 0x56
 #define US24F_PRODUCT_ID_1 0x63

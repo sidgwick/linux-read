@@ -10,9 +10,9 @@
 volatile void _exit(int exit_code)
 {
 fake_volatile:
-	__asm__("movl %1,%%ebx\n\t"
-		"int $0x80"
-		: /* no outputs */
-		:"a" (__NR_exit),"g" (exit_code));
-	goto fake_volatile;
+    __asm__("movl %1,%%ebx\n\t"
+            "int $0x80"
+            : /* no outputs */
+            : "a"(__NR_exit), "g"(exit_code));
+    goto fake_volatile;
 }

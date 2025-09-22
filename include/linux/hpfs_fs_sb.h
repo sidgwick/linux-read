@@ -2,18 +2,18 @@
 #define _HPFS_FS_SB
 
 struct hpfs_sb_info {
-	ino_t sb_root;			/* inode number of root dir */
-	unsigned sb_fs_size;		/* file system size, sectors */
-	unsigned sb_bitmaps;		/* sector number of bitmap list */
-	unsigned sb_dirband_size;	/* directory band size, dnodes */
-	unsigned sb_dmap;		/* sector number of dnode bit map */
-	unsigned sb_n_free;		/* free blocks for statfs, or -1 */
-	unsigned sb_n_free_dnodes;	/* free dnodes for statfs, or -1 */
-	uid_t sb_uid;			/* uid from mount options */
-	gid_t sb_gid;			/* gid from mount options */
-	umode_t sb_mode;		/* mode from mount options */
-	unsigned sb_lowercase : 1;	/* downcase filenames hackery */
-	unsigned sb_conv : 2;		/* crlf->newline hackery */
+    ino_t sb_root;             /* inode number of root dir */
+    unsigned sb_fs_size;       /* file system size, sectors */
+    unsigned sb_bitmaps;       /* sector number of bitmap list */
+    unsigned sb_dirband_size;  /* directory band size, dnodes */
+    unsigned sb_dmap;          /* sector number of dnode bit map */
+    unsigned sb_n_free;        /* free blocks for statfs, or -1 */
+    unsigned sb_n_free_dnodes; /* free dnodes for statfs, or -1 */
+    uid_t sb_uid;              /* uid from mount options */
+    gid_t sb_gid;              /* gid from mount options */
+    umode_t sb_mode;           /* mode from mount options */
+    unsigned sb_lowercase : 1; /* downcase filenames hackery */
+    unsigned sb_conv : 2;      /* crlf->newline hackery */
 };
 
 #define s_hpfs_root u.hpfs_sb.sb_root

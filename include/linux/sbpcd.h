@@ -11,7 +11,7 @@
  * these strings are case sensitive !!!
  */
 
-/* 
+/*
  * change this to select the type of your interface board:
  *
  * set SBPRO to 1 for "true" SoundBlaster card
@@ -27,7 +27,7 @@
  * (currently I do not know any "compatible" with SBPRO 1)
  * then I can include better information with the next release.
  */
-#define SBPRO     1
+#define SBPRO 1
 
 /*
  * put your CDROM port base address here:
@@ -40,7 +40,6 @@
  */
 #define CDROM_PORT 0x0230
 
-
 /*==========================================================================*/
 /*==========================================================================*/
 /*
@@ -51,27 +50,27 @@
 /*
  * Debug output levels
  */
-#define DBG_INF		1	/* necessary information */
-#define DBG_IRQ		2	/* interrupt trace */
-#define DBG_REA		3	/* "read" status trace */
-#define DBG_CHK		4	/* "media check" trace */
-#define DBG_TIM		5	/* datarate timer test */
-#define DBG_INI		6	/* initialization trace */
-#define DBG_TOC		7	/* tell TocEntry values */
-#define DBG_IOC         8	/* ioctl trace */
-#define DBG_STA		9	/* "ResponseStatus" trace */
-#define DBG_ERR		10	/* "xx_ReadError" trace */
-#define DBG_CMD		11	/* "cmd_out" trace */
-#define DBG_WRN		12	/* give explanation before auto-probing */
-#define DBG_MUL         13      /* multi session code test */
-#define DBG_ID		14	/* "drive_id !=0" test code */
-#define DBG_IOX		15	/* some special information */
-#define DBG_DID		16	/* drive ID test */
-#define DBG_RES		17	/* drive reset info */
-#define DBG_SPI		18	/* SpinUp test */
-#define DBG_IOS		19	/* ioctl trace: "subchannel" */
-#define DBG_IO2		20	/* ioctl trace: general */
-#define DBG_000		21	/* unnecessary information */
+#define DBG_INF 1  /* necessary information */
+#define DBG_IRQ 2  /* interrupt trace */
+#define DBG_REA 3  /* "read" status trace */
+#define DBG_CHK 4  /* "media check" trace */
+#define DBG_TIM 5  /* datarate timer test */
+#define DBG_INI 6  /* initialization trace */
+#define DBG_TOC 7  /* tell TocEntry values */
+#define DBG_IOC 8  /* ioctl trace */
+#define DBG_STA 9  /* "ResponseStatus" trace */
+#define DBG_ERR 10 /* "xx_ReadError" trace */
+#define DBG_CMD 11 /* "cmd_out" trace */
+#define DBG_WRN 12 /* give explanation before auto-probing */
+#define DBG_MUL 13 /* multi session code test */
+#define DBG_ID 14  /* "drive_id !=0" test code */
+#define DBG_IOX 15 /* some special information */
+#define DBG_DID 16 /* drive ID test */
+#define DBG_RES 17 /* drive reset info */
+#define DBG_SPI 18 /* SpinUp test */
+#define DBG_IOS 19 /* ioctl trace: "subchannel" */
+#define DBG_IO2 20 /* ioctl trace: general */
+#define DBG_000 21 /* unnecessary information */
 
 /*==========================================================================*/
 /*==========================================================================*/
@@ -103,14 +102,13 @@
 /*
  * disk states (bits of diskstate_flags):
  */
-#define upc_valid (DS[d].diskstate_flags&upc_bit)
-#define volume_valid (DS[d].diskstate_flags&volume_bit)
-#define toc_valid (DS[d].diskstate_flags&toc_bit)
-#define multisession_valid (DS[d].diskstate_flags&multisession_bit)
-#define cd_size_valid (DS[d].diskstate_flags&cd_size_bit)
-#define subq_valid (DS[d].diskstate_flags&subq_bit)
-#define frame_size_valid (DS[d].diskstate_flags&frame_size_bit)
-
+#define upc_valid (DS[d].diskstate_flags & upc_bit)
+#define volume_valid (DS[d].diskstate_flags & volume_bit)
+#define toc_valid (DS[d].diskstate_flags & toc_bit)
+#define multisession_valid (DS[d].diskstate_flags & multisession_bit)
+#define cd_size_valid (DS[d].diskstate_flags & cd_size_bit)
+#define subq_valid (DS[d].diskstate_flags & subq_bit)
+#define frame_size_valid (DS[d].diskstate_flags & frame_size_bit)
 
 /*
  * bits of the status_byte (result of xx_ReadStatus):
@@ -133,45 +131,45 @@
 /*
  * used drive states:
  */
-#define st_door_closed (DS[d].status_byte&p_door_closed)
-#define st_caddy_in (DS[d].status_byte&p_caddy_in)
-#define st_spinning (DS[d].status_byte&p_spinning)
-#define st_check (DS[d].status_byte&p_check)
-#define st_busy (DS[d].status_byte&p_busy_new)
-#define st_door_locked (DS[d].status_byte&p_door_locked)
-#define st_diskok (DS[d].status_byte&p_disk_ok)
+#define st_door_closed (DS[d].status_byte & p_door_closed)
+#define st_caddy_in (DS[d].status_byte & p_caddy_in)
+#define st_spinning (DS[d].status_byte & p_spinning)
+#define st_check (DS[d].status_byte & p_check)
+#define st_busy (DS[d].status_byte & p_busy_new)
+#define st_door_locked (DS[d].status_byte & p_door_locked)
+#define st_diskok (DS[d].status_byte & p_disk_ok)
 
 /*
  * bits of the CDi_status register:
  */
-#define s_not_result_ready 0x04  /* 0: "result ready" */
-#define s_not_data_ready 0x02    /* 0: "data ready"   */
-#define s_attention 0x01         /* 1: "attention required" */
+#define s_not_result_ready 0x04 /* 0: "result ready" */
+#define s_not_data_ready 0x02   /* 0: "data ready"   */
+#define s_attention 0x01        /* 1: "attention required" */
 /*
  * usable as:
  */
-#define DRV_ATTN               ((inb(CDi_status)&s_attention)!=0)
-#define DATA_READY             ((inb(CDi_status)&s_not_data_ready)==0)
-#define RESULT_READY           ((inb(CDi_status)&s_not_result_ready)==0)
+#define DRV_ATTN ((inb(CDi_status) & s_attention) != 0)
+#define DATA_READY ((inb(CDi_status) & s_not_data_ready) == 0)
+#define RESULT_READY ((inb(CDi_status) & s_not_result_ready) == 0)
 
 /*
  * drive types (firmware versions):
  */
-#define drv_199 0       /* <200 */
-#define drv_200 1       /* <201 */
-#define drv_201 2       /* <210 */
-#define drv_210 3       /* <211 */
-#define drv_211 4       /* <300 */
-#define drv_300 5       /* else */
-#define drv_099 0x10    /* new,  <100 */
-#define drv_100 0x11    /* new, >=100 */
-#define drv_new 0x10    /* all new drives have that bit set */
-#define drv_old 0x00    /*  */
+#define drv_199 0    /* <200 */
+#define drv_200 1    /* <201 */
+#define drv_201 2    /* <210 */
+#define drv_210 3    /* <211 */
+#define drv_211 4    /* <300 */
+#define drv_300 5    /* else */
+#define drv_099 0x10 /* new,  <100 */
+#define drv_100 0x11 /* new, >=100 */
+#define drv_new 0x10 /* all new drives have that bit set */
+#define drv_old 0x00 /*  */
 
 /*
  * drv_099 and drv_100 are the "new" drives
  */
-#define new_drive (DS[d].drv_type&0x10)
+#define new_drive (DS[d].drv_type & 0x10)
 
 /*
  * audio states:
@@ -192,9 +190,9 @@
 /*
  * values of cmd_type (0 else):
  */
-#define cmd_type_READ_M1  0x01 /* "data mode 1": 2048 bytes per frame */
-#define cmd_type_READ_M2  0x02 /* "data mode 2": 12+2048+280 bytes per frame */
-#define cmd_type_READ_SC  0x04 /* "subchannel info": 96 bytes per frame */
+#define cmd_type_READ_M1 0x01 /* "data mode 1": 2048 bytes per frame */
+#define cmd_type_READ_M2 0x02 /* "data mode 2": 12+2048+280 bytes per frame */
+#define cmd_type_READ_SC 0x04 /* "subchannel info": 96 bytes per frame */
 
 /*
  * sense byte: used only if new_drive
@@ -205,15 +203,13 @@
  *                  xx from infobuf[0] after 85 00 00 00 00 00 00
  */
 
-
-#define CD_MINS                   75  /* minutes per CD                  */
-#define CD_SECS                   60  /* seconds per minutes             */
-#define CD_FRAMES                 75  /* frames per second               */
-#define CD_FRAMESIZE            2048  /* bytes per frame, data mode      */
-#define CD_FRAMESIZE_XA	        2340  /* bytes per frame, "xa" mode      */
-#define CD_FRAMESIZE_RAW        2352  /* bytes per frame, "raw" mode     */
-#define CD_BLOCK_OFFSET          150  /* offset of first logical frame   */
-
+#define CD_MINS 75            /* minutes per CD                  */
+#define CD_SECS 60            /* seconds per minutes             */
+#define CD_FRAMES 75          /* frames per second               */
+#define CD_FRAMESIZE 2048     /* bytes per frame, data mode      */
+#define CD_FRAMESIZE_XA 2340  /* bytes per frame, "xa" mode      */
+#define CD_FRAMESIZE_RAW 2352 /* bytes per frame, "raw" mode     */
+#define CD_BLOCK_OFFSET 150   /* offset of first logical frame   */
 
 /* audio status (bin) */
 #define aud_00 0x00 /* Audio status byte not supported or not valid */
@@ -236,45 +232,45 @@
 COMMAND SET of "old" drives like CR-521, CR-522
                (the CR-562 family is different):
 
-No.	Command			       Code
+No.    Command                   Code
 --------------------------------------------
 
 Drive Commands:
- 1	Seek				01	
- 2	Read Data			02
- 3	Read XA-Data			03
- 4	Read Header			04
- 5	Spin Up				05
- 6	Spin Down			06
- 7	Diagnostic			07
- 8	Read UPC			08
- 9	Read ISRC			09
-10	Play Audio			0A
-11	Play Audio MSF			0B
-12	Play Audio Track/Index		0C
+ 1    Seek                01
+ 2    Read Data            02
+ 3    Read XA-Data            03
+ 4    Read Header            04
+ 5    Spin Up                05
+ 6    Spin Down            06
+ 7    Diagnostic            07
+ 8    Read UPC            08
+ 9    Read ISRC            09
+10    Play Audio            0A
+11    Play Audio MSF            0B
+12    Play Audio Track/Index        0C
 
 Status Commands:
-13	Read Status			81	
-14	Read Error			82
-15	Read Drive Version		83
-16	Mode Select			84
-17	Mode Sense			85
-18	Set XA Parameter		86
-19	Read XA Parameter		87
-20	Read Capacity			88
-21	Read SUB_Q			89
-22	Read Disc Code			8A
-23	Read Disc Information		8B
-24	Read TOC			8C
-25	Pause/Resume			8D
-26	Read Packet			8E
-27	Read Path Check			00
- 
- 
+13    Read Status            81
+14    Read Error            82
+15    Read Drive Version        83
+16    Mode Select            84
+17    Mode Sense            85
+18    Set XA Parameter        86
+19    Read XA Parameter        87
+20    Read Capacity            88
+21    Read SUB_Q            89
+22    Read Disc Code            8A
+23    Read Disc Information        8B
+24    Read TOC            8C
+25    Pause/Resume            8D
+26    Read Packet            8E
+27    Read Path Check            00
+
+
 all numbers (lba, msf-bin, msf-bcd, counts) to transfer high byte first
 
 mnemo     7-byte command        #bytes response (r0...rn)
-________ ____________________  ____ 
+________ ____________________  ____
 
 Read Status:
 status:  81.                    (1)  one-byte command, gives the main
@@ -296,7 +292,7 @@ Play Audio Track/Index:
          0c ...
 
 Pause/Resume:
-pause:   8d pr 00 00 00 00 00.  (0)  pause (pr=00) 
+pause:   8d pr 00 00 00 00 00.  (0)  pause (pr=00)
                                      resume (pr=80) audio playing
 
 Mode Select:
@@ -305,7 +301,7 @@ Mode Select:
 
 set_vol: 84 83 00 00 sw le 00.  (0)  sw(itch): lrxxxxxx (off=1)
                                      le(vel): min=0, max=FF, else half
-				     (firmware 2.11)
+                     (firmware 2.11)
 
 Mode Sense:
 get_vol: 85 03 00 00 00 00 00.  (2)  tell current audio volume setting
@@ -326,25 +322,25 @@ ping:    00 00 00 00 00 00 00.  (2)  r0=AA, r1=55
                                      ("ping" if the drive is connected)
 
 Read Drive Version:
-ident:   83 00 00 00 00 00 00. (12)  gives "MATSHITAn.nn" 
+ident:   83 00 00 00 00 00 00. (12)  gives "MATSHITAn.nn"
                                      (n.nn = 2.01, 2.11., 3.00, ...)
 
 Seek:
-seek:    01 00 ll-bb-aa 00 00.  (0)  
-seek:    01 02 mm-ss-ff 00 00.  (0)  
+seek:    01 00 ll-bb-aa 00 00.  (0)
+seek:    01 02 mm-ss-ff 00 00.  (0)
 
 Read Data:
 read:    02 xx-xx-xx nn-nn fl. (??)  read nn-nn blocks of 2048 bytes,
-                                     starting at block xx-xx-xx  
+                                     starting at block xx-xx-xx
                                      fl=0: "lba"-, =2:"msf-bcd"-coded xx-xx-xx
 
 Read XA-Data:
-read:    03 xx-xx-xx nn-nn fl. (??)  read nn-nn blocks of 2340 bytes, 
-                                     starting at block xx-xx-xx  
+read:    03 xx-xx-xx nn-nn fl. (??)  read nn-nn blocks of 2340 bytes,
+                                     starting at block xx-xx-xx
                                      fl=0: "lba"-, =2:"msf-bcd"-coded xx-xx-xx
 
 Read SUB_Q:
-         89 fl 00 00 00 00 00. (13)  r0: audio status, r4-r7: lba/msf, 
+         89 fl 00 00 00 00 00. (13)  r0: audio status, r4-r7: lba/msf,
                                        fl=0: "lba", fl=2: "msf"
 
 Read Disc Code:
@@ -365,8 +361,8 @@ Diagnostic:
          07 02 mm-ss-ff 00 00.  (2)   2 bytes response with "check2"
 
 Read UPC:
-         08 00 ll-bb-aa 00 00. (16)  
-         08 02 mm-ss-ff 00 00. (16)  
+         08 00 ll-bb-aa 00 00. (16)
+         08 02 mm-ss-ff 00 00. (16)
 
 Read ISRC:
          09 00 ll-bb-aa 00 00. (15)  15 bytes response with "check2"
@@ -398,21 +394,20 @@ Read XA Parameter:
 /*
  * we don't use the IRQ line - leave it free for the sound driver
  */
-#define SBPCD_USE_IRQ	0
+#define SBPCD_USE_IRQ 0
 
 /*
  * you can set the interrupt number of your interface board here:
  * It is not used at this time. No need to set it correctly.
  */
-#define SBPCD_INTR_NR	7            
+#define SBPCD_INTR_NR 7
 
 /*
  * "write byte to port"
  */
-#define OUT(x,y) outb(y,x)
+#define OUT(x, y) outb(y, x)
 
-
-#define MIXER_CD_Volume	0x28
+#define MIXER_CD_Volume 0x28
 
 /*==========================================================================*/
 /*
@@ -425,42 +420,30 @@ Read XA Parameter:
  * to fork and execute a function after some elapsed time:
  * one "jifs" unit is 10 msec.
  */
-#define SET_TIMER(func, jifs) \
-        ((timer_table[SBPCD_TIMER].expires = jiffies + jifs), \
-        (timer_table[SBPCD_TIMER].fn = func), \
-        (timer_active |= 1<<SBPCD_TIMER))
+#define SET_TIMER(func, jifs)                                                                      \
+    ((timer_table[SBPCD_TIMER].expires = jiffies + jifs), (timer_table[SBPCD_TIMER].fn = func),    \
+     (timer_active |= 1 << SBPCD_TIMER))
 
-#define CLEAR_TIMER	timer_active &= ~(1<<SBPCD_TIMER)
+#define CLEAR_TIMER timer_active &= ~(1 << SBPCD_TIMER)
 
 /*==========================================================================*/
 /*
  * Creative Labs Programmers did this:
  */
-#define MAX_TRACKS	120 /* why more than 99? */
-
+#define MAX_TRACKS 120 /* why more than 99? */
 
 /*==========================================================================*/
 /*
  * To make conversions easier (machine dependent!)
  */
-typedef union _msf
-{
-  u_int n;
-  u_char c[4];
-}
-MSF;
+typedef union _msf {
+    u_int n;
+    u_char c[4];
+} MSF;
 
-typedef union _blk
-{
-  u_int n;
-  u_char c[4];
-}
-BLK;
+typedef union _blk {
+    u_int n;
+    u_char c[4];
+} BLK;
 
 /*==========================================================================*/
-
-
-
-
-
-
