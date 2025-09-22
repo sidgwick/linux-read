@@ -1,7 +1,7 @@
 /*
  *  linux/mm/memory.c
  *
- *  (C) 1991  Linus Torvalds
+ *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
 /*
@@ -24,268 +24,478 @@
  * Real VM (paging to/from disk) started 18.12.91. Much more work and
  * thought has to go into this. Oh, well..
  * 19.12.91  -  works, somewhat. Sometimes I get faults, don't know why.
- *        Found it. Everything seems to work now.
+ *		Found it. Everything seems to work now.
  * 20.12.91  -  Ok, making the swap-device changeable like the root.
  */
 
-#include <signal.h>
-
 #include <asm/system.h>
+#include <linux/config.h>
 
+#include <linux/signal.h>
+#include <linux/sched.h>
 #include <linux/head.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/errno.h>
+#include <linux/string.h>
+#include <linux/types.h>
+#include <linux/ptrace.h>
+#include <linux/mman.h>
 
-#define PRESENT_RW_USER (PAGE_PRESENT | PAGE_RW | PAGE_USER)
+unsigned long high_memory = 0;
 
-/**
- * 该宏用于判断给定线性地址是否位于当前进程的代码段中
- * `(((addr)+4095)&~4095)` 用于取得线性地址 addr 所在内存页面的末端地址
- * 这实际上就是 (addr + 0xFFF) & 0xFFFFF000 */
-#define CODE_SPACE(addr) ((((addr) + 4095) & ~4095) < current->start_code + current->end_code)
+extern unsigned long pg0[1024];		/* page table for 0-4MB for everybody */
 
-unsigned long HIGH_MEMORY = 0; // 内存高端地址
+extern void sound_mem_init(void);
+extern void die_if_kernel(char *,struct pt_regs *,long);
 
-/* 拷贝一页内容 */
-#define copy_page(from, to) __asm__("cld ; rep movsl" ::"S"(from), "D"(to), "c"(1024))
+int nr_swap_pages = 0;
+int nr_free_pages = 0;
+unsigned long free_page_list = 0;
+/*
+ * The secondary free_page_list is used for malloc() etc things that
+ * may need pages during interrupts etc. Normal get_free_page() operations
+ * don't touch it, so it stays as a kind of "panic-list", that can be
+ * accessed when all other mm tricks have failed.
+ */
+int nr_secondary_pages = 0;
+unsigned long secondary_page_list = 0;
 
-// 物理内存映射字节图(1字节代表1页内存)
-// 每个页面对应的字节用于标志页面当前被引用(占用)次数, 使用 PAGING_PAGES
-// 最大可以映射 15Mb 的内存空间 在初始化函数 mem_init 中,
-// 对于不能用作主内存区页面的位置均都预先被设置成 USED
-unsigned char mem_map[PAGING_PAGES] = {
-    0,
-};
+#define copy_page(from,to) \
+__asm__("cld ; rep ; movsl": :"S" (from),"D" (to),"c" (1024):"cx","di","si")
+
+unsigned short * mem_map = NULL;
+
+#define CODE_SPACE(addr,p) ((addr) < (p)->end_code)
 
 /*
- * Free a page of memory at physical address 'addr'. Used by
- * 'free_page_tables()'
- *
- * 从 addr 处释放所属的内从空间
+ * oom() prints a message (so that the user knows why the process died),
+ * and gives the process an untrappable SIGSEGV.
  */
-void free_page(unsigned long addr)
+void oom(struct task_struct * task)
 {
-    // 物理地址 1MB 以下的内存空间用于内核程序和缓冲, 不作为分配页面的内存空间
-    if (addr < LOW_MEM)
-        return;
+	printk("\nout of memory\n");
+	task->sigaction[SIGKILL-1].sa_handler = NULL;
+	task->blocked &= ~(1<<(SIGKILL-1));
+	send_sig(SIGKILL,task,1);
+}
 
-    // 如果物理地址 addr 大于等于系统所含物理内存最高端,
-    // 则显示出错信息并且内核停止工作
-    if (addr >= HIGH_MEMORY)
-        panic("trying to free nonexistent page");
+static void free_one_table(unsigned long * page_dir)
+{
+	int j;
+	unsigned long pg_table = *page_dir;
+	unsigned long * page_table;
 
-    // 计算 addr 所属的页面编号 == `addr = MAP_NR(addr)`
-    addr -= LOW_MEM;
-    addr >>= 12;
-
-    // 如果页面还有引用, 就不做处理
-    if (mem_map[addr]--)
-        return;
-
-    // 否则页面已经是 0 引用, 这种情况就是重复释放页面, 看错是出错了
-    mem_map[addr] = 0;
-    panic("trying to free free page");
+	if (!pg_table)
+		return;
+	*page_dir = 0;
+	if (pg_table >= high_memory || !(pg_table & PAGE_PRESENT)) {
+		printk("Bad page table: [%p]=%08lx\n",page_dir,pg_table);
+		return;
+	}
+	if (mem_map[MAP_NR(pg_table)] & MAP_PAGE_RESERVED)
+		return;
+	page_table = (unsigned long *) (pg_table & PAGE_MASK);
+	for (j = 0 ; j < PTRS_PER_PAGE ; j++,page_table++) {
+		unsigned long pg = *page_table;
+		
+		if (!pg)
+			continue;
+		*page_table = 0;
+		if (pg & PAGE_PRESENT)
+			free_page(PAGE_MASK & pg);
+		else
+			swap_free(pg);
+	}
+	free_page(PAGE_MASK & pg_table);
 }
 
 /*
- * This function frees a continuos block of page tables, as needed
- * by 'exit()'. As does copy_page_tables(), this handles only 4Mb blocks.
- *
- * 释放从线性地址 from 开始, 大小为 size 的这部分内存空间所属的页面
- * 这个函数是以页目录项为单位操作的, 一口气操作 4MB
+ * This function clears all user-level page tables of a process - this
+ * is needed by execve(), so that old pages aren't in the way. Note that
+ * unlike 'free_page_tables()', this function still leaves a valid
+ * page-table-tree in memory: it just removes the user pages. The two
+ * functions are similar, but there is a fundamental difference.
  */
-int free_page_tables(unsigned long from, unsigned long size)
+void clear_page_tables(struct task_struct * tsk)
 {
-    unsigned long *pg_table;
-    unsigned long *dir, nr;
+	int i;
+	unsigned long pg_dir;
+	unsigned long * page_dir;
 
-    /* 因为每个页表最多映射 4M 的内存, 所以 from 表示的线性基地址, 必然是 4M
-     * 对齐的 */
-    if (from & 0x3fffff)
-        panic("free_page_tables called with wrong alignment");
+	if (!tsk)
+		return;
+	if (tsk == task[0])
+		panic("task[0] (swapper) doesn't support exec()\n");
+	pg_dir = tsk->tss.cr3;
+	page_dir = (unsigned long *) pg_dir;
+	if (!page_dir || page_dir == swapper_pg_dir) {
+		printk("Trying to clear kernel page-directory: not good\n");
+		return;
+	}
+	if (mem_map[MAP_NR(pg_dir)] > 1) {
+		unsigned long * new_pg;
 
-    /* 0~4M 开始的这部分空间是内核专用, 也不允许释放 */
-    if (!from)
-        panic("Trying to free up swapper memory space");
-
-    /* size 换算成有几个 4M 页面簇 */
-    size = (size + 0x3fffff) >> 22;
-
-    /* 因为 page directory 在内存地址 0 处, 这里直接算出 from 所属的页目录项(高
-     * 10 位) 然后从此页目录项开始遍历页面簇 没有 `>> 20` 而不是 22
-     * 是因为还要考虑每个 PDE 占据 4 字节 */
-    dir = (unsigned long *)((from >> 20) & 0xffc); /* _pg_dir = 0 */
-    for (; size-- > 0; dir++) {
-        if (!(1 & *dir)) /* 页目录项不存在自然不需要处理 */
-            continue;
-        /* 解引用页目录项, 得到页表地址 */
-        pg_table = (unsigned long *)(0xfffff000 & *dir);
-        for (nr = 0; nr < 1024; nr++) {
-            /* 对 pg_table 解引用, 得到的是物理页面的地址 */
-            if (*pg_table) {
-                if (1 & *pg_table)
-                    /* 页面要是存在就回收, `&` 操作是在清理页表项属性 */
-                    free_page(0xfffff000 & *pg_table);
-                else
-                    /* 被交换出去的页面, 也需要清理
-                     * swap 出去的页面, PTE 记录的是 (swap_nr << 1) */
-                    swap_free(*pg_table >> 1);
-                *pg_table = 0;
-            }
-            pg_table++;
-        }
-
-        /* page table 所在的页面也要被释放 */
-        free_page(0xfffff000 & *dir);
-        *dir = 0; /* 清空 PDE */
-    }
-
-    /* 重新加载 CR0, 使得 TLB 失效 */
-    invalidate();
-    return 0;
+		if (!(new_pg = (unsigned long*) get_free_page(GFP_KERNEL))) {
+			oom(tsk);
+			return;
+		}
+		for (i = 768 ; i < 1024 ; i++)
+			new_pg[i] = page_dir[i];
+		free_page(pg_dir);
+		tsk->tss.cr3 = (unsigned long) new_pg;
+		return;
+	}
+	for (i = 0 ; i < 768 ; i++,page_dir++)
+		free_one_table(page_dir);
+	invalidate();
+	return;
 }
 
 /*
- *  Well, here is one of the most complicated functions in mm. It
- * copies a range of linerar addresses by copying only the pages.
- * Let's hope this is bug-free, 'cause this one I don't want to debug :-)
- *
- * Note! We don't copy just any chunks of memory - addresses have to
- * be divisible by 4Mb (one page-directory entry), as this makes the
- * function easier. It's used only by fork anyway.
- *
- * NOTE 2!! When from==0 we are copying kernel space for the first
- * fork(). Then we DONT want to copy a full page-directory entry, as
- * that would lead to some serious memory waste - we just copy the
- * first 160 pages - 640kB. Even that is more than we need, but it
- * doesn't take any more memory - we don't copy-on-write in the low
- * 1 Mb-range, so the pages can be shared with the kernel. Thus the
- * special case for nr=xxxx.
- *
- * 从 from 到 to 复制 size 对应线性空间对应的 PDE 和 PTE
+ * This function frees up all page tables of a process when it exits.
  */
-int copy_page_tables(unsigned long from, unsigned long to, long size)
+void free_page_tables(struct task_struct * tsk)
 {
-    unsigned long *from_page_table;
-    unsigned long *to_page_table;
-    unsigned long this_page;
-    unsigned long *from_dir, *to_dir;
-    unsigned long new_page;
-    unsigned long nr;
+	int i;
+	unsigned long pg_dir;
+	unsigned long * page_dir;
 
-    /* 指定的线性地址都应该是 4MB 对齐的 */
-    if ((from & 0x3fffff) || (to & 0x3fffff))
-        panic("copy_page_tables called with wrong alignment");
-
-    /* 找到 from, to 所属的 PDE */
-    from_dir = (unsigned long *)((from >> 20) & 0xffc); /* _pg_dir = 0 */
-    to_dir = (unsigned long *)((to >> 20) & 0xffc);
-    size = ((unsigned)(size + 0x3fffff)) >> 22; /* size 跨度有几个 PDE */
-    for (; size-- > 0; from_dir++, to_dir++) {
-        /* 如果目标页面已经存在, 就报错退出 */
-        if (1 & *to_dir)
-            panic("copy_page_tables: already exist");
-
-        /* 如果源页面不存在, 那也不处理 */
-        if (!(1 & *from_dir))
-            continue;
-
-        /* 源页表, 目标页表新分配 */
-        from_page_table = (unsigned long *)(0xfffff000 & *from_dir);
-        if (!(to_page_table = (unsigned long *)get_free_page()))
-            return -1; /* Out of memory, see freeing */
-
-        /* 目标页目录项属性 (PDE) */
-        *to_dir = ((unsigned long)to_page_table) | 7;
-
-        /* from=0 有特殊含义, 表示复制内核页表内容, 这时候只复制 160 项
-         * 其他情况下, 复制整个页面 1024 项 */
-        nr = (from == 0) ? 0xA0 : 1024;
-        for (; nr-- > 0; from_page_table++, to_page_table++) {
-            this_page = *from_page_table; // PTE
-            if (!this_page) {
-                continue;
-            }
-
-            /* 这个表示页面存在, 但是被交换到了 SWAP */
-            if (!(PAGE_PRESENT & this_page)) {
-                if (!(new_page = get_free_page())) {
-                    return -1;
-                }
-
-                read_swap_page(this_page >> 1, (char *)new_page);
-                *to_page_table = this_page;
-
-                /* TODO: 这里设置 DIRTY 的含义
-                 * 答: 可能是 '标记为 dirty 之后无法共享这个页' ??? */
-                *from_page_table = new_page | (PAGE_DIRTY | PRESENT_RW_USER);
-                continue;
-            }
-
-            /* 页面清理掉写标记, 主要是如果有页面是公用的, 就可以实现
-             * copy-on-write 操作 */
-            this_page &= ~PAGE_RW; /* 清理掉 RW 属性 */
-            *to_page_table = this_page;
-            /* 位于主内存区域的页面, 需要追加引用计数 */
-            if (this_page > LOW_MEM) {
-                *from_page_table = this_page; /* 源页表也只读 */
-                this_page -= LOW_MEM;
-                this_page >>= 12;
-                mem_map[this_page]++;
-            }
-        }
-    }
-
-    /* 因为上面有 page 的属性调整, 这里需要重载页表, 使 TLB 失效 */
-    invalidate();
-    return 0;
+	if (!tsk)
+		return;
+	if (tsk == task[0]) {
+		printk("task[0] (swapper) killed: unable to recover\n");
+		panic("Trying to free up swapper memory space");
+	}
+	pg_dir = tsk->tss.cr3;
+	if (!pg_dir || pg_dir == (unsigned long) swapper_pg_dir) {
+		printk("Trying to free kernel page-directory: not good\n");
+		return;
+	}
+	tsk->tss.cr3 = (unsigned long) swapper_pg_dir;
+	if (tsk == current)
+		__asm__ __volatile__("movl %0,%%cr3": :"a" (tsk->tss.cr3));
+	if (mem_map[MAP_NR(pg_dir)] > 1) {
+		free_page(pg_dir);
+		return;
+	}
+	page_dir = (unsigned long *) pg_dir;
+	for (i = 0 ; i < PTRS_PER_PAGE ; i++,page_dir++)
+		free_one_table(page_dir);
+	free_page(pg_dir);
+	invalidate();
 }
 
-/**
- * @brief 把物理内存页面映射到线性地址空间指定处
- *
+/*
+ * clone_page_tables() clones the page table for a process - both
+ * processes will have the exact same pages in memory. There are
+ * probably races in the memory management with cloning, but we'll
+ * see..
+ */
+int clone_page_tables(struct task_struct * tsk)
+{
+	unsigned long pg_dir;
+
+	pg_dir = current->tss.cr3;
+	mem_map[MAP_NR(pg_dir)]++;
+	tsk->tss.cr3 = pg_dir;
+	return 0;
+}
+
+/*
+ * copy_page_tables() just copies the whole process memory range:
+ * note the special handling of RESERVED (ie kernel) pages, which
+ * means that they are always shared by all processes.
+ */
+int copy_page_tables(struct task_struct * tsk)
+{
+	int i;
+	unsigned long old_pg_dir, *old_page_dir;
+	unsigned long new_pg_dir, *new_page_dir;
+
+	if (!(new_pg_dir = get_free_page(GFP_KERNEL)))
+		return -ENOMEM;
+	old_pg_dir = current->tss.cr3;
+	tsk->tss.cr3 = new_pg_dir;
+	old_page_dir = (unsigned long *) old_pg_dir;
+	new_page_dir = (unsigned long *) new_pg_dir;
+	for (i = 0 ; i < PTRS_PER_PAGE ; i++,old_page_dir++,new_page_dir++) {
+		int j;
+		unsigned long old_pg_table, *old_page_table;
+		unsigned long new_pg_table, *new_page_table;
+
+		old_pg_table = *old_page_dir;
+		if (!old_pg_table)
+			continue;
+		if (old_pg_table >= high_memory || !(old_pg_table & PAGE_PRESENT)) {
+			printk("copy_page_tables: bad page table: "
+				"probable memory corruption");
+			*old_page_dir = 0;
+			continue;
+		}
+		if (mem_map[MAP_NR(old_pg_table)] & MAP_PAGE_RESERVED) {
+			*new_page_dir = old_pg_table;
+			continue;
+		}
+		if (!(new_pg_table = get_free_page(GFP_KERNEL))) {
+			free_page_tables(tsk);
+			return -ENOMEM;
+		}
+		old_page_table = (unsigned long *) (PAGE_MASK & old_pg_table);
+		new_page_table = (unsigned long *) (PAGE_MASK & new_pg_table);
+		for (j = 0 ; j < PTRS_PER_PAGE ; j++,old_page_table++,new_page_table++) {
+			unsigned long pg;
+			pg = *old_page_table;
+			if (!pg)
+				continue;
+			if (!(pg & PAGE_PRESENT)) {
+				*new_page_table = swap_duplicate(pg);
+				continue;
+			}
+			if ((pg & (PAGE_RW | PAGE_COW)) == (PAGE_RW | PAGE_COW))
+				pg &= ~PAGE_RW;
+			*new_page_table = pg;
+			if (mem_map[MAP_NR(pg)] & MAP_PAGE_RESERVED)
+				continue;
+			*old_page_table = pg;
+			mem_map[MAP_NR(pg)]++;
+		}
+		*new_page_dir = new_pg_table | PAGE_TABLE;
+	}
+	invalidate();
+	return 0;
+}
+
+/*
+ * a more complete version of free_page_tables which performs with page
+ * granularity.
+ */
+int unmap_page_range(unsigned long from, unsigned long size)
+{
+	unsigned long page, page_dir;
+	unsigned long *page_table, *dir;
+	unsigned long poff, pcnt, pc;
+
+	if (from & ~PAGE_MASK) {
+		printk("unmap_page_range called with wrong alignment\n");
+		return -EINVAL;
+	}
+	size = (size + ~PAGE_MASK) >> PAGE_SHIFT;
+	dir = PAGE_DIR_OFFSET(current->tss.cr3,from);
+	poff = (from >> PAGE_SHIFT) & (PTRS_PER_PAGE-1);
+	if ((pcnt = PTRS_PER_PAGE - poff) > size)
+		pcnt = size;
+
+	for ( ; size > 0; ++dir, size -= pcnt,
+	     pcnt = (size > PTRS_PER_PAGE ? PTRS_PER_PAGE : size)) {
+		if (!(page_dir = *dir))	{
+			poff = 0;
+			continue;
+		}
+		if (!(page_dir & PAGE_PRESENT)) {
+			printk("unmap_page_range: bad page directory.");
+			continue;
+		}
+		page_table = (unsigned long *)(PAGE_MASK & page_dir);
+		if (poff) {
+			page_table += poff;
+			poff = 0;
+		}
+		for (pc = pcnt; pc--; page_table++) {
+			if ((page = *page_table) != 0) {
+				*page_table = 0;
+				if (1 & page) {
+					if (!(mem_map[MAP_NR(page)] & MAP_PAGE_RESERVED))
+						if (current->rss > 0)
+							--current->rss;
+					free_page(PAGE_MASK & page);
+				} else
+					swap_free(page);
+			}
+		}
+		if (pcnt == PTRS_PER_PAGE) {
+			*dir = 0;
+			free_page(PAGE_MASK & page_dir);
+		}
+	}
+	invalidate();
+	return 0;
+}
+
+int zeromap_page_range(unsigned long from, unsigned long size, int mask)
+{
+	unsigned long *page_table, *dir;
+	unsigned long poff, pcnt;
+	unsigned long page;
+
+	if (mask) {
+		if ((mask & (PAGE_MASK|PAGE_PRESENT)) != PAGE_PRESENT) {
+			printk("zeromap_page_range: mask = %08x\n",mask);
+			return -EINVAL;
+		}
+		mask |= ZERO_PAGE;
+	}
+	if (from & ~PAGE_MASK) {
+		printk("zeromap_page_range: from = %08lx\n",from);
+		return -EINVAL;
+	}
+	dir = PAGE_DIR_OFFSET(current->tss.cr3,from);
+	size = (size + ~PAGE_MASK) >> PAGE_SHIFT;
+	poff = (from >> PAGE_SHIFT) & (PTRS_PER_PAGE-1);
+	if ((pcnt = PTRS_PER_PAGE - poff) > size)
+		pcnt = size;
+
+	while (size > 0) {
+		if (!(PAGE_PRESENT & *dir)) {
+				/* clear page needed here?  SRB. */
+			if (!(page_table = (unsigned long*) get_free_page(GFP_KERNEL))) {
+				invalidate();
+				return -ENOMEM;
+			}
+			if (PAGE_PRESENT & *dir) {
+				free_page((unsigned long) page_table);
+				page_table = (unsigned long *)(PAGE_MASK & *dir++);
+			} else
+				*dir++ = ((unsigned long) page_table) | PAGE_TABLE;
+		} else
+			page_table = (unsigned long *)(PAGE_MASK & *dir++);
+		page_table += poff;
+		poff = 0;
+		for (size -= pcnt; pcnt-- ;) {
+			if ((page = *page_table) != 0) {
+				*page_table = 0;
+				if (page & PAGE_PRESENT) {
+					if (!(mem_map[MAP_NR(page)] & MAP_PAGE_RESERVED))
+						if (current->rss > 0)
+							--current->rss;
+					free_page(PAGE_MASK & page);
+				} else
+					swap_free(page);
+			}
+			*page_table++ = mask;
+		}
+		pcnt = (size > PTRS_PER_PAGE ? PTRS_PER_PAGE : size);
+	}
+	invalidate();
+	return 0;
+}
+
+/*
+ * maps a range of physical memory into the requested pages. the old
+ * mappings are removed. any references to nonexistent pages results
+ * in null mappings (currently treated as "copy-on-access")
+ */
+int remap_page_range(unsigned long from, unsigned long to, unsigned long size, int mask)
+{
+	unsigned long *page_table, *dir;
+	unsigned long poff, pcnt;
+	unsigned long page;
+
+	if (mask) {
+		if ((mask & (PAGE_MASK|PAGE_PRESENT)) != PAGE_PRESENT) {
+			printk("remap_page_range: mask = %08x\n",mask);
+			return -EINVAL;
+		}
+	}
+	if ((from & ~PAGE_MASK) || (to & ~PAGE_MASK)) {
+		printk("remap_page_range: from = %08lx, to=%08lx\n",from,to);
+		return -EINVAL;
+	}
+	dir = PAGE_DIR_OFFSET(current->tss.cr3,from);
+	size = (size + ~PAGE_MASK) >> PAGE_SHIFT;
+	poff = (from >> PAGE_SHIFT) & (PTRS_PER_PAGE-1);
+	if ((pcnt = PTRS_PER_PAGE - poff) > size)
+		pcnt = size;
+
+	while (size > 0) {
+		if (!(PAGE_PRESENT & *dir)) {
+			/* clearing page here, needed?  SRB. */
+			if (!(page_table = (unsigned long*) get_free_page(GFP_KERNEL))) {
+				invalidate();
+				return -1;
+			}
+			*dir++ = ((unsigned long) page_table) | PAGE_TABLE;
+		}
+		else
+			page_table = (unsigned long *)(PAGE_MASK & *dir++);
+		if (poff) {
+			page_table += poff;
+			poff = 0;
+		}
+
+		for (size -= pcnt; pcnt-- ;) {
+			if ((page = *page_table) != 0) {
+				*page_table = 0;
+				if (PAGE_PRESENT & page) {
+					if (!(mem_map[MAP_NR(page)] & MAP_PAGE_RESERVED))
+						if (current->rss > 0)
+							--current->rss;
+					free_page(PAGE_MASK & page);
+				} else
+					swap_free(page);
+			}
+
+			/*
+			 * the first condition should return an invalid access
+			 * when the page is referenced. current assumptions
+			 * cause it to be treated as demand allocation in some
+			 * cases.
+			 */
+			if (!mask)
+				*page_table++ = 0;	/* not present */
+			else if (to >= high_memory)
+				*page_table++ = (to | mask);
+			else if (!mem_map[MAP_NR(to)])
+				*page_table++ = 0;	/* not present */
+			else {
+				*page_table++ = (to | mask);
+				if (!(mem_map[MAP_NR(to)] & MAP_PAGE_RESERVED)) {
+					++current->rss;
+					mem_map[MAP_NR(to)]++;
+				}
+			}
+			to += PAGE_SIZE;
+		}
+		pcnt = (size > PTRS_PER_PAGE ? PTRS_PER_PAGE : size);
+	}
+	invalidate();
+	return 0;
+}
+
+/*
  * This function puts a page in memory at the wanted address.
  * It returns the physical address of the page gotten, 0 if
  * out of memory (either when trying to access page-table or
  * page.)
- *
- * @param page 页面的物理地址
- * @param address 页面的线性地址
- * @return unsigned long
  */
-static unsigned long put_page(unsigned long page, unsigned long address)
+unsigned long put_page(struct task_struct * tsk,unsigned long page,
+	unsigned long address,int prot)
 {
-    unsigned long tmp, *page_table;
+	unsigned long *page_table;
 
-    /* NOTE !!! This uses the fact that _pg_dir=0 */
-
-    if (page < LOW_MEM || page >= HIGH_MEMORY) {
-        printk("Trying to put page %p at %p\n", page, address);
-    }
-
-    if (mem_map[(page - LOW_MEM) >> 12] != 1) {
-        printk("mem_map disagrees with %p at %p\n", page, address);
-    }
-
-    page_table = (unsigned long *)((address >> 20) & 0xffc); // PDT
-    if ((*page_table) & 1) {
-        page_table = (unsigned long *)(0xfffff000 & *page_table); // PTE
-    } else {
-        if (!(tmp = get_free_page())) {
-            return 0;
-        }
-
-        *page_table = tmp | PRESENT_RW_USER; // PTE
-        page_table = (unsigned long *)tmp;   // page table 只想最新分配的页面
-    }
-
-    page_table[(address >> 12) & 0x3ff] = page | PRESENT_RW_USER;
-
-    /* no need for invalidate
-     * put_page 的调用方只会是 do_no_page 中断处理函数,
-     * 因此这里始终都是插入新页面, 不需要失效 TLB 里面的条目 */
-
-    return page;
+	if ((prot & (PAGE_MASK|PAGE_PRESENT)) != PAGE_PRESENT)
+		printk("put_page: prot = %08x\n",prot);
+	if (page >= high_memory) {
+		printk("put_page: trying to put page %08lx at %08lx\n",page,address);
+		return 0;
+	}
+	page_table = PAGE_DIR_OFFSET(tsk->tss.cr3,address);
+	if ((*page_table) & PAGE_PRESENT)
+		page_table = (unsigned long *) (PAGE_MASK & *page_table);
+	else {
+		printk("put_page: bad page directory entry\n");
+		oom(tsk);
+		*page_table = BAD_PAGETABLE | PAGE_TABLE;
+		return 0;
+	}
+	page_table += (address >> PAGE_SHIFT) & (PTRS_PER_PAGE-1);
+	if (*page_table) {
+		printk("put_page: page already exists\n");
+		*page_table = 0;
+		invalidate();
+	}
+	*page_table = page | prot;
+/* no need for invalidate */
+	return page;
 }
 
 /*
@@ -293,164 +503,180 @@ static unsigned long put_page(unsigned long page, unsigned long address)
  * the page dirty: exec.c wants this, as it has earlier changed the page,
  * and we want the dirty-status to be correct (for VM). Thus the same
  * routine, but this time we mark it dirty too.
- *
- * 同 put_page, 但是会把 page 标记为脏页
  */
-unsigned long put_dirty_page(unsigned long page, unsigned long address)
+unsigned long put_dirty_page(struct task_struct * tsk, unsigned long page, unsigned long address)
 {
-    unsigned long tmp, *page_table;
+	unsigned long tmp, *page_table;
 
-    /* NOTE !!! This uses the fact that _pg_dir=0 */
-
-    if (page < LOW_MEM || page >= HIGH_MEMORY) {
-        printk("Trying to put page %p at %p\n", page, address);
-    }
-
-    if (mem_map[(page - LOW_MEM) >> 12] != 1) {
-        printk("mem_map disagrees with %p at %p\n", page, address);
-    }
-
-    page_table = (unsigned long *)((address >> 20) & 0xffc); /* PDE */
-    if ((*page_table) & 1) {
-        page_table = (unsigned long *)(0xfffff000 & *page_table);
-    } else {
-        if (!(tmp = get_free_page())) {
-            return 0;
-        }
-
-        *page_table = tmp | PRESENT_RW_USER;
-        page_table = (unsigned long *)tmp;
-    }
-
-    page_table[(address >> 12) & 0x3ff] = page | (PAGE_DIRTY | PRESENT_RW_USER); /* update PTE */
-    /* no need for invalidate */
-    return page;
+	if (page >= high_memory)
+		printk("put_dirty_page: trying to put page %08lx at %08lx\n",page,address);
+	if (mem_map[MAP_NR(page)] != 1)
+		printk("mem_map disagrees with %08lx at %08lx\n",page,address);
+	page_table = PAGE_DIR_OFFSET(tsk->tss.cr3,address);
+	if (PAGE_PRESENT & *page_table)
+		page_table = (unsigned long *) (PAGE_MASK & *page_table);
+	else {
+		if (!(tmp = get_free_page(GFP_KERNEL)))
+			return 0;
+		if (PAGE_PRESENT & *page_table) {
+			free_page(tmp);
+			page_table = (unsigned long *) (PAGE_MASK & *page_table);
+		} else {
+			*page_table = tmp | PAGE_TABLE;
+			page_table = (unsigned long *) tmp;
+		}
+	}
+	page_table += (address >> PAGE_SHIFT) & (PTRS_PER_PAGE-1);
+	if (*page_table) {
+		printk("put_dirty_page: page already exists\n");
+		*page_table = 0;
+		invalidate();
+	}
+	*page_table = page | (PAGE_DIRTY | PAGE_PRIVATE);
+/* no need for invalidate */
+	return page;
 }
 
-/**
- * @brief 这个函数在页面触发写保护的时候执行 Copy-On_Write
- *
- * @param table_entry
- */
-void un_wp_page(unsigned long *table_entry)
-{
-    unsigned long old_page, new_page;
-
-    old_page = 0xfffff000 & *table_entry;
-
-    /* 如果这个页面只有一个引用, 那就直接让这个页面可写, 然后失效 TLB */
-    if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)] == 1) {
-        *table_entry |= PAGE_RW;
-        invalidate();
-        return;
-    }
-
-    /* 如果不是, 我们就看到了所谓的 copy on write 技术
-     * 这里需要复制一份页面, 并把老页面计数减一, 然后更新 PTE 为可读写的新页面 */
-    if (!(new_page = get_free_page()))
-        oom();
-
-    if (old_page >= LOW_MEM)
-        mem_map[MAP_NR(old_page)]--;
-
-    copy_page(old_page, new_page);
-    *table_entry = new_page | PRESENT_RW_USER;
-    invalidate();
-}
-
-/**
- * @brief 处理页面写保护异常
- *
+/*
  * This routine handles present pages, when users try to write
  * to a shared page. It is done by copying the page to a new address
  * and decrementing the shared-page counter for the old page.
  *
- * If it's in code space we exit with a segment error.
+ * Note that we do many checks twice (look at do_wp_page()), as
+ * we have to be careful about race-conditions.
  *
- * 当用户试图往一共享页面上写时, 该函数处理已存在的内存页面(写时复制)
- * 它是通过将页面复制到一个新地址上并且递减原页面的共享计数值实现的
- * 如果它在代码空间，我们就显示段出错信息并退出。
- *
- * 写共享页面时需复制页面(写时复制)
- * 页异常中断处理过程中调用的 C 函数, 在 page.s 程序中被调用
- * 函数参数 error_code 和 address 是进程在写写保护页面时由
- * CPU产生异常而自动生成的
- *
- * error_code 指出出错类型, 参见本章开始处的"内存页面出错异常"一节
- * address 是产生异常的页面线性地址
- *
- * @param error_code
- * @param address
+ * Goto-purists beware: the only reason for goto's here is that it results
+ * in better assembly code.. The "default" path will see no jumps at all.
  */
-void do_wp_page(unsigned long error_code, unsigned long address)
+static void __do_wp_page(unsigned long error_code, unsigned long address,
+	struct task_struct * tsk, unsigned long user_esp)
 {
-    /* 首先判断 CPU 控制寄存器 CR2 给出的引起页面异常的线性地址在什么范围中
-     * 如果 address 小于 TASK_SIZE=0x4000000(即64MB),
-     * 表示异常页面位置在内核或任务 0 和任务 1 所处的线性地址范围内,
-     * 于是发出警告信息“内核范围内存被写保护” */
-    if (address < TASK_SIZE) {
-        printk("\n\rBAD! KERNEL MEMORY WP-ERR!\n\r");
-    }
+	unsigned long *pde, pte, old_page, prot;
+	unsigned long new_page;
 
-    /* 如果 (address–当前进程代码起始地址) 大于一个进程的长度(64MB), 表示
-     * address 所指的线性地址不在引起异常的进程线性地址空间范围内,
-     * 则在发出出错信息后退出 */
-    if (address - current->start_code > TASK_SIZE) {
-        printk("Bad things happen: page error in do_wp_page\n\r");
-        do_exit(SIGSEGV);
-    }
-
-#if 0
-/* we cannot do this yet: the estdio library writes to code space */
-/* stupid, stupid. I really want the libc.a from GNU */
-/* 如果线性地址位于进程的代码空间中，则终止执行程序。因为代码是只读的 */
-    if (CODE_SPACE(address))
-        do_exit(SIGSEGV);
-#endif
-
-    /* 参数部分在计算 pte 地址, 仔细看能看懂 */
-    un_wp_page((unsigned long *)(((address >> 10) & 0xffc) +
-                                 (0xfffff000 & *((unsigned long *)((address >> 20) & 0xffc)))));
+	new_page = __get_free_page(GFP_KERNEL);
+	pde = PAGE_DIR_OFFSET(tsk->tss.cr3,address);
+	pte = *pde;
+	if (!(pte & PAGE_PRESENT))
+		goto end_wp_page;
+	if ((pte & PAGE_TABLE) != PAGE_TABLE || pte >= high_memory)
+		goto bad_wp_pagetable;
+	pte &= PAGE_MASK;
+	pte += PAGE_PTR(address);
+	old_page = *(unsigned long *) pte;
+	if (!(old_page & PAGE_PRESENT))
+		goto end_wp_page;
+	if (old_page >= high_memory)
+		goto bad_wp_page;
+	if (old_page & PAGE_RW)
+		goto end_wp_page;
+	tsk->min_flt++;
+	prot = (old_page & ~PAGE_MASK) | PAGE_RW;
+	old_page &= PAGE_MASK;
+	if (mem_map[MAP_NR(old_page)] != 1) {
+		if (new_page) {
+			if (mem_map[MAP_NR(old_page)] & MAP_PAGE_RESERVED)
+				++tsk->rss;
+			copy_page(old_page,new_page);
+			*(unsigned long *) pte = new_page | prot;
+			free_page(old_page);
+			invalidate();
+			return;
+		}
+		free_page(old_page);
+		oom(tsk);
+		*(unsigned long *) pte = BAD_PAGE | prot;
+		invalidate();
+		return;
+	}
+	*(unsigned long *) pte |= PAGE_RW;
+	invalidate();
+	if (new_page)
+		free_page(new_page);
+	return;
+bad_wp_page:
+	printk("do_wp_page: bogus page at address %08lx (%08lx)\n",address,old_page);
+	*(unsigned long *) pte = BAD_PAGE | PAGE_SHARED;
+	send_sig(SIGKILL, tsk, 1);
+	goto end_wp_page;
+bad_wp_pagetable:
+	printk("do_wp_page: bogus page-table at address %08lx (%08lx)\n",address,pte);
+	*pde = BAD_PAGETABLE | PAGE_TABLE;
+	send_sig(SIGKILL, tsk, 1);
+end_wp_page:
+	if (new_page)
+		free_page(new_page);
+	return;
 }
 
 /*
- * 检查线性地址 address 对应的页面是否可写, 如果不可写, 则解除写保护 */
-void write_verify(unsigned long address)
-{
-    unsigned long page;
-
-    /* 先找到 PDE, 然后计算 PDE 指向的页表是否存在 */
-    if (!((page = *((unsigned long *)((address >> 20) & 0xffc))) & 1))
-        return;
-
-    page &= 0xfffff000;                /* PDE 指向的页表地址 */
-    page += ((address >> 10) & 0xffc); /* page 现在指向 PTE */
-
-    /* PTE 如果最低两位是 01, if 条件就是真
-     * 01 意味着不允许写但页面存在, 因此这时候做一次解除写保护 */
-    if ((3 & *(unsigned long *)page) == 1) /* non-writeable, present */
-        un_wp_page((unsigned long *)page);
-    return;
-}
-
-/**
- * @brief 分配一个空白页面, 并将线性地址 address 和这个页面对应起来
- *
- * @param address 新页面对应的线性地址
+ * check that a page table change is actually needed, and call
+ * the low-level function only in that case..
  */
-void get_empty_page(unsigned long address)
+void do_wp_page(unsigned long error_code, unsigned long address,
+	struct task_struct * tsk, unsigned long user_esp)
 {
-    unsigned long tmp;
+	unsigned long page;
+	unsigned long * pg_table;
 
-    if (!(tmp = get_free_page()) || !put_page(tmp, address)) {
-        free_page(tmp); /* 0 is ok - ignored */
-        oom();
-    }
+	pg_table = PAGE_DIR_OFFSET(tsk->tss.cr3,address);
+	page = *pg_table;
+	if (!page)
+		return;
+	if ((page & PAGE_PRESENT) && page < high_memory) {
+		pg_table = (unsigned long *) ((page & PAGE_MASK) + PAGE_PTR(address));
+		page = *pg_table;
+		if (!(page & PAGE_PRESENT))
+			return;
+		if (page & PAGE_RW)
+			return;
+		if (!(page & PAGE_COW)) {
+			if (user_esp && tsk == current) {
+				current->tss.cr2 = address;
+				current->tss.error_code = error_code;
+				current->tss.trap_no = 14;
+				send_sig(SIGSEGV, tsk, 1);
+				return;
+			}
+		}
+		if (mem_map[MAP_NR(page)] == 1) {
+			*pg_table |= PAGE_RW | PAGE_DIRTY;
+			invalidate();
+			return;
+		}
+		__do_wp_page(error_code, address, tsk, user_esp);
+		return;
+	}
+	printk("bad page directory entry %08lx\n",page);
+	*pg_table = 0;
 }
 
-/**
- * @brief 尝试对当前进程指定地址处的页面进行共享处理
- *
+int __verify_write(unsigned long start, unsigned long size)
+{
+	size--;
+	size += start & ~PAGE_MASK;
+	size >>= PAGE_SHIFT;
+	start &= PAGE_MASK;
+	do {
+		do_wp_page(1,start,current,0);
+		start += PAGE_SIZE;
+	} while (size--);
+	return 0;
+}
+
+static inline void get_empty_page(struct task_struct * tsk, unsigned long address)
+{
+	unsigned long tmp;
+
+	if (!(tmp = get_free_page(GFP_KERNEL))) {
+		oom(tsk);
+		tmp = BAD_PAGE;
+	}
+	if (!put_page(tsk,tmp,address,PAGE_PRIVATE))
+		free_page(tmp);
+}
+
+/*
  * try_to_share() checks the page at address "address" in the task "p",
  * to see if it exists, and if it is clean. If so, share it with the current
  * task.
@@ -458,397 +684,542 @@ void get_empty_page(unsigned long address)
  * NOTE! This assumes we have checked that p != current, and that they
  * share the same executable or library.
  *
- * 这个函数有个前提知识点: 所有进程使用的页目录项和页表项, 都是同一个
- *
- * 因为只可以共享代码段或者共享库所在的数据区, 因此执行到本函数, 可以认为当前进程与进程 p
- * 是同一执行代码, 也可以认为当前进程是由 p 进程执行 fork 操作产生的进程, 因此它们的代码
- * 内容一样. 如果未对数据段内容作过修改那么数据段内容也应一样. 如果 p 进程 address 处的
- * 页面存在并且没有被修改过的话, 就让当前进程与 p 进程共享之.
- *
- * 同时还需要验证指定的地址处是否已经申请了页面, 若是则出错/死机
- *
- * @param address 当前进程中相对于代码段的起始地址的逻辑地址
- * @param p 是将被共享页面的进程
- * @return int 1-页面共享处理成功, 0-失败
+ * We may want to fix this to allow page sharing for PIC pages at different
+ * addresses so that ELF will really perform properly. As long as the vast
+ * majority of sharable libraries load at fixed addresses this is not a
+ * big concern. Any sharing of pages between the buffer cache and the
+ * code space reduces the need for this as well.  - ERY
  */
-static int try_to_share(unsigned long address, struct task_struct *p)
+static int try_to_share(unsigned long address, struct task_struct * tsk,
+	struct task_struct * p, unsigned long error_code, unsigned long newpage)
 {
-    unsigned long from;
-    unsigned long to;
-    unsigned long from_page;
-    unsigned long to_page;
-    unsigned long phys_addr;
+	unsigned long from;
+	unsigned long to;
+	unsigned long from_page;
+	unsigned long to_page;
 
-    /* 页目录项索引 */
-    from_page = to_page = ((address >> 20) & 0xffc);
-
-    /* 这里的操作是 address 是进程空间里面的线性地址, 它的范围是 0-64MB, 因此 address 对应的 PDE,
-     * 是相对于进程空间本身的, 下面用 start_code 在计算一次 PDE, 这次算出来的是进程空间在 4GB 空间
-     * 上的偏移, 因此两者相加, 就是 address 在 4GB 空间上的页表项 */
-    from_page += ((p->start_code >> 20) & 0xffc);     // p进程目录项
-    to_page += ((current->start_code >> 20) & 0xffc); // 当前进程目录项
-
-    /* is there a page-directory at from?
-     * 源页目录项内容. 如果标记不存在, 谈不上共享, 直接退出 */
-    from = *(unsigned long *)from_page;
-    if (!(from & 1)) {
-        return 0;
-    }
-
-    from &= 0xfffff000;                           /* 得到源页表页地址 */
-    from_page = from + ((address >> 10) & 0xffc); /* 页表页基址加上页表页索引, 得指向 PTE 指针 */
-    phys_addr = *(unsigned long *)from_page;      /* 取出来 PTE 内容 */
-
-    /* is the page clean and present? */
-    if ((phys_addr & (PAGE_DIRTY | PAGE_PRESENT)) != PAGE_PRESENT) {
-        return 0;
-    }
-
-    /* 源页面物理地址 */
-    phys_addr &= 0xfffff000;
-    if (phys_addr >= HIGH_MEMORY || phys_addr < LOW_MEM) {
-        /* 要求物理地址在主内存空间, 否则也不共享 */
-        return 0;
-    }
-
-    /* 目的页目录项内容, 如果标记不存在, 需要分配一个当做页表的页 */
-    to = *(unsigned long *)to_page;
-    if (!(to & 1)) {
-        if ((to = get_free_page())) {
-            /* 页表属性: 存在,可读写,超级用户权限 */
-            *(unsigned long *)to_page = to | (PRESENT_RW_USER);
-        } else {
-            oom();
-        }
-    }
-
-    to &= 0xfffff000;                         /* 页表页地址 */
-    to_page = to + ((address >> 10) & 0xffc); /* PTE 地址 */
-    if (PAGE_PRESENT & *(unsigned long *)to_page) {
-        /* 要把 from 共享到 to, 自然要求 to 不存在 */
-        panic("try_to_share: to_page already exists");
-    }
-
-    /* share them: write-protect
-     * 把写标记清除, 将来好 Copy-On-Write
-     * 并让 from_page, to_page 都指向 from_page 对应的物理地址 */
-    *(unsigned long *)from_page &= ~PAGE_RW;
-    *(unsigned long *)to_page = *(unsigned long *)from_page;
-
-    /* 更新 TLB */
-    invalidate();
-
-    // 将内存页引用计数 +1
-    phys_addr -= LOW_MEM;
-    phys_addr >>= 12;
-    mem_map[phys_addr]++;
-
-    return 1;
+	from_page = (unsigned long)PAGE_DIR_OFFSET(p->tss.cr3,address);
+	to_page = (unsigned long)PAGE_DIR_OFFSET(tsk->tss.cr3,address);
+/* is there a page-directory at from? */
+	from = *(unsigned long *) from_page;
+	if (!(from & PAGE_PRESENT))
+		return 0;
+	from &= PAGE_MASK;
+	from_page = from + PAGE_PTR(address);
+	from = *(unsigned long *) from_page;
+/* is the page clean and present? */
+	if ((from & (PAGE_PRESENT | PAGE_DIRTY)) != PAGE_PRESENT)
+		return 0;
+	if (from >= high_memory)
+		return 0;
+	if (mem_map[MAP_NR(from)] & MAP_PAGE_RESERVED)
+		return 0;
+/* is the destination ok? */
+	to = *(unsigned long *) to_page;
+	if (!(to & PAGE_PRESENT))
+		return 0;
+	to &= PAGE_MASK;
+	to_page = to + PAGE_PTR(address);
+	if (*(unsigned long *) to_page)
+		return 0;
+/* share them if read - do COW immediately otherwise */
+	if (error_code & PAGE_RW) {
+		if(!newpage)	/* did the page exist?  SRB. */
+			return 0;
+		copy_page((from & PAGE_MASK),newpage);
+		to = newpage | PAGE_PRIVATE;
+	} else {
+		mem_map[MAP_NR(from)]++;
+		from &= ~PAGE_RW;
+		to = from;
+		if(newpage)	/* only if it existed. SRB. */
+			free_page(newpage);
+	}
+	*(unsigned long *) from_page = from;
+	*(unsigned long *) to_page = to;
+	invalidate();
+	return 1;
 }
 
-/**
- * @brief 查找 inode 是否已经在内存中, 如果可能将对应的内存映射到 address
- *
+/*
  * share_page() tries to find a process that could share a page with
  * the current one. Address is the address of the wanted page relative
  * to the current data space.
  *
  * We first check if it is at all feasible by checking executable->i_count.
  * It should be >1 if there are other tasks sharing this inode.
- *
- * share_page 试图找到一个进程, 它可以与当前进程共享页面. 参数 address 是
- * 当前进程数据空间中期望共享的某页面地址
- *
- * 首先我们通过检测 `executable->i_count` 来查证是否可行, 如果有其他任务已共享
- * 该 inode, 则它应该大于 1
- *
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * 在发生缺页异常时, 首先看看能否与运行同一个执行文件的其他进程进行页面共享处理该函数首先判断系统中
- * 是否有另一个进程也在运行当前进程一样的执行文件. 若有, 则在系统当前所有任务中寻找这样的任务.
- * 若找到了这样的任务就尝试与其共享指定地址处的页面. 若系统中没有其他任务正在运行与当前进程相同的
- * 执行文件, 那么共享页面操作的前提条件不存在, 因此函数立刻退出.
- *
- * 判断系统中是否有另一个进程也在执行同一个执行文件的方法是利用进程任务数据结构中的 executable
- * 字段(或 library 字段), 该字段指向进程正在执行程序(或使用的库文件) 在内存中的 inode. 根据该
- * inode 的引用次数 i_count 我们可以进行这种判断, 若节点的 i_count 值大于 1, 则表明系统中有两
- * 个进程正在运行同一个执行文件(或库文件), 于是可以再对任务结构数组中所有任务比较是否有相同的
- * executable 字段(或 library 字段) 来最后确定多个进程运行着相同执行文件的情况
- *
- * @param inode 欲进行共享页面进程执行文件的内存 inode
- * @param address 当前进程中相对于代码段的起始地址的逻辑地址
- * @return int 1-共享操作成功, 0-失败
  */
-static int share_page(struct m_inode *inode, unsigned long address)
+int share_page(struct vm_area_struct * area, struct task_struct * tsk,
+	struct inode * inode,
+	unsigned long address, unsigned long error_code, unsigned long newpage)
 {
-    struct task_struct **p;
+	struct task_struct ** p;
 
-    /* 检查文件 i 节点的引用数量, 如果这个节点引用数 <= 1
-     * 说明它在内存中只有一个进程在用, 谈不上共享 */
-    if (inode->i_count < 2 || !inode)
-        return 0;
-
-    /* 遍历进程列表, 找找是那个进程和当前进程共用了 inode,
-     * 然后试着共享这个进程的页面 */
-    for (p = &LAST_TASK; p > &FIRST_TASK; --p) {
-        if (!*p) {
-            continue;
-        }
-
-        if (current == *p) {
-            continue;
-        }
-
-        /* address 位于库区域还是自生可执行区域 */
-        if (address < LIBRARY_OFFSET) {
-            if (inode != (*p)->executable) {
-                continue;
-            }
-        } else {
-            if (inode != (*p)->library) {
-                continue;
-            }
-        }
-
-        /* 试着共享页面, 如果成功直接退出, 如果不成功继续尝试和其他的 task 共享 */
-        if (try_to_share(address, *p)) {
-            return 1;
-        }
-    }
-
-    return 0;
+	if (!inode || inode->i_count < 2 || !area->vm_ops)
+		return 0;
+	for (p = &LAST_TASK ; p > &FIRST_TASK ; --p) {
+		if (!*p)
+			continue;
+		if (tsk == *p)
+			continue;
+		if (inode != (*p)->executable) {
+			  if(!area) continue;
+			/* Now see if there is something in the VMM that
+			   we can share pages with */
+			if(area){
+			  struct vm_area_struct * mpnt;
+			  for (mpnt = (*p)->mmap; mpnt; mpnt = mpnt->vm_next) {
+			    if (mpnt->vm_ops == area->vm_ops &&
+			       mpnt->vm_inode->i_ino == area->vm_inode->i_ino&&
+			       mpnt->vm_inode->i_dev == area->vm_inode->i_dev){
+			      if (mpnt->vm_ops->share(mpnt, area, address))
+				break;
+			    };
+			  };
+			  if (!mpnt) continue;  /* Nope.  Nuthin here */
+			};
+		}
+		if (try_to_share(address,tsk,*p,error_code,newpage))
+			return 1;
+	}
+	return 0;
 }
 
-/**
- * @brief 处理缺页异常
- *
- * 页面异常有两种类型, 一种是写保护异常, 还有一种是缺页异常
- *
- * @param error_code
- * @param address
+/*
+ * fill in an empty page-table if none exists.
  */
-void do_no_page(unsigned long error_code, unsigned long address)
+static inline unsigned long get_empty_pgtable(struct task_struct * tsk,unsigned long address)
 {
-    int nr[4];
-    unsigned long tmp;
-    unsigned long page;
-    int block, i;
-    struct m_inode *inode;
+	unsigned long page;
+	unsigned long *p;
 
-    /* 只为主内存空间服务 */
-    if (address < TASK_SIZE) {
-        printk("\n\rBAD!! KERNEL PAGE MISSING\n\r");
-    }
-
-    /* 超出了应用自身的空间范围 */
-    if (address - current->start_code > TASK_SIZE) {
-        printk("Bad things happen: nonexistent page error in do_no_page\n\r");
-        do_exit(SIGSEGV);
-    }
-
-    /* 页目录表在 0x0 位置处 */
-    page = *(unsigned long *)((address >> 20) & 0xffc); /* PDE 内容, ((address >> 22) << 2) */
-    if (page & 1) {                                     /* PDE 对应的页存在 */
-        page &= 0xfffff000;                             /* 页表页地址 */
-        page += (address >> 10) & 0xffc;                /* PTE 地址 */
-        tmp = *(unsigned long *)page;                   /* PTE 内容 */
-        if (tmp && !(1 & tmp)) {                        /* P=0, 只需要把页面交换回来就行了 */
-            swap_in((unsigned long *)page);
-            return;
-        }
-    }
-
-    /* 到这里有 2 种情况
-     *  1. (page & 1) = 0, 即页表页不存在
-     *  2. PTE = nil 或者 (PTE & 1) == 1, 物理帧不存在 */
-
-    /* 进程内存模型如下:
-     * (代码段) -- (数据段 -- 栈 -- ARGS -- LIBRARY) */
-
-    address &= 0xfffff000; /* address 对应的线性空间页面起始位置地址 */
-
-    /* 得到 address 页面在进程内部的相对位置, 这个可以帮我们判断 address
-     * 对应的是什么性质的内存区域 */
-    tmp = address - current->start_code;
-    if (tmp >= LIBRARY_OFFSET) {
-        /* 如果是 library 缺页异常, 加载 library 对应的 inode 数据 */
-        inode = current->library;
-        block = 1 + (tmp - LIBRARY_OFFSET) / BLOCK_SIZE;
-    } else if (tmp < current->end_data) {
-        /* 这里是代码段对应的缺页, 加载代码段 */
-        inode = current->executable;
-        block = 1 + tmp / BLOCK_SIZE;
-    } else {
-        /* 其他情况, 不用加载磁盘 */
-        inode = NULL;
-        block = 0;
-    }
-
-    /* 对除了 library 和 executable 部分的缺页, 直接分配新页面
-     * 这种页面一般是 '动态申请的页面或存放栈信息的页面' */
-    if (!inode) {
-        get_empty_page(address);
-        return;
-    }
-
-    /* 尝试共享已有页面 */
-    if (share_page(inode, tmp)) {
-        return;
-    }
-
-    /* 不能共享页面的, 分配新页面 */
-    if (!(page = get_free_page())) {
-        oom();
-    }
-
-    /* 根据这个块号和执行文件的 i 节点, 我们就可以从映射位图中找到对应块设备中
-     * 对应的设备逻辑块号(保存在 nr[] 数组中), 利用 bread_page 即可把这 4
-     * 个逻辑块读入到物理页面 page 中 */
-
-    /* remember that 1 block is used for header
-     * 程序头要使用 1 个数据块(1024B) */
-    for (i = 0; i < 4; block++, i++)
-        nr[i] = bmap(inode, block);
-
-    bread_page(page, inode->i_dev, nr); /* 把磁盘上的数据读取到内存里 */
-
-    /* TODO-DONE: 没看懂这里.
-     * tmp 是 address 向下对齐 4KB 页面后在进程内存布局内部的相对位置
-     * `tmp + 4096` 计算的是 address 所在页面的结束位置
-     * `tmp + 4096 - current->end_data` 计算的是, 页面结束位置和数据段结束位置的距离
-     *
-     * 如果这个距离小于 4095, 说明 address 所在页面, 是在数据段内部的.
-     * 如果这个距离值再大于 0, 说明 address 所在的页面, 是数据段的最后一个页面
-     *
-     * 我们需要把数据段的最后一个页面超出二进制映像的部分, 填充为 0 值 */
-    i = tmp + 4096 - current->end_data;
-    if (i > 4095) {
-        i = 0;
-    }
-
-    /* 下面的 for 循环, 从页面的结束为止开始, 擦除 i 字节数据 */
-    tmp = page + 4096;
-    while (i-- > 0) {
-        tmp--;
-        *(char *)tmp = 0;
-    }
-
-    /* 新页和线性地址关联起来 */
-    if (put_page(page, address)) {
-        return;
-    }
-
-    free_page(page);
-    oom();
+	p = PAGE_DIR_OFFSET(tsk->tss.cr3,address);
+	if (PAGE_PRESENT & *p)
+		return *p;
+	if (*p) {
+		printk("get_empty_pgtable: bad page-directory entry \n");
+		*p = 0;
+	}
+	page = get_free_page(GFP_KERNEL);
+	p = PAGE_DIR_OFFSET(tsk->tss.cr3,address);
+	if (PAGE_PRESENT & *p) {
+		free_page(page);
+		return *p;
+	}
+	if (*p) {
+		printk("get_empty_pgtable: bad page-directory entry \n");
+		*p = 0;
+	}
+	if (page) {
+		*p = page | PAGE_TABLE;
+		return *p;
+	}
+	oom(current);
+	*p = BAD_PAGETABLE | PAGE_TABLE;
+	return 0;
 }
 
-/**
- * 内存初始化, 只管理 start ~ end 之间的内存空间
- * 这部分内从空间叫做主内存区域, 他们并不是全机器上的全部空间 */
-void mem_init(long start_mem, long end_mem)
+void do_no_page(unsigned long error_code, unsigned long address,
+	struct task_struct *tsk, unsigned long user_esp)
 {
-    int i;
+	unsigned long tmp;
+	unsigned long page;
+	struct vm_area_struct * mpnt;
 
-    HIGH_MEMORY = end_mem;
-
-    // 这里吧全部的内存都标记为占用状态
-    for (i = 0; i < PAGING_PAGES; i++) {
-        mem_map[i] = USED;
-    }
-
-    /* 找到 start_mem 所属的页面编号 */
-    i = MAP_NR(start_mem);
-
-    /* 计算主内存区域页面总量 */
-    end_mem -= start_mem;
-    end_mem >>= 12;
-
-    /* 再把主内存区域所属的页面置为空闲
-     * 请注意这里的处理主内存区域不是从 1M 开始的
-     * Linux 主内存区域只是 **最多** 能管理 15MB 主内存区域 */
-    while (end_mem-- > 0) {
-        mem_map[i++] = 0;
-    }
+	page = get_empty_pgtable(tsk,address);
+	if (!page)
+		return;
+	page &= PAGE_MASK;
+	page += PAGE_PTR(address);
+	tmp = *(unsigned long *) page;
+	if (tmp & PAGE_PRESENT)
+		return;
+	++tsk->rss;
+	if (tmp) {
+		++tsk->maj_flt;
+		swap_in((unsigned long *) page);
+		return;
+	}
+	address &= 0xfffff000;
+	tmp = 0;
+	for (mpnt = tsk->mmap; mpnt != NULL; mpnt = mpnt->vm_next) {
+		if (address < mpnt->vm_start)
+			break;
+		if (address >= mpnt->vm_end) {
+			tmp = mpnt->vm_end;
+			continue;
+		}
+		if (!mpnt->vm_ops || !mpnt->vm_ops->nopage) {
+			++tsk->min_flt;
+			get_empty_page(tsk,address);
+			return;
+		}
+		mpnt->vm_ops->nopage(error_code, mpnt, address);
+		return;
+	}
+	if (tsk != current)
+		goto ok_no_page;
+	if (address >= tsk->end_data && address < tsk->brk)
+		goto ok_no_page;
+	if (mpnt && mpnt == tsk->stk_vma &&
+	    address - tmp > mpnt->vm_start - address &&
+	    tsk->rlim[RLIMIT_STACK].rlim_cur > mpnt->vm_end - address) {
+		mpnt->vm_start = address;
+		goto ok_no_page;
+	}
+	tsk->tss.cr2 = address;
+	current->tss.error_code = error_code;
+	current->tss.trap_no = 14;
+	send_sig(SIGSEGV,tsk,1);
+	if (error_code & 4)	/* user level access? */
+		return;
+ok_no_page:
+	++tsk->min_flt;
+	get_empty_page(tsk,address);
 }
 
-/* TODO: 重新看看 */
+/*
+ * This routine handles page faults.  It determines the address,
+ * and the problem, and then passes it off to one of the appropriate
+ * routines.
+ */
+asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
+{
+	unsigned long address;
+	unsigned long user_esp = 0;
+	unsigned int bit;
+
+	/* get the address */
+	__asm__("movl %%cr2,%0":"=r" (address));
+	if (address < TASK_SIZE) {
+		if (error_code & 4) {	/* user mode access? */
+			if (regs->eflags & VM_MASK) {
+				bit = (address - 0xA0000) >> PAGE_SHIFT;
+				if (bit < 32)
+					current->screen_bitmap |= 1 << bit;
+			} else 
+				user_esp = regs->esp;
+		}
+		if (error_code & 1)
+			do_wp_page(error_code, address, current, user_esp);
+		else
+			do_no_page(error_code, address, current, user_esp);
+		return;
+	}
+	address -= TASK_SIZE;
+	if (wp_works_ok < 0 && address == 0 && (error_code & PAGE_PRESENT)) {
+		wp_works_ok = 1;
+		pg0[0] = PAGE_SHARED;
+		printk("This processor honours the WP bit even when in supervisor mode. Good.\n");
+		return;
+	}
+	if (address < PAGE_SIZE) {
+		printk("Unable to handle kernel NULL pointer dereference");
+		pg0[0] = PAGE_SHARED;
+	} else
+		printk("Unable to handle kernel paging request");
+	printk(" at address %08lx\n",address);
+	die_if_kernel("Oops", regs, error_code);
+	do_exit(SIGKILL);
+}
+
+/*
+ * BAD_PAGE is the page that is used for page faults when linux
+ * is out-of-memory. Older versions of linux just did a
+ * do_exit(), but using this instead means there is less risk
+ * for a process dying in kernel mode, possibly leaving a inode
+ * unused etc..
+ *
+ * BAD_PAGETABLE is the accompanying page-table: it is initialized
+ * to point to BAD_PAGE entries.
+ *
+ * ZERO_PAGE is a special page that is used for zero-initialized
+ * data and COW.
+ */
+unsigned long __bad_pagetable(void)
+{
+	extern char empty_bad_page_table[PAGE_SIZE];
+
+	__asm__ __volatile__("cld ; rep ; stosl":
+		:"a" (BAD_PAGE + PAGE_TABLE),
+		 "D" ((long) empty_bad_page_table),
+		 "c" (PTRS_PER_PAGE)
+		:"di","cx");
+	return (unsigned long) empty_bad_page_table;
+}
+
+unsigned long __bad_page(void)
+{
+	extern char empty_bad_page[PAGE_SIZE];
+
+	__asm__ __volatile__("cld ; rep ; stosl":
+		:"a" (0),
+		 "D" ((long) empty_bad_page),
+		 "c" (PTRS_PER_PAGE)
+		:"di","cx");
+	return (unsigned long) empty_bad_page;
+}
+
+unsigned long __zero_page(void)
+{
+	extern char empty_zero_page[PAGE_SIZE];
+
+	__asm__ __volatile__("cld ; rep ; stosl":
+		:"a" (0),
+		 "D" ((long) empty_zero_page),
+		 "c" (PTRS_PER_PAGE)
+		:"di","cx");
+	return (unsigned long) empty_zero_page;
+}
+
 void show_mem(void)
 {
-    int i, j, k, free = 0, total = 0;
-    int shared = 0;
-    unsigned long *pg_tbl;
+	int i,free = 0,total = 0,reserved = 0;
+	int shared = 0;
 
-    printk("Mem-info:\n\r");
-    for (i = 0; i < PAGING_PAGES; i++) {
-        /* 参看 mem_init, 如果内存不属于主存储区, 它们的标记就是 USED */
-        if (mem_map[i] == USED) {
-            continue;
-        }
-
-        total++; /* 主存储区的页面数量 */
-
-        if (!mem_map[i]) {
-            free++; /* 主存储区的空闲页面数量 */
-        } else {
-            shared += mem_map[i] - 1; /* 主存储区的页面共享数量(自己用不算共享) */
-        }
-    }
-
-    printk("%d free pages of %d\n\r", free, total);
-    printk("%d pages shared\n\r", shared);
-
-    /* 下面遍历页目录项 */
-
-    k = 0; /* 一个进程占用页面统计值 */
-    for (i = 4; i < 1024;) {
-        /* 页目录项标记的页表页存在的话, 处理页表页的统计信息 */
-        if (1 & pg_dir[i]) {
-            /* pg_dir 记录的地址超过了可管理的物理内存 */
-            if (pg_dir[i] > HIGH_MEMORY) {
-                printk("page directory[%d]: %08X\n\r", i, pg_dir[i]);
-                continue;
-            }
-
-            /* 如果当前页表项所指物理页面存在并且该物理页面 '地址' 大于 LOW_MEM,
-             * 那么就将页表项对应页面纳入统计值 */
-            if (pg_dir[i] > LOW_MEM) {
-                free++, k++;
-            }
-
-            pg_tbl = (unsigned long *)(0xfffff000 & pg_dir[i]);
-            for (j = 0; j < 1024; j++) {
-                if ((pg_tbl[j] & 1) && pg_tbl[j] > LOW_MEM) {
-                    if (pg_tbl[j] > HIGH_MEMORY) {
-                        printk("page_dir[%d][%d]: %08X\n\r", i, j, pg_tbl[j]);
-                    } else {
-                        k++, free++;
-                    }
-                }
-            }
-        }
-
-        /* 处理页目录项的统计信息 */
-
-        i++;
-
-        /* 因每个任务线性空间长度是 64MB, 所以一个任务占用 16 个目录项
-         * 因此这里每统计了 16 个目录项就把进程的任务结构占用的页表统计进来
-         * 若此时 k=0 则表示当前的 16
-         * 个页目录所对应的进程在系统中不存在(没有创建或者已经终止)
-         * 在显示了对应进程号和其占用的物理内存页统计值 k 后, 将 k 清零,
-         * 以用于统计下一个进程占用的内存页面数.
-         *
-         * 当 i <= 15 的时候, (i&15) 恒真, 当 16 < i <= 31 的时候, (i&15) 恒真,
-         * 此后的数据类似 因此 (!(i&15)) 意思就是每次 i 是 16 的倍数的时候,
-         * 就真一次
-         * TODO: 但是这里的 i 是从 4 开始的啊? */
-        if (!(i & 15) && k) { /* k !=0 表示相应进程存在 */
-            k++, free++;      /* one page/process for task_struct */
-            /* (i>>4) -1 可以求得任务编号(除以 16 减 1) */
-            printk("Process %d: %d pages\n\r", (i >> 4) - 1, k);
-            k = 0;
-        }
-    }
-
-    /* 最后显示系统中正在使用的内存页面和主内存区中总的内存页面数 */
-    printk("Memory found: %d (%d)\n\r", free - shared, total);
+	printk("Mem-info:\n");
+	printk("Free pages:      %6dkB\n",nr_free_pages<<(PAGE_SHIFT-10));
+	printk("Secondary pages: %6dkB\n",nr_secondary_pages<<(PAGE_SHIFT-10));
+	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+	i = high_memory >> PAGE_SHIFT;
+	while (i-- > 0) {
+		total++;
+		if (mem_map[i] & MAP_PAGE_RESERVED)
+			reserved++;
+		else if (!mem_map[i])
+			free++;
+		else
+			shared += mem_map[i]-1;
+	}
+	printk("%d pages of RAM\n",total);
+	printk("%d free pages\n",free);
+	printk("%d reserved pages\n",reserved);
+	printk("%d pages shared\n",shared);
+	show_buffers();
 }
+
+/*
+ * paging_init() sets up the page tables - note that the first 4MB are
+ * already mapped by head.S.
+ *
+ * This routines also unmaps the page at virtual kernel address 0, so
+ * that we can trap those pesky NULL-reference errors in the kernel.
+ */
+unsigned long paging_init(unsigned long start_mem, unsigned long end_mem)
+{
+	unsigned long * pg_dir;
+	unsigned long * pg_table;
+	unsigned long tmp;
+	unsigned long address;
+
+/*
+ * Physical page 0 is special; it's not touched by Linux since BIOS
+ * and SMM (for laptops with [34]86/SL chips) may need it.  It is read
+ * and write protected to detect null pointer references in the
+ * kernel.
+ */
+#if 0
+	memset((void *) 0, 0, PAGE_SIZE);
+#endif
+	start_mem = PAGE_ALIGN(start_mem);
+	address = 0;
+	pg_dir = swapper_pg_dir;
+	while (address < end_mem) {
+		tmp = *(pg_dir + 768);		/* at virtual addr 0xC0000000 */
+		if (!tmp) {
+			tmp = start_mem | PAGE_TABLE;
+			*(pg_dir + 768) = tmp;
+			start_mem += PAGE_SIZE;
+		}
+		*pg_dir = tmp;			/* also map it in at 0x0000000 for init */
+		pg_dir++;
+		pg_table = (unsigned long *) (tmp & PAGE_MASK);
+		for (tmp = 0 ; tmp < PTRS_PER_PAGE ; tmp++,pg_table++) {
+			if (address < end_mem)
+				*pg_table = address | PAGE_SHARED;
+			else
+				*pg_table = 0;
+			address += PAGE_SIZE;
+		}
+	}
+	invalidate();
+	return start_mem;
+}
+
+void mem_init(unsigned long start_low_mem,
+	      unsigned long start_mem, unsigned long end_mem)
+{
+	int codepages = 0;
+	int reservedpages = 0;
+	int datapages = 0;
+	unsigned long tmp;
+	unsigned short * p;
+	extern int etext;
+
+	cli();
+	end_mem &= PAGE_MASK;
+	high_memory = end_mem;
+	start_mem +=  0x0000000f;
+	start_mem &= ~0x0000000f;
+	tmp = MAP_NR(end_mem);
+	mem_map = (unsigned short *) start_mem;
+	p = mem_map + tmp;
+	start_mem = (unsigned long) p;
+	while (p > mem_map)
+		*--p = MAP_PAGE_RESERVED;
+	start_low_mem = PAGE_ALIGN(start_low_mem);
+	start_mem = PAGE_ALIGN(start_mem);
+	while (start_low_mem < 0xA0000) {
+		mem_map[MAP_NR(start_low_mem)] = 0;
+		start_low_mem += PAGE_SIZE;
+	}
+	while (start_mem < end_mem) {
+		mem_map[MAP_NR(start_mem)] = 0;
+		start_mem += PAGE_SIZE;
+	}
+#ifdef CONFIG_SOUND
+	sound_mem_init();
+#endif
+	free_page_list = 0;
+	nr_free_pages = 0;
+	for (tmp = 0 ; tmp < end_mem ; tmp += PAGE_SIZE) {
+		if (mem_map[MAP_NR(tmp)]) {
+			if (tmp >= 0xA0000 && tmp < 0x100000)
+				reservedpages++;
+			else if (tmp < (unsigned long) &etext)
+				codepages++;
+			else
+				datapages++;
+			continue;
+		}
+		*(unsigned long *) tmp = free_page_list;
+		free_page_list = tmp;
+		nr_free_pages++;
+	}
+	tmp = nr_free_pages << PAGE_SHIFT;
+	printk("Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data)\n",
+		tmp >> 10,
+		end_mem >> 10,
+		codepages << (PAGE_SHIFT-10),
+		reservedpages << (PAGE_SHIFT-10),
+		datapages << (PAGE_SHIFT-10));
+/* test if the WP bit is honoured in supervisor mode */
+	wp_works_ok = -1;
+	pg0[0] = PAGE_READONLY;
+	invalidate();
+	__asm__ __volatile__("movb 0,%%al ; movb %%al,0": : :"ax", "memory");
+	pg0[0] = 0;
+	invalidate();
+	if (wp_works_ok < 0)
+		wp_works_ok = 0;
+	return;
+}
+
+void si_meminfo(struct sysinfo *val)
+{
+	int i;
+
+	i = high_memory >> PAGE_SHIFT;
+	val->totalram = 0;
+	val->freeram = 0;
+	val->sharedram = 0;
+	val->bufferram = buffermem;
+	while (i-- > 0)  {
+		if (mem_map[i] & MAP_PAGE_RESERVED)
+			continue;
+		val->totalram++;
+		if (!mem_map[i]) {
+			val->freeram++;
+			continue;
+		}
+		val->sharedram += mem_map[i]-1;
+	}
+	val->totalram <<= PAGE_SHIFT;
+	val->freeram <<= PAGE_SHIFT;
+	val->sharedram <<= PAGE_SHIFT;
+	return;
+}
+
+
+/* This handles a generic mmap of a disk file */
+void file_mmap_nopage(int error_code, struct vm_area_struct * area, unsigned long address)
+{
+	struct inode * inode = area->vm_inode;
+	unsigned int block;
+	unsigned long page;
+	int nr[8];
+	int i, j;
+	int prot = area->vm_page_prot;
+
+	address &= PAGE_MASK;
+	block = address - area->vm_start + area->vm_offset;
+	block >>= inode->i_sb->s_blocksize_bits;
+
+	page = get_free_page(GFP_KERNEL);
+	if (share_page(area, area->vm_task, inode, address, error_code, page)) {
+		++area->vm_task->min_flt;
+		return;
+	}
+
+	++area->vm_task->maj_flt;
+	if (!page) {
+		oom(current);
+		put_page(area->vm_task, BAD_PAGE, address, PAGE_PRIVATE);
+		return;
+	}
+	for (i=0, j=0; i< PAGE_SIZE ; j++, block++, i += inode->i_sb->s_blocksize)
+		nr[j] = bmap(inode,block);
+	if (error_code & PAGE_RW)
+		prot |= PAGE_RW | PAGE_DIRTY;
+	page = bread_page(page, inode->i_dev, nr, inode->i_sb->s_blocksize, prot);
+
+	if (!(prot & PAGE_RW)) {
+		if (share_page(area, area->vm_task, inode, address, error_code, page))
+			return;
+	}
+	if (put_page(area->vm_task,page,address,prot))
+		return;
+	free_page(page);
+	oom(current);
+}
+
+void file_mmap_free(struct vm_area_struct * area)
+{
+	if (area->vm_inode)
+		iput(area->vm_inode);
+#if 0
+	if (area->vm_inode)
+		printk("Free inode %x:%d (%d)\n",area->vm_inode->i_dev, 
+				 area->vm_inode->i_ino, area->vm_inode->i_count);
+#endif
+}
+
+/*
+ * Compare the contents of the mmap entries, and decide if we are allowed to
+ * share the pages
+ */
+int file_mmap_share(struct vm_area_struct * area1, 
+		    struct vm_area_struct * area2, 
+		    unsigned long address)
+{
+	if (area1->vm_inode != area2->vm_inode)
+		return 0;
+	if (area1->vm_start != area2->vm_start)
+		return 0;
+	if (area1->vm_end != area2->vm_end)
+		return 0;
+	if (area1->vm_offset != area2->vm_offset)
+		return 0;
+	if (area1->vm_page_prot != area2->vm_page_prot)
+		return 0;
+	return 1;
+}
+
+struct vm_operations_struct file_mmap = {
+	NULL,			/* open */
+	file_mmap_free,		/* close */
+	file_mmap_nopage,	/* nopage */
+	NULL,			/* wppage */
+	file_mmap_share,	/* share */
+	NULL,			/* unmap */
+};

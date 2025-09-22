@@ -5,21 +5,20 @@
  * patches by Peter MacDonald. Heavily edited by Linus.
  */
 
+#include <linux/types.h>
+#include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/tty.h>
+#include <linux/string.h>
+#include <linux/stat.h>
+#include <linux/signal.h>
+#include <linux/errno.h>
 
 #include <asm/segment.h>
 #include <asm/system.h>
 
-#include <const.h>
-#include <errno.h>
-#include <signal.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
+#define ROUND_UP(x,y) (((x)+(y)-1)/(y))
 
 /*
  * Ok, Peter made a complicated, but straightforward multiple_wait() function.
@@ -28,420 +27,226 @@
  * understand what I'm doing here, then you understand how the linux
  * sleep/wakeup mechanism works.
  *
- * Two very simple procedures, add_wait() and free_wait() make all the work. We
- * have to have interrupts disabled throughout the select, but that's not really
- * such a loss: sleeping automatically frees interrupts when we aren't in this
- * task.
+ * Two very simple procedures, select_wait() and free_wait() make all the work.
+ * select_wait() is a inline-function defined in <linux/sched.h>, as all select
+ * functions have to call it to add an entry to the select table.
  */
 
-typedef struct {
-    struct task_struct *old_task;      /* 指向发起等待的进程 */
-    struct task_struct **wait_address; /* 指向发起等待的进程的指针地址 */
-} wait_entry;
-
-typedef struct {
-    int nr;
-    wait_entry entry[NR_OPEN * 3]; /* 每个文件描述符, 可以监控 read/write/exception 三种状态 */
-} select_table;
-
-/**
- * @brief 将 wait_address 代表的任务, 追加到 select_table 里面
- *
- * @param wait_address 等待事件的任务
- * @param p 等待表
+/*
+ * I rewrote this again to make the select_table size variable, take some
+ * more shortcuts, improve responsiveness, and remove another race that
+ * Linus noticed.  -- jrs
  */
-static void add_wait(struct task_struct **wait_address, select_table *p)
+
+static void free_wait(select_table * p)
 {
-    int i;
+	struct select_table_entry * entry = p->entry + p->nr;
 
-    if (!wait_address) {
-        return;
-    }
-
-    /* 如果已经在表中, 直接退出 */
-    for (i = 0; i < p->nr; i++) {
-        if (p->entry[i].wait_address == wait_address) {
-            return;
-        }
-    }
-
-    /* pipe/tty 里面有个记录等待事件的指针字段(统一都叫做 i_wait), 这里把这个字段上记录的以前
-     * 的等待进程(如有的话), 记录在 wait_address 和 old_task 里面
-     *
-     * 然后把当前进程塞道这个等待字段(i_wait)里面来 */
-    p->entry[p->nr].wait_address = wait_address;
-    p->entry[p->nr].old_task = *wait_address;
-    *wait_address = current;
-    p->nr++;
+	while (p->nr > 0) {
+		p->nr--;
+		entry--;
+		remove_wait_queue(entry->wait_address,&entry->wait);
+	}
 }
 
-/**
- * @brief 尝试将等待表归零
+/*
+ * The check function checks the ready status of a file using the vfs layer.
  *
- * 这里和 __sleep_on 函数里面的处理差不多, 不同的是这里是多个文件描述符, 在 for 循环里面处理
- *
- * @param p
+ * If the file was not ready we were added to its wait queue.  But in
+ * case it became ready just after the check and just before it called
+ * select_wait, we call it again, knowing we are already on its
+ * wait queue this time.  The second call is not necessary if the
+ * select_table is NULL indicating an earlier file check was ready
+ * and we aren't going to sleep on the select_table.  -- jrs
  */
-static void free_wait(select_table *p)
+
+static int check(int flag, select_table * wait, struct file * file)
 {
-    int i;
-    struct task_struct **tpp; /* task pointer pointer */
+	struct inode * inode;
+	struct file_operations *fops;
+	int (*select) (struct inode *, struct file *, int, select_table *);
 
-    /* 遍历等待表中的 entry
-     * 如果 wait_address 不为空, 就尝试唤醒 wait_address 对应的任务, 并挂起当前任务 */
-    for (i = 0; i < p->nr; i++) {
-        tpp = p->entry[i].wait_address;
-
-        /* wait_address 指向的是 i_wait 的二级指针, 在 select 期间, 完全有可能有其他的进程
-         * 通过 sleep_on 函数修改了 i_wait, 这时候就出现了 (*tpp != current) 的情况, 通过
-         * 将发起 sleep_on 的那个进程唤醒, 让那边先得到执行. 在 sleep_on 的执行里面, 会对此前
-         * 记录在 i_wait 上的那个的进程(发起 select 的进程, 也就是这里的 current)执行唤醒,
-         * 然后程序就可以继续执行下去了 */
-        while (*tpp && *tpp != current) {
-            (*tpp)->state = 0;
-            current->state = TASK_UNINTERRUPTIBLE;
-            schedule();
-        }
-
-        if (!*tpp) {
-            printk("free_wait: NULL");
-        }
-
-        /* wait_address 指向的内容可以变化, 但是 old_task 永远都是 add_wait 的时候的那个进程 */
-        if ((*tpp = p->entry[i].old_task)) {
-            (**tpp).state = 0;
-        }
-    }
-
-    p->nr = 0;
+	inode = file->f_inode;
+	if ((fops = file->f_op) && (select = fops->select))
+		return select(inode, file, flag, wait)
+		    || (wait && select(inode, file, flag, NULL));
+	if (S_ISREG(inode->i_mode))
+		return 1;
+	return 0;
 }
 
-/**
- * @brief 获取 inode 对应的控制终端
- *
- * @param inode 设备文件 inode
- * @return struct tty_struct* 设备文件对应的 tty 结构
- */
-static struct tty_struct *get_tty(struct m_inode *inode)
+int do_select(int n, fd_set *in, fd_set *out, fd_set *ex,
+	fd_set *res_in, fd_set *res_out, fd_set *res_ex)
 {
-    int major, minor;
+	int count;
+	select_table wait_table, *wait;
+	struct select_table_entry *entry;
+	unsigned long set;
+	int i,j;
+	int max = -1;
 
-    /* tty 设备肯定是字符设备 */
-    if (!S_ISCHR(inode->i_mode)) {
-        return NULL;
-    }
-
-    if ((major = MAJOR(inode->i_zone[0])) != 5 && major != 4) {
-        return NULL;
-    }
-
-    /* MAJOR == 4: /dev/ttyx
-     * MAJOR == 5: /dev/tty
-     * 所以通过这里就能看出来 /dev/tty 特指当亲进程使用的那个控制终端 */
-    if (major == 5) {
-        minor = current->tty;
-    } else {
-        minor = MINOR(inode->i_zone[0]);
-    }
-
-    if (minor < 0) {
-        return NULL;
-    }
-
-    return TTY_TABLE(minor);
-}
-
-/**
- * @brief 检查 inode 是否可读
- *
- * The check_XX functions check out a file. We know it's either
- * a pipe, a character device or a fifo (fifo's not implemented)
- *
- * @param wait
- * @param inode
- * @return int
- */
-static int check_in(select_table *wait, struct m_inode *inode)
-{
-    struct tty_struct *tty;
-
-    if ((tty = get_tty(inode))) {
-        /* tty 设备的话, 检查它的辅助队列 */
-        if (!EMPTY(tty->secondary)) {
-            return 1;
-        } else {
-            add_wait(&tty->secondary->proc_list, wait);
-        }
-    } else if (inode->i_pipe) {
-        /* pipe 的话, 检查它不为空 */
-        if (!PIPE_EMPTY(*inode)) {
-            return 1;
-        } else {
-            add_wait(&inode->i_wait, wait);
-        }
-    }
-
-    return 0;
-}
-
-/**
- * @brief 检查 inode 是否可写
- *
- * @param wait
- * @param inode
- * @return int
- */
-static int check_out(select_table *wait, struct m_inode *inode)
-{
-    struct tty_struct *tty;
-
-    if ((tty = get_tty(inode))) {
-        if (!FULL(tty->write_q)) {
-            return 1;
-        } else {
-            add_wait(&tty->write_q->proc_list, wait);
-        }
-    } else if (inode->i_pipe) {
-        if (!PIPE_FULL(*inode)) {
-            return 1;
-        } else {
-            add_wait(&inode->i_wait, wait);
-        }
-    }
-
-    return 0;
-}
-
-/**
- * @brief 检查 inode 是否出现异常
- *
- * @param wait
- * @param inode
- * @return int
- */
-static int check_ex(select_table *wait, struct m_inode *inode)
-{
-    struct tty_struct *tty;
-
-    if ((tty = get_tty(inode))) {
-        /* tty 设备永远不会异常 */
-        if (!FULL(tty->write_q)) {
-            return 0;
-        } else {
-            return 0;
-        }
-    } else if (inode->i_pipe) {
-        /* 管道文件, 读写端都要存在才是正常 */
-        if (inode->i_count < 2) {
-            return 1;
-        } else {
-            add_wait(&inode->i_wait, wait);
-        }
-    }
-
-    return 0;
-}
-
-/**
- * @brief
- *
- * @param in
- * @param out
- * @param ex
- * @param inp
- * @param outp
- * @param exp
- * @return int
- */
-int do_select(fd_set in, fd_set out, fd_set ex, fd_set *inp, fd_set *outp, fd_set *exp)
-{
-    int count;
-    select_table wait_table;
-    int i;
-    fd_set mask;
-
-    mask = in | out | ex;
-
-    /* 现在仅支持字符设备, 管道文件, fifo 文件的处理 */
-    for (i = 0; i < NR_OPEN; i++, mask >>= 1) {
-        if (!(mask & 1)) {
-            continue;
-        }
-
-        if (!current->filp[i]) {
-            return -EBADF;
-        }
-
-        if (!current->filp[i]->f_inode) {
-            return -EBADF;
-        }
-
-        if (current->filp[i]->f_inode->i_pipe) {
-            continue;
-        }
-
-        if (S_ISCHR(current->filp[i]->f_inode->i_mode)) {
-            continue;
-        }
-
-        if (S_ISFIFO(current->filp[i]->f_inode->i_mode)) {
-            continue;
-        }
-
-        return -EBADF;
-    }
-
+	for (j = 0 ; j < __FDSET_LONGS ; j++) {
+		i = j << 5;
+		if (i >= n)
+			break;
+		set = in->fds_bits[j] | out->fds_bits[j] | ex->fds_bits[j];
+		for ( ; set ; i++,set >>= 1) {
+			if (i >= n)
+				goto end_check;
+			if (!(set & 1))
+				continue;
+			if (!current->filp[i])
+				return -EBADF;
+			if (!current->filp[i]->f_inode)
+				return -EBADF;
+			max = i;
+		}
+	}
+end_check:
+	n = max + 1;
+	if(!(entry = (struct select_table_entry*) __get_free_page(GFP_KERNEL)))
+		return -ENOMEM;
+	FD_ZERO(res_in);
+	FD_ZERO(res_out);
+	FD_ZERO(res_ex);
+	count = 0;
+	wait_table.nr = 0;
+	wait_table.entry = entry;
+	wait = &wait_table;
 repeat:
-    wait_table.nr = 0;
-    *inp = *outp = *exp = 0;
-    count = 0;
-    mask = 1;
-
-    /*                            mask = mask << 1      */
-    for (i = 0; i < NR_OPEN; i++, mask += mask) {
-        if (mask & in) {
-            if (check_in(&wait_table, current->filp[i]->f_inode)) {
-                *inp |= mask;
-                count++;
-            }
-        }
-
-        if (mask & out) {
-            if (check_out(&wait_table, current->filp[i]->f_inode)) {
-                *outp |= mask;
-                count++;
-            }
-        }
-
-        if (mask & ex) {
-            if (check_ex(&wait_table, current->filp[i]->f_inode)) {
-                *exp |= mask;
-                count++;
-            }
-        }
-    }
-
-    /* 注意: 因为已经 cli, 这个函数里不会因为中断被打断执行
-       1. (没有信号出现) 且 (有需要等待的 fd) 且 (没有文件描述符更新)
-       2. (没有信号出现) 且 (进程没有等待超时) 且 (没有文件描述符更新) */
-    if (!(current->signal & ~current->blocked) && (wait_table.nr || current->timeout) && !count) {
-        current->state = TASK_INTERRUPTIBLE;
-        schedule();
-
-        /* 执行到这里, 是因为信号/描述符状态有改变导致的, 此时使用 free_wait
-         * 激活等待进程的状态, 然后重新统计描述符的变化情况
-         *
-         * 注意看这里每个循环都 free */
-        free_wait(&wait_table);
-        goto repeat;
-    }
-
-    free_wait(&wait_table);
-    return count;
+	current->state = TASK_INTERRUPTIBLE;
+	for (i = 0 ; i < n ; i++) {
+		if (FD_ISSET(i,in) && check(SEL_IN,wait,current->filp[i])) {
+			FD_SET(i, res_in);
+			count++;
+			wait = NULL;
+		}
+		if (FD_ISSET(i,out) && check(SEL_OUT,wait,current->filp[i])) {
+			FD_SET(i, res_out);
+			count++;
+			wait = NULL;
+		}
+		if (FD_ISSET(i,ex) && check(SEL_EX,wait,current->filp[i])) {
+			FD_SET(i, res_ex);
+			count++;
+			wait = NULL;
+		}
+	}
+	wait = NULL;
+	if (!count && current->timeout && !(current->signal & ~current->blocked)) {
+		schedule();
+		goto repeat;
+	}
+	free_wait(&wait_table);
+	free_page((unsigned long) entry);
+	current->state = TASK_RUNNING;
+	return count;
 }
 
-/**
- * @brief select 系统调用
- *
- * Note that we cannot return -ERESTARTSYS, as we change our input
- * parameters. Sad, but there you are. We could do some tweaking in
- * the library function ...
- *
- * @param buffer
- * @return int
- *
- * TODO: select 系统调用的参数怎么穿进来的?
+/*
+ * We do a VERIFY_WRITE here even though we are only reading this time:
+ * we'll write to it eventually..
  */
-int sys_select(unsigned long *buffer)
+static int __get_fd_set(int nr, unsigned long * fs_pointer, unsigned long * fdset)
 {
-    /* Perform the select(nd, in, out, ex, tv) system call. */
-    int i;
-    fd_set res_in, in = 0, *inp;
-    fd_set res_out, out = 0, *outp;
-    fd_set res_ex, ex = 0, *exp;
-    fd_set mask;
-    struct timeval *tvp;
-    unsigned long timeout;
+	int error;
 
-    /* buffer = [mask(nfds), inp, outp, exp, tvp]
-     *
-     * 假如 nfds = 8, 则 ~((~0) << 8) =
-     * ~((~0) << 8)
-     * = ~((1111_1111_1111_1111) << 8)
-     * = ~(1111_1111_1111_1100)
-     * = 0000_0000_0000_0011
-     * 所以这个操作实际上就是 组装一个低 nfds 位都是1 的掩码出来  */
+	FD_ZERO(fdset);
+	if (!fs_pointer)
+		return 0;
+	error = verify_area(VERIFY_WRITE,fs_pointer,sizeof(fd_set));
+	if (error)
+		return error;
+	while (nr > 0) {
+		*fdset = get_fs_long(fs_pointer);
+		fdset++;
+		fs_pointer++;
+		nr -= 32;
+	}
+	return 0;
+}
 
-    mask = ~((~0) << get_fs_long(buffer++));
-    inp = (fd_set *)get_fs_long(buffer++);
-    outp = (fd_set *)get_fs_long(buffer++);
-    exp = (fd_set *)get_fs_long(buffer++);
-    tvp = (struct timeval *)get_fs_long(buffer);
+static void __set_fd_set(int nr, unsigned long * fs_pointer, unsigned long * fdset)
+{
+	if (!fs_pointer)
+		return;
+	while (nr > 0) {
+		put_fs_long(*fdset, fs_pointer);
+		fdset++;
+		fs_pointer++;
+		nr -= 32;
+	}
+}
 
-    if (inp) {
-        in = mask & get_fs_long(inp);
-    }
+#define get_fd_set(nr,fsp,fdp) \
+__get_fd_set(nr, (unsigned long *) (fsp), (unsigned long *) (fdp))
 
-    if (outp) {
-        out = mask & get_fs_long(outp);
-    }
+#define set_fd_set(nr,fsp,fdp) \
+__set_fd_set(nr, (unsigned long *) (fsp), (unsigned long *) (fdp))
 
-    if (exp) {
-        ex = mask & get_fs_long(exp);
-    }
+/*
+ * We can actually return ERESTARTSYS insetad of EINTR, but I'd
+ * like to be certain this leads to no problems. So I return
+ * EINTR just for safety.
+ *
+ * Update: ERESTARTSYS breaks at least the xview clock binary, so
+ * I'm trying ERESTARTNOHAND which restart only when you want to.
+ */
+asmlinkage int sys_select( unsigned long *buffer )
+{
+/* Perform the select(nd, in, out, ex, tv) system call. */
+	int i;
+	fd_set res_in, in, *inp;
+	fd_set res_out, out, *outp;
+	fd_set res_ex, ex, *exp;
+	int n;
+	struct timeval *tvp;
+	unsigned long timeout;
 
-    timeout = 0xffffffff;
-    if (tvp) {
-        timeout = get_fs_long((unsigned long *)&tvp->tv_usec) / (1000000 / HZ);
-        timeout += get_fs_long((unsigned long *)&tvp->tv_sec) * HZ;
-        timeout += jiffies;
-    }
-
-    current->timeout = timeout;
-    cli();
-    i = do_select(in, out, ex, &res_in, &res_out, &res_ex);
-
-    if (current->timeout > jiffies) {
-        /* 未超时 */
-        timeout = current->timeout - jiffies;
-    } else {
-        timeout = 0;
-    }
-
-    sti();
-    current->timeout = 0;
-
-    if (i < 0) {
-        return i;
-    }
-
-    if (inp) {
-        verify_area(inp, 4);
-        put_fs_long(res_in, inp);
-    }
-
-    if (outp) {
-        verify_area(outp, 4);
-        put_fs_long(res_out, outp);
-    }
-
-    if (exp) {
-        verify_area(exp, 4);
-        put_fs_long(res_ex, exp);
-    }
-
-    if (tvp) {
-        verify_area(tvp, sizeof(*tvp));
-        put_fs_long(timeout / HZ, (unsigned long *)&tvp->tv_sec);
-        timeout %= HZ;
-        timeout *= (1000000 / HZ);
-        put_fs_long(timeout, (unsigned long *)&tvp->tv_usec);
-    }
-
-    /* 因为信号导致的 select 返回 */
-    if (!i && (current->signal & ~current->blocked)) {
-        return -EINTR;
-    }
-
-    return i;
+	i = verify_area(VERIFY_READ, buffer, 20);
+	if (i)
+		return i;
+	n = get_fs_long(buffer++);
+	if (n < 0)
+		return -EINVAL;
+	if (n > NR_OPEN)
+		n = NR_OPEN;
+	inp = (fd_set *) get_fs_long(buffer++);
+	outp = (fd_set *) get_fs_long(buffer++);
+	exp = (fd_set *) get_fs_long(buffer++);
+	tvp = (struct timeval *) get_fs_long(buffer);
+	if ((i = get_fd_set(n, inp, &in)) ||
+	    (i = get_fd_set(n, outp, &out)) ||
+	    (i = get_fd_set(n, exp, &ex))) return i;
+	timeout = ~0UL;
+	if (tvp) {
+		i = verify_area(VERIFY_WRITE, tvp, sizeof(*tvp));
+		if (i)
+			return i;
+		timeout = ROUND_UP(get_fs_long((unsigned long *)&tvp->tv_usec),(1000000/HZ));
+		timeout += get_fs_long((unsigned long *)&tvp->tv_sec) * HZ;
+		if (timeout)
+			timeout += jiffies + 1;
+	}
+	current->timeout = timeout;
+	i = do_select(n, &in, &out, &ex, &res_in, &res_out, &res_ex);
+	if (current->timeout > jiffies)
+		timeout = current->timeout - jiffies;
+	else
+		timeout = 0;
+	current->timeout = 0;
+	if (tvp) {
+		put_fs_long(timeout/HZ, (unsigned long *) &tvp->tv_sec);
+		timeout %= HZ;
+		timeout *= (1000000/HZ);
+		put_fs_long(timeout, (unsigned long *) &tvp->tv_usec);
+	}
+	if (i < 0)
+		return i;
+	if (!i && (current->signal & ~current->blocked))
+		return -ERESTARTNOHAND;
+	set_fd_set(n, inp, &res_in);
+	set_fd_set(n, outp, &res_out);
+	set_fd_set(n, exp, &res_ex);
+	return i;
 }

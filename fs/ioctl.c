@@ -1,67 +1,99 @@
 /*
  *  linux/fs/ioctl.c
  *
- *  (C) 1991  Linus Torvalds
+ *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <errno.h>
-#include <string.h>
-#include <sys/stat.h>
+#include <asm/segment.h>
 
 #include <linux/sched.h>
+#include <linux/errno.h>
+#include <linux/string.h>
+#include <linux/stat.h>
+#include <linux/termios.h>
+#include <linux/fcntl.h> /* for f_flags values */
 
-extern int tty_ioctl(int dev, int cmd, int arg);
-extern int pipe_ioctl(struct m_inode *pino, int cmd, int arg);
-
-typedef int (*ioctl_ptr)(int dev, int cmd, int arg);
-
-#define NRDEVS ((sizeof(ioctl_table)) / (sizeof(ioctl_ptr)))
-
-static ioctl_ptr ioctl_table[] = {NULL,      /* nodev */
-                                  NULL,      /* /dev/mem */
-                                  NULL,      /* /dev/fd */
-                                  NULL,      /* /dev/hd */
-                                  tty_ioctl, /* /dev/ttyx */
-                                  tty_ioctl, /* /dev/tty */
-                                  NULL,      /* /dev/lp */
-                                  NULL};     /* named pipes */
-
-/**
- * @brief ioctl 系统调用
- *
- * @param fd
- * @param cmd
- * @param arg
- * @return int
- */
-int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int file_ioctl(struct file *filp,unsigned int cmd,unsigned long arg)
 {
-    struct file *filp;
-    int dev, mode;
+	int error;
+	int block;
 
-    if (fd >= NR_OPEN || !(filp = current->filp[fd])) {
-        return -EBADF;
-    }
+	switch (cmd) {
+		case FIBMAP:
+			if (filp->f_inode->i_op == NULL)
+				return -EBADF;
+		    	if (filp->f_inode->i_op->bmap == NULL)
+				return -EINVAL;
+			error = verify_area(VERIFY_WRITE,(void *) arg,4);
+			if (error)
+				return error;
+			block = get_fs_long((long *) arg);
+			block = filp->f_inode->i_op->bmap(filp->f_inode,block);
+			put_fs_long(block,(long *) arg);
+			return 0;
+		case FIGETBSZ:
+			if (filp->f_inode->i_sb == NULL)
+				return -EBADF;
+			error = verify_area(VERIFY_WRITE,(void *) arg,4);
+			if (error)
+				return error;
+			put_fs_long(filp->f_inode->i_sb->s_blocksize,
+			    (long *) arg);
+			return 0;
+		case FIONREAD:
+			error = verify_area(VERIFY_WRITE,(void *) arg,4);
+			if (error)
+				return error;
+			put_fs_long(filp->f_inode->i_size - filp->f_pos,
+			    (long *) arg);
+			return 0;
+	}
+	if (filp->f_op && filp->f_op->ioctl)
+		return filp->f_op->ioctl(filp->f_inode, filp, cmd,arg);
+	return -EINVAL;
+}
 
-    if (filp->f_inode->i_pipe) {
-        /* 仅有读管道允许执行 ioctl 操作 */
-        return (filp->f_mode & S_PIPE_READ) ? pipe_ioctl(filp->f_inode, cmd, arg) : -EBADF;
-    }
 
-    /* 仅有字符设备和块设备允许执行 ioctl */
-    mode = filp->f_inode->i_mode;
-    if (!S_ISCHR(mode) && !S_ISBLK(mode)) {
-        return -EINVAL;
-    }
+asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{	
+	struct file * filp;
+	int on;
 
-    dev = filp->f_inode->i_zone[0];
-    if (MAJOR(dev) >= NRDEVS) {
-        return -ENODEV;
-    }
+	if (fd >= NR_OPEN || !(filp = current->filp[fd]))
+		return -EBADF;
+	switch (cmd) {
+		case FIOCLEX:
+			FD_SET(fd, &current->close_on_exec);
+			return 0;
 
-    if (!ioctl_table[MAJOR(dev)]) {
-        return -ENOTTY;
-    }
+		case FIONCLEX:
+			FD_CLR(fd, &current->close_on_exec);
+			return 0;
 
-    return ioctl_table[MAJOR(dev)](dev, cmd, arg);
+		case FIONBIO:
+			on = get_fs_long((unsigned long *) arg);
+			if (on)
+				filp->f_flags |= O_NONBLOCK;
+			else
+				filp->f_flags &= ~O_NONBLOCK;
+			return 0;
+
+		case FIOASYNC: /* O_SYNC is not yet implemented,
+				  but it's here for completeness. */
+			on = get_fs_long ((unsigned long *) arg);
+			if (on)
+				filp->f_flags |= O_SYNC;
+			else
+				filp->f_flags &= ~O_SYNC;
+			return 0;
+
+		default:
+			if (filp->f_inode && S_ISREG(filp->f_inode->i_mode))
+				return file_ioctl(filp,cmd,arg);
+
+			if (filp->f_op && filp->f_op->ioctl)
+				return filp->f_op->ioctl(filp->f_inode, filp, cmd,arg);
+
+			return -EINVAL;
+	}
 }
