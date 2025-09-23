@@ -138,7 +138,7 @@ tools/version.h: $(CONFIGURE) Makefile
 	@echo \#define LINUX_COMPILE_DOMAIN \"`domainname`\" >> tools/version.h
 
 tools/build: tools/build.c $(CONFIGURE)
-	$(HOSTCC) $(CFLAGS) -o $@ $<
+	$(HOSTCC) -Wall -I/app/linux-read/include -o $@ $<
 
 boot/head.o: $(CONFIGURE) boot/head.s
 
@@ -151,7 +151,7 @@ init/main.o: $(CONFIGURE) init/main.c
 	$(CC) $(CFLAGS) $(PROFILING) -c -o $*.o $<
 
 tools/system:	boot/head.o init/main.o tools/version.o linuxsubdirs
-	$(LD) $(LDFLAGS) -Ttext 1000 boot/head.o init/main.o tools/version.o \
+	$(LD) $(LDFLAGS) -Ttext 1000 -e startup_32 boot/head.o init/main.o tools/version.o \
 		$(ARCHIVES) \
 		$(FILESYSTEMS) \
 		$(DRIVERS) \
@@ -178,8 +178,8 @@ boot/bootsect.o: boot/bootsect.s
 boot/bootsect.s: boot/bootsect.S $(CONFIGURE) include/linux/config.h Makefile
 	$(CPP) -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
 
-zBoot/zSystem: zBoot/*.c zBoot/*.S tools/zSystem
-	$(MAKE) -C zBoot
+zBoot/zSystem: tools/zSystem
+	objcopy -R .pdr -R .comment -R .note -S -O binary tools/zSystem zBoot/zSystem
 
 zImage: $(CONFIGURE) boot/bootsect boot/setup zBoot/zSystem tools/build
 	tools/build boot/bootsect boot/setup zBoot/zSystem $(ROOT_DEV) > zImage
@@ -196,7 +196,7 @@ zlilo: $(CONFIGURE) zImage
 	if [ -x /sbin/lilo ]; then /sbin/lilo; else /etc/lilo/install; fi
 
 tools/zSystem:	boot/head.o init/main.o tools/version.o linuxsubdirs
-	$(LD) $(LDFLAGS) -Ttext 100000 boot/head.o init/main.o tools/version.o \
+	$(LD) $(LDFLAGS) -Ttext 100000 -e startup_32 boot/head.o init/main.o tools/version.o \
 		$(ARCHIVES) \
 		$(FILESYSTEMS) \
 		$(DRIVERS) \

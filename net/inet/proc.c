@@ -32,6 +32,7 @@
 #include <linux/autoconf.h>
 #include <linux/sched.h>
 #include <linux/socket.h>
+#include <linux/string.h>
 #include <linux/net.h>
 #include <linux/un.h>
 #include <linux/in.h>

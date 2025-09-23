@@ -14,6 +14,7 @@
  *		Alan Cox	:	More generic kfree handler
  */
 
+#include <linux/string.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>

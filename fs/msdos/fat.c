@@ -4,6 +4,7 @@
  *  Written 1992,1993 by Werner Almesberger
  */
 
+#include <linux/string.h>
 #include <linux/msdos_fs.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>

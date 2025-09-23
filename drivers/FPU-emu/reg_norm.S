@@ -20,9 +20,9 @@
 .text
 
 	.align 2,144
-.globl _normalize
+.globl normalize
 
-_normalize:
+normalize:
 	pushl	%ebp
 	movl	%esp,%ebp
 	pushl	%ebx
@@ -34,7 +34,7 @@ _normalize:
 	je	L_ok
 
 	pushl	$0x220
-	call	_exception
+	call	exception
 	addl	$4,%esp
 
 L_ok:
@@ -86,13 +86,13 @@ L_zero:
 
 L_underflow:
 	push	%ebx
-	call	_arith_underflow
+	call	arith_underflow
 	pop	%ebx
 	jmp	L_exit
 
 L_overflow:
 	push	%ebx
-	call	_arith_overflow
+	call	arith_overflow
 	pop	%ebx
 	jmp	L_exit
 
@@ -100,9 +100,9 @@ L_overflow:
 
 /* Normalise without reporting underflow or overflow */
 	.align 2,144
-.globl _normalize_nuo
+.globl normalize_nuo
 
-_normalize_nuo:
+normalize_nuo:
 	pushl	%ebp
 	movl	%esp,%ebp
 	pushl	%ebx
@@ -114,7 +114,7 @@ _normalize_nuo:
 	je	L_ok_nuo
 
 	pushl	$0x221
-	call	_exception
+	call	exception
 	addl	$4,%esp
 
 L_ok_nuo:

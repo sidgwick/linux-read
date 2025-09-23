@@ -16,6 +16,7 @@
 	their I/O port region before the SCSI probes start.
 */
 
+#include <linux/string.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -23,9 +24,9 @@
 #include <linux/fs.h>
 #include <linux/malloc.h>
 #include <linux/if_ether.h>
-#include <memory.h>
 #include "dev.h"
 #include "eth.h"
+
 
 /* The network devices currently exist only in the socket namespace, so these
    entries are unused.  The only ones that make sense are

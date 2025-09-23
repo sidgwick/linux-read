@@ -40,6 +40,7 @@
 #include "sock.h"
 #include <linux/errno.h>
 #include <linux/timer.h>
+#include <linux/string.h>
 #include <asm/system.h>
 #include <asm/segment.h>
 #include "udp.h"
