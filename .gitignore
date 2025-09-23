@@ -2,6 +2,11 @@
 *.o
 *.a
 
+bochsout.txt
+minix.img
+minix.img.lock
+zImage.lock
+
 .config
 .depend
 .tmpdepend

@@ -25,7 +25,7 @@ ata0-master: type=disk, path="minix.img", mode=flat
 ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
 
 # 软盘配置
-floppya: 1_44=Image, status=inserted
+floppya: 1_44=zImage, status=inserted
 # floppyb: 1_44=minix.img, status=inserted
 
 # 输出日志
@@ -45,5 +45,5 @@ keyboard: keymap=#$BXSHARE/keymaps/x11-pc-us.map
 megs: 128
 
 # debug
-gdbstub: enabled=1, port=1234
+gdbstub: enabled=0, port=1234
 iodebug: all_rings=1
