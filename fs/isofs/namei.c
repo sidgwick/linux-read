@@ -50,7 +50,7 @@ static int isofs_match(int len,const char * name, char * compare, int dlen)
 		"setz %%al"
 		:"=a" (same)
 		:"0" (0),"S" ((long) name),"D" ((long) compare),"c" (len)
-		:"cx","di","si");
+		);
 	return same;
 }
 

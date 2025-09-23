@@ -93,7 +93,7 @@ extern void aha152x_setup(char *str, int *ints);
 extern void sound_setup(char *str, int *ints);
 #ifdef CONFIG_SBPCD
 extern void sbpcd_setup(char *str, int *ints);
-#endif CONFIG_SBPCD
+#endif /* CONFIG_SBPCD */
 
 #ifdef CONFIG_SYSVIPC
 extern void ipc_init(void);
@@ -203,7 +203,7 @@ struct {
 #endif
 #ifdef CONFIG_SBPCD
 	{ "sbpcd=", sbpcd_setup },
-#endif CONFIG_SBPCD
+#endif /* CONFIG_SBPCD */
 	{ 0, 0 }
 };
 
@@ -240,7 +240,7 @@ static void calibrate_delay(void)
 				:"d" (HZ),
 				 "r" (ticks),
 				 "0" (loops_per_sec)
-				:"dx");
+				);
 			printk("ok - %lu.%02lu BogoMips\n",
 				loops_per_sec/500000,
 				(loops_per_sec/5000) % 100);
@@ -305,7 +305,7 @@ static void parse_options(char *line)
 			hard_math = 0;
 			__asm__("movl %%cr0,%%eax\n\t"
 				"orl $0xE,%%eax\n\t"
-				"movl %%eax,%%cr0\n\t" : : : "ax");
+				"movl %%eax,%%cr0\n\t" : : );
 		} else
 			checksetup(line);
 		/*

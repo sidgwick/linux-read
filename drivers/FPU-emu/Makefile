@@ -12,7 +12,7 @@ CFLAGS	:= $(CFLAGS) $(PARANOID) $(DEBUG) -fno-builtin
 	$(CC) $(CFLAGS) $(MATH_EMULATION) -c $<
 
 .S.o:
-	$(CC) -D__ASSEMBLER__ $(PARANOID) $(REENTRANT) -c $<
+	$(CC) -D__ASSEMBLER__ $(CFLAGS) $(PARANOID) $(REENTRANT) -c $<
 
 .s.o:
 	$(CC) -c $<

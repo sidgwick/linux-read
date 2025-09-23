@@ -9,9 +9,9 @@
 
 extern unsigned long loops_per_sec;
 
-extern __inline__ void __delay(int loops)
+static inline void __delay(int loops)
 {
-	__asm__(".align 2,0x90\n1:\tdecl %0\n\tjns 1b": :"a" (loops):"ax");
+	__asm__(".align 2,0x90\n1:\tdecl %0\n\tjns 1b": :"a" (loops));
 }
 
 /*
@@ -24,13 +24,13 @@ extern __inline__ void __delay(int loops)
  * first constant multiplications gets optimized away if the delay is
  * a constant)
  */
-extern __inline__ void udelay(unsigned long usecs)
+static inline void udelay(unsigned long usecs)
 {
 	usecs *= 0x000010c6;		/* 2**32 / 1000000 */
 	__asm__("mull %0"
 		:"=d" (usecs)
 		:"a" (usecs),"0" (loops_per_sec)
-		:"ax");
+		);
 	__delay(usecs);
 }
 

@@ -299,7 +299,7 @@ struct cdrom_read
 #define	CDROM_MODE1_SIZE	512
 #else
 #define	CDROM_MODE1_SIZE	2048
-#endif FIVETWELVE
+#endif /* FIVETWELVE */
 #define	CDROM_MODE2_SIZE	2336
 
 /*

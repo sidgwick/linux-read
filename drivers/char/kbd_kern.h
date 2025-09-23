@@ -44,62 +44,62 @@ extern struct kbd_struct kbd_table[];
 
 extern unsigned long kbd_init(unsigned long);
 
-extern inline int vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline int vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	return ((kbd->ledstate >> flag) & 1);
 }
 
-extern inline int vc_kbd_lock(struct kbd_struct * kbd, int flag)
+static inline int vc_kbd_lock(struct kbd_struct * kbd, int flag)
 {
 	return ((kbd->lockstate >> flag) & 1);
 }
 
-extern inline int vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline int vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	return ((kbd->modeflags >> flag) & 1);
 }
 
-extern inline void set_vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline void set_vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	kbd->ledstate |= 1 << flag;
 }
 
-extern inline void set_vc_kbd_lock(struct kbd_struct * kbd, int flag)
+static inline void set_vc_kbd_lock(struct kbd_struct * kbd, int flag)
 {
 	kbd->lockstate |= 1 << flag;
 }
 
-extern inline void set_vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline void set_vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	kbd->modeflags |= 1 << flag;
 }
 
-extern inline void clr_vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline void clr_vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	kbd->ledstate &= ~(1 << flag);
 }
 
-extern inline void clr_vc_kbd_lock(struct kbd_struct * kbd, int flag)
+static inline void clr_vc_kbd_lock(struct kbd_struct * kbd, int flag)
 {
 	kbd->lockstate &= ~(1 << flag);
 }
 
-extern inline void clr_vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline void clr_vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	kbd->modeflags &= ~(1 << flag);
 }
 
-extern inline void chg_vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline void chg_vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	kbd->ledstate ^= 1 << flag;
 }
 
-extern inline void chg_vc_kbd_lock(struct kbd_struct * kbd, int flag)
+static inline void chg_vc_kbd_lock(struct kbd_struct * kbd, int flag)
 {
 	kbd->lockstate ^= 1 << flag;
 }
 
-extern inline void chg_vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline void chg_vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	kbd->modeflags ^= 1 << flag;
 }

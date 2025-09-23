@@ -36,7 +36,7 @@ __asm__("cld\n\t"
 	"stosl"
 	:
 	:"a" (0),"D" (s),"c" (count/4)
-	:"cx","di","memory");
+	);
 }
 
 void sysv_free_block(struct super_block * sb, unsigned int block)

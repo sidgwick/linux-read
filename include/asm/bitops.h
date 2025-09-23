@@ -19,7 +19,7 @@
 struct __dummy { unsigned long a[100]; };
 #define ADDR (*(struct __dummy *) addr)
 
-extern __inline__ int set_bit(int nr, void * addr)
+static inline int set_bit(int nr, void * addr)
 {
 	int oldbit;
 
@@ -29,7 +29,7 @@ extern __inline__ int set_bit(int nr, void * addr)
 	return oldbit;
 }
 
-extern __inline__ int clear_bit(int nr, void * addr)
+static inline int clear_bit(int nr, void * addr)
 {
 	int oldbit;
 
@@ -43,7 +43,7 @@ extern __inline__ int clear_bit(int nr, void * addr)
  * This routine doesn't need to be atomic, but it's faster to code it
  * this way.
  */
-extern __inline__ int test_bit(int nr, void * addr)
+static inline int test_bit(int nr, void * addr)
 {
 	int oldbit;
 
@@ -69,7 +69,7 @@ extern __inline__ int test_bit(int nr, void * addr)
  * C language equivalents written by Theodore Ts'o, 9/26/92
  */
 
-extern __inline__ int set_bit(int nr,int * addr)
+static inline int set_bit(int nr,int * addr)
 {
 	int	mask, retval;
 
@@ -82,7 +82,7 @@ extern __inline__ int set_bit(int nr,int * addr)
 	return retval;
 }
 
-extern __inline__ int clear_bit(int nr, int * addr)
+static inline int clear_bit(int nr, int * addr)
 {
 	int	mask, retval;
 
@@ -95,7 +95,7 @@ extern __inline__ int clear_bit(int nr, int * addr)
 	return retval;
 }
 
-extern __inline__ int test_bit(int nr, int * addr)
+static inline int test_bit(int nr, int * addr)
 {
 	int	mask;
 

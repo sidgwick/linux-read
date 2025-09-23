@@ -144,7 +144,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	  __asm__("movl $0,%%edx\n\t" \
 		  "movl %%edx,%%db7\n\t" \
 		  : /* no output */ \
-		  : /* no input */ :"dx");
+		  : /* no input */ );
 
 	  return;
 	};

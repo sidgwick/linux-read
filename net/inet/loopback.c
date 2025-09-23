@@ -83,7 +83,7 @@ loopback_xmit(struct sk_buff *skb, struct device *dev)
 		"1:"
 		:
 		:
-		: "ax", "dx", "cx");
+		);
 #endif
 
   return(0);

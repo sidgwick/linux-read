@@ -116,7 +116,7 @@ static unsigned long vm86_segment(unsigned char segment)
       EXCEPTION(EX_INTERNAL|0x130);
       math_abort(FPU_info,SIGSEGV);
     }
-#endif PARANOID
+#endif /* PARANOID */
   return (unsigned long)VM86_REG_(segment) << 4;
 }
 
@@ -148,7 +148,7 @@ void get_address(unsigned char FPU_modrm, unsigned long *fpu_eip,
 #ifndef PECULIAR_486
   /* This is a reasonable place to do this */
   FPU_data_selector = FPU_DS;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 
   /* Memory accessed via the cs selector is write protected
      in 32 bit protected mode. */
@@ -227,7 +227,7 @@ void get_address_16(unsigned char FPU_modrm, unsigned long *fpu_eip,
 #ifndef PECULIAR_486
   /* This is a reasonable place to do this */
   FPU_data_selector = FPU_DS;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 
   /* Memory accessed via the cs selector is write protected
      in 32 bit protected mode. */

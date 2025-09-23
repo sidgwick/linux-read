@@ -235,7 +235,7 @@ struct task_struct {
 	unsigned long swap_cnt;		/* number of pages to swap on next pass */
 	short swap_table;		/* current page table */
 	short swap_page;		/* current page */
-#endif NEW_SWAP
+#endif /* NEW_SWAP */
 	struct vm_area_struct *stk_vma;
 };
 
@@ -305,7 +305,7 @@ extern struct task_struct *current;
 extern unsigned long volatile jiffies;
 extern unsigned long itimer_ticks;
 extern unsigned long itimer_next;
-extern struct timeval xtime;
+extern volatile struct timeval xtime;
 extern int need_resched;
 
 #define CURRENT_TIME (xtime.tv_sec)
@@ -368,7 +368,7 @@ __asm__("cmpl %%ecx,_current\n\t" \
 	: /* no output */ \
 	:"m" (*(((char *)&tsk->tss.tr)-4)), \
 	 "c" (tsk) \
-	:"cx")
+	)
 
 #define _set_base(addr,base) \
 __asm__("movw %%dx,%0\n\t" \
@@ -380,7 +380,7 @@ __asm__("movw %%dx,%0\n\t" \
 	 "m" (*((addr)+4)), \
 	 "m" (*((addr)+7)), \
 	 "d" (base) \
-	:"dx")
+	)
 
 #define _set_limit(addr,limit) \
 __asm__("movw %%dx,%0\n\t" \
@@ -393,7 +393,7 @@ __asm__("movw %%dx,%0\n\t" \
 	:"m" (*(addr)), \
 	 "m" (*((addr)+6)), \
 	 "d" (limit) \
-	:"dx")
+	)
 
 #define set_base(ldt,base) _set_base( ((char *)&(ldt)) , base )
 #define set_limit(ldt,limit) _set_limit( ((char *)&(ldt)) , (limit-1)>>12 )
@@ -403,7 +403,7 @@ __asm__("movw %%dx,%0\n\t" \
  * to keep them correct. Use only these two functions to add/remove
  * entries in the queues.
  */
-extern inline void add_wait_queue(struct wait_queue ** p, struct wait_queue * wait)
+static inline void add_wait_queue(struct wait_queue ** p, struct wait_queue * wait)
 {
 	unsigned long flags;
 
@@ -427,7 +427,7 @@ extern inline void add_wait_queue(struct wait_queue ** p, struct wait_queue * wa
 	restore_flags(flags);
 }
 
-extern inline void remove_wait_queue(struct wait_queue ** p, struct wait_queue * wait)
+static inline void remove_wait_queue(struct wait_queue ** p, struct wait_queue * wait)
 {
 	unsigned long flags;
 	struct wait_queue * tmp;
@@ -466,7 +466,7 @@ extern inline void remove_wait_queue(struct wait_queue ** p, struct wait_queue *
 #endif
 }
 
-extern inline void select_wait(struct wait_queue ** wait_address, select_table * p)
+static inline void select_wait(struct wait_queue ** wait_address, select_table * p)
 {
 	struct select_table_entry * entry;
 
@@ -484,14 +484,14 @@ extern inline void select_wait(struct wait_queue ** wait_address, select_table *
 
 extern void __down(struct semaphore * sem);
 
-extern inline void down(struct semaphore * sem)
+static inline void down(struct semaphore * sem)
 {
 	if (sem->count <= 0)
 		__down(sem);
 	sem->count--;
 }
 
-extern inline void up(struct semaphore * sem)
+static inline void up(struct semaphore * sem)
 {
 	sem->count++;
 	wake_up(&sem->wait);
@@ -563,6 +563,6 @@ extern struct desc_struct default_ldt;
 			"movl %%edx,%%db" #register "\n\t" \
 			: /* no output */ \
 			:"m" (current->debugreg[register]) \
-			:"dx");
+			);
 
 #endif

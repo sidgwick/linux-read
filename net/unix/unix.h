@@ -50,6 +50,7 @@ extern struct unix_proto_data unix_datas[NSOCKETS];
 
 
 #define UN_DATA(SOCK) 		((struct unix_proto_data *)(SOCK)->data)
+#define UN_DATA_FIX(SOCK) 		((SOCK)->data)
 #define UN_PATH_OFFSET		((unsigned long)((struct sockaddr_un *)0) \
 							->sun_path)
 
