@@ -4,6 +4,10 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#define STRINGIZE(x) STRINGIZE2(x)
+#define STRINGIZE2(x) #x
+#define LINE_STRING STRINGIZE(__LINE__)
+
 /*
  * This file builds a disk-image from three different files:
  *
@@ -20,6 +24,7 @@
  * Changes by tytso to allow root device specification
  */
 
+#include <stdarg.h>
 #include <stdio.h>	/* fprintf */
 #include <string.h>
 #include <stdlib.h>	/* contains exit */
@@ -71,15 +76,19 @@ short intel_short(short l)
 	return t.s[0];
 }
 
-void die(char * str)
+void die(char * str, ...)
 {
-	fprintf(stderr,"%s\n",str);
+	va_list arg;
+
+	va_start(arg,str);
+
+	vfprintf(stderr,str, arg);
 	exit(1);
 }
 
 void usage(void)
 {
-	die("Usage: build bootsect setup system [rootdev] [> image]");
+	die(LINE_STRING " : ""Usage: build bootsect setup system [rootdev] [> image]");
 }
 
 int main(int argc, char ** argv)
@@ -97,14 +106,14 @@ int main(int argc, char ** argv)
 		if (!strcmp(argv[4], "CURRENT")) {
 			if (stat("/", &sb)) {
 				perror("/");
-				die("Couldn't stat /");
+				die(LINE_STRING " : ""Couldn't stat /");
 			}
 			major_root = major(sb.st_dev);
 			minor_root = minor(sb.st_dev);
 		} else if (strcmp(argv[4], "FLOPPY")) {
 			if (stat(argv[4], &sb)) {
 				perror(argv[4]);
-				die("Couldn't stat root device.");
+				die(LINE_STRING " : ""Couldn't stat root device.");
 			}
 			major_root = major(sb.st_rdev);
 			minor_root = minor(sb.st_rdev);
@@ -119,58 +128,58 @@ int main(int argc, char ** argv)
 	fprintf(stderr, "Root device is (%d, %d)\n", major_root, minor_root);
 	for (i=0;i<sizeof buf; i++) buf[i]=0;
 	if ((id=open(argv[1],O_RDONLY,0))<0)
-		die("Unable to open 'boot'");
+		die(LINE_STRING " : ""Unable to open 'boot'");
 	if (read(id,buf,MINIX_HEADER) != MINIX_HEADER)
-		die("Unable to read header of 'boot'");
-	if (((long *) buf)[0]!=intel_long(0x04100301))
-		die("Non-Minix header of 'boot'");
-	if (((long *) buf)[1]!=intel_long(MINIX_HEADER))
-		die("Non-Minix header of 'boot'");
-	if (((long *) buf)[3] != 0)
-		die("Illegal data segment in 'boot'");
-	if (((long *) buf)[4] != 0)
-		die("Illegal bss in 'boot'");
-	if (((long *) buf)[5] != 0)
-		die("Non-Minix header of 'boot'");
-	if (((long *) buf)[7] != 0)
-		die("Illegal symbol table in 'boot'");
+		die(LINE_STRING " : ""Unable to read header of 'boot'");
+	if (((int32_t *) buf)[0]!=0x04100301)
+		die(LINE_STRING " : ""Non-Minix header of 'boot'");
+	if (((int32_t *) buf)[1]!=MINIX_HEADER)
+		die(LINE_STRING " : ""Non-Minix header of 'boot'");
+	if (((int32_t *) buf)[3] != 0)
+		die(LINE_STRING " : ""Illegal data segment in 'boot'");
+	if (((int32_t *) buf)[4] != 0)
+		die(LINE_STRING " : ""Illegal bss in 'boot'");
+	if (((int32_t *) buf)[5] != 0)
+		die(LINE_STRING " : ""Non-Minix header of 'boot'");
+	if (((int32_t *) buf)[7] != 0)
+		die(LINE_STRING " : ""Illegal symbol table in 'boot'");
 	i=read(id,buf,sizeof buf);
 	fprintf(stderr,"Boot sector %d bytes.\n",i);
 	if (i != 512)
-		die("Boot block must be exactly 512 bytes");
+		die(LINE_STRING " : ""Boot block must be exactly 512 bytes");
 	if ((*(unsigned short *)(buf+510)) != (unsigned short)intel_short(0xAA55))
-		die("Boot block hasn't got boot flag (0xAA55)");
+		die(LINE_STRING " : ""Boot block hasn't got boot flag (0xAA55)");
 	buf[508] = (char) minor_root;
 	buf[509] = (char) major_root;	
 	i=write(1,buf,512);
 	if (i!=512)
-		die("Write call failed");
+		die(LINE_STRING " : ""Write call failed");
 	close (id);
 	
 	if ((id=open(argv[2],O_RDONLY,0))<0)
-		die("Unable to open 'setup'");
+		die(LINE_STRING " : ""Unable to open 'setup'");
 	if (read(id,buf,MINIX_HEADER) != MINIX_HEADER)
-		die("Unable to read header of 'setup'");
-	if (((long *) buf)[0]!=intel_long(0x04100301))
-		die("Non-Minix header of 'setup'");
-	if (((long *) buf)[1]!=intel_long(MINIX_HEADER))
-		die("Non-Minix header of 'setup'");
-	if (((long *) buf)[3] != 0)
-		die("Illegal data segment in 'setup'");
-	if (((long *) buf)[4] != 0)
-		die("Illegal bss in 'setup'");
-	if (((long *) buf)[5] != 0)
-		die("Non-Minix header of 'setup'");
-	if (((long *) buf)[7] != 0)
-		die("Illegal symbol table in 'setup'");
+		die(LINE_STRING " : ""Unable to read header of 'setup'");
+	if (((int32_t *) buf)[0]!=0x04100301)
+		die(LINE_STRING " : ""Non-Minix header of 'setup'");
+	if (((int32_t *) buf)[1]!=MINIX_HEADER)
+		die(LINE_STRING " : ""Non-Minix header of 'setup'");
+	if (((int32_t *) buf)[3] != 0)
+		die(LINE_STRING " : ""Illegal data segment in 'setup'");
+	if (((int32_t *) buf)[4] != 0)
+		die(LINE_STRING " : ""Illegal bss in 'setup'");
+	if (((int32_t *) buf)[5] != 0)
+		die(LINE_STRING " : ""Non-Minix header of 'setup'");
+	if (((int32_t *) buf)[7] != 0)
+		die(LINE_STRING " : ""Illegal symbol table in 'setup'");
 	for (i=0 ; (c=read(id,buf,sizeof buf))>0 ; i+=c )
 		if (write(1,buf,c)!=c)
-			die("Write call failed");
+			die(LINE_STRING " : ""Write call failed");
 	if (c != 0)
-		die("read-error on 'setup'");
+		die(LINE_STRING " : ""read-error on 'setup'");
 	close (id);
 	if (i > SETUP_SECTS*512)
-		die("Setup exceeds " STRINGIFY(SETUP_SECTS)
+		die(LINE_STRING " : ""Setup exceeds " STRINGIFY(SETUP_SECTS)
 			" sectors - rewrite build/boot/setup");
 	fprintf(stderr,"Setup is %d bytes.\n",i);
 	for (c=0 ; c<sizeof(buf) ; c++)
@@ -180,48 +189,30 @@ int main(int argc, char ** argv)
 		if (c > sizeof(buf))
 			c = sizeof(buf);
 		if (write(1,buf,c) != c)
-			die("Write call failed");
+			die(LINE_STRING " : ""Write call failed");
 		i += c;
 	}
 	
-	if ((id=open(argv[3],O_RDONLY,0))<0)
-		die("Unable to open 'system'");
-	if (read(id,buf,GCC_HEADER) != GCC_HEADER)
-		die("Unable to read header of 'system'");
-	if (N_MAGIC(*ex) != ZMAGIC)
-		die("Non-GCC header of 'system'");
-	fprintf(stderr,"System is %d kB (%d kB code, %d kB data and %d kB bss)\n",
-		(ex->a_text+ex->a_data+ex->a_bss)/1024,
-		ex->a_text /1024,
-		ex->a_data /1024,
-		ex->a_bss  /1024);
-	sz = N_SYMOFF(*ex) - GCC_HEADER + 4;
-	sys_size = (sz + 15) / 16;
-	if (sys_size > SYS_SIZE)
-		die("System is too big");
-	while (sz > 0) {
-		int l, n;
+    int n;
+    sys_size = 0;
 
-		l = sz;
-		if (l > sizeof(buf))
-			l = sizeof(buf);
-		if ((n=read(id, buf, l)) != l) {
-			if (n == -1) 
-				perror(argv[1]);
-			else
-				fprintf(stderr, "Unexpected EOF\n");
-			die("Can't read 'system'");
-		}
-		if (write(1, buf, l) != l)
-			die("Write failed");
-		sz -= l;
-	}
+	if ((id=open(argv[3],O_RDONLY,0))<0)
+		die(LINE_STRING " : ""Unable to open 'system'");
+
+    while ((n=read(id, buf, 1024)) > 0) {
+        sys_size += n;
+		if (write(1, buf, n) != n)
+			die(LINE_STRING " : ""Write failed");
+    }
+
+	fprintf(stderr,"System is %d kB\n", sys_size/1024);
+
 	close(id);
 	if (lseek(1,500,0) == 500) {
 		buf[0] = (sys_size & 0xff);
 		buf[1] = ((sys_size >> 8) & 0xff);
 		if (write(1, buf, 2) != 2)
-			die("Write failed");
+			die(LINE_STRING " : ""Write failed");
 	}
 	return(0);
 }
